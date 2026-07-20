@@ -9,13 +9,18 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 - construction continue des murs ;
 - murs portés par les arêtes et portes traversables ;
 - grille de navigation séparée ;
-- pathfinding A* ;
+- pathfinding A* respectant les murs dans les deux sens ;
+- vérification des collisions pendant le déplacement ;
 - plusieurs clients simultanés ;
 - arrivées manuelles ou automatiques ;
 - cycle client : entrée → rayon → caisse → sortie ;
 - choix de la caisse la moins chargée ;
-- files d’attente et encaissement séquentiel ;
+- files d’attente matérialisées près des caisses ;
+- encaissement séquentiel ;
+- patience limitée et abandon des files trop longues ;
+- satisfaction et temps d’attente moyen ;
 - stock propre à chaque rayon ;
+- compteur de stock actualisé après chaque achat ;
 - rupture de stock visible ;
 - réapprovisionnement global ;
 - trésorerie, chiffre d’affaires, résultat et compteurs clients ;
@@ -49,26 +54,27 @@ Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:517
 ## Scénario de test
 
 1. Construire au moins un rayon et une caisse.
-2. Vérifier la trésorerie dans le panneau supérieur.
-3. Appuyer plusieurs fois sur `C`, ou activer `S`.
-4. Observer les clients choisir une caisse et attendre leur tour.
-5. Attendre que le stock diminue et qu’un rayon passe en rupture.
-6. Appuyer sur `A` pour acheter le stock manquant.
-7. Observer l’évolution du chiffre d’affaires et du résultat.
+2. Entourer une zone avec des murs et conserver une ouverture ou une porte.
+3. Appuyer sur `C` et vérifier que le client contourne les murs.
+4. Ajouter un mur sur son trajet pour vérifier qu’il refuse de le traverser.
+5. Générer plusieurs clients et observer les files matérialisées.
+6. Vérifier que les compteurs `stock/capacité` diminuent après chaque achat.
+7. Observer la satisfaction et le temps d’attente moyen.
+8. Appuyer sur `A` pour acheter le stock manquant.
 
 ## Architecture
 
-- `GridManager` : occupation des cellules et des arêtes ;
+- `GridManager` : occupation des cellules, arêtes et règles de collision ;
 - `NavigationGrid` : calcul A* et règles de traversée ;
-- `CustomerAgent` : représentation et déplacement d’un client ;
-- `StoreSimulation` : stocks, files de caisse et économie ;
+- `CustomerAgent` : représentation, humeur et déplacement sécurisé d’un client ;
+- `StoreSimulation` : stocks, files, patience, satisfaction et économie ;
 - `StoreScene` : orchestration, entrées et rendu Phaser.
 
 ## Prochaines étapes
 
-1. Représenter physiquement les positions dans les files de caisse.
-2. Ajouter plusieurs produits et affecter un produit à chaque rayon.
-3. Ajouter une horloge, des journées et un bilan de fermeture.
-4. Ajouter satisfaction, patience et abandon des files trop longues.
+1. Ajouter plusieurs catégories de produits et affecter un produit à chaque rayon.
+2. Ajouter une horloge, des journées et un bilan de fermeture.
+3. Déplacer réellement les clients sur des positions successives dans les files.
+4. Ajouter ouverture et fermeture individuelles des caisses.
 5. Déplacer le HUD et les outils de gestion vers Vue et Pinia.
 6. Ajouter sauvegarde et chargement du magasin.
