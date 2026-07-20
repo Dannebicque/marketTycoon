@@ -17,20 +17,18 @@
       <dl>
         <div><dt>C</dt><dd>Ajouter un client</dd></div>
         <div><dt>Maj + S</dt><dd>Arrivées automatiques</dd></div>
-        <div><dt>A</dt><dd>Réapprovisionner</dd></div>
+        <div><dt>Maj + A</dt><dd>Réapprovisionner</dd></div>
         <div><dt>N</dt><dd>Jour suivant</dd></div>
       </dl>
 
-      <h2>Caméra</h2>
+      <h2>Vue — AZERTY</h2>
       <dl>
-        <div><dt>Q / E</dt><dd>Tourner la scène</dd></div>
-        <div><dt>Flèches</dt><dd>Déplacer la vue</dd></div>
-        <div><dt>Bouton central</dt><dd>Faire glisser la vue</dd></div>
+        <div><dt>A / E</dt><dd>Tourner la scène</dd></div>
+        <div><dt>ZQSD</dt><dd>Déplacer la caméra</dd></div>
+        <div><dt>Flèches</dt><dd>Déplacer la caméra</dd></div>
+        <div><dt>Bouton central</dt><dd>Déplacer à la souris</dd></div>
         <div><dt>Molette</dt><dd>Zoomer</dd></div>
       </dl>
-
-      <h2>Fonctionnement</h2>
-      <p>Les clients prennent 1 à 9 articles sur plusieurs rayons. Le temps de caisse dépend du panier et du paiement.</p>
 
       <h2>Construction</h2>
       <dl>
@@ -51,6 +49,54 @@ import { StoreScene } from './game/StoreScene'
 const gameContainer = ref<HTMLElement | null>(null)
 let game: Phaser.Game | null = null
 
+type SceneCommands = {
+  rotateScene: (step: -1 | 1) => void
+  restock: () => void
+  toggleAutoSpawn: () => void
+}
+
+function getStoreScene(): SceneCommands | null {
+  const scene = game?.scene.getScene('StoreScene')
+  return scene ? scene as unknown as SceneCommands : null
+}
+
+function handleAzertyShortcuts(event: KeyboardEvent) {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+  const target = event.target as HTMLElement | null
+  if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
+
+  const key = event.key.toLocaleLowerCase('fr-FR')
+  const scene = getStoreScene()
+  if (!scene) return
+
+  if (!event.shiftKey && key === 'a') {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    scene.rotateScene(-1)
+    return
+  }
+
+  if (!event.shiftKey && key === 'e') {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    scene.rotateScene(1)
+    return
+  }
+
+  if (event.shiftKey && key === 'a') {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    scene.restock()
+    return
+  }
+
+  if (event.shiftKey && key === 's') {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    scene.toggleAutoSpawn()
+  }
+}
+
 onMounted(() => {
   if (!gameContainer.value) return
   game = new Phaser.Game({
@@ -63,7 +109,11 @@ onMounted(() => {
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     render: { antialias: true },
   })
+  window.addEventListener('keydown', handleAzertyShortcuts, { capture: true })
 })
 
-onBeforeUnmount(() => game?.destroy(true))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true })
+  game?.destroy(true)
+})
 </script>
