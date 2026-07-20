@@ -9,7 +9,7 @@ import {
   type PlacedEdge,
 } from './GridManager'
 import { NavigationGrid } from './NavigationGrid'
-import { StoreSimulation } from './StoreSimulation'
+import { StoreSimulation, type BasketLine, type PaymentMethod } from './StoreSimulation'
 
 const BUILDINGS: Record<string, BuildingDefinition> = {
   shelf: { type: 'shelf', width: 1, height: 3, price: 100 },
@@ -18,7 +18,11 @@ const BUILDINGS: Record<string, BuildingDefinition> = {
   door: { type: 'door', width: 1, height: 1, price: 150 },
 }
 
-const MAX_QUEUE_WAIT_MS = 9_000
+const MAX_QUEUE_WAIT_MS = 18_000
+const OPENING_MINUTES = 8 * 60
+const CLOSING_MINUTES = 20 * 60
+const CLOCK_STEP_MINUTES = 10
+const CLOCK_STEP_MS = 750
 
 export class StoreScene extends Phaser.Scene {
   private grid = new GridManager(16, 16, 64, 32, 700, 80)
@@ -35,6 +39,8 @@ export class StoreScene extends Phaser.Scene {
   private selectedLabel!: Phaser.GameObjects.Text
   private statusLabel!: Phaser.GameObjects.Text
   private metricsLabel!: Phaser.GameObjects.Text
+  private clockLabel!: Phaser.GameObjects.Text
+  private summaryLabel?: Phaser.GameObjects.Text
   private shelfLabels: Phaser.GameObjects.Text[] = []
   private queueLabels: Phaser.GameObjects.Text[] = []
   private isDragging = false
@@ -43,6 +49,10 @@ export class StoreScene extends Phaser.Scene {
   private nextCustomer = 1
   private autoSpawn = false
   private spawnTimer?: Phaser.Time.TimerEvent
+  private clockTimer?: Phaser.Time.TimerEvent
+  private day = 1
+  private currentMinutes = OPENING_MINUTES
+  private storeOpen = true
 
   constructor() { super('StoreScene') }
 
@@ -55,10 +65,14 @@ export class StoreScene extends Phaser.Scene {
     this.selectedLabel = this.add.text(18, 18, '', this.textStyle(18)).setScrollFactor(0).setDepth(1000)
     this.statusLabel = this.add.text(18, 62, 'Placez au moins un rayon et une caisse.', this.textStyle(15, '#cbd5e1')).setScrollFactor(0).setDepth(1000)
     this.metricsLabel = this.add.text(18, 106, '', this.textStyle(14, '#bfdbfe')).setScrollFactor(0).setDepth(1000)
+    this.clockLabel = this.add.text(18, 178, '', this.textStyle(16, '#fde68a')).setScrollFactor(0).setDepth(1000)
 
     this.updateSelectedLabel()
     this.updateMetrics()
+    this.updateClockLabel()
     this.drawGrid()
+    this.simulation.startDay()
+    this.startClock()
     this.input.mouse?.disableContextMenu()
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -100,6 +114,7 @@ export class StoreScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-C', () => void this.spawnCustomer())
     this.input.keyboard?.on('keydown-S', () => this.toggleAutoSpawn())
     this.input.keyboard?.on('keydown-A', () => this.restock())
+    this.input.keyboard?.on('keydown-N', () => this.startNextDay())
     this.input.keyboard?.on('keydown-ESC', () => {
       this.previewLayer.clear()
       this.hovered = { x: -1, y: -1 }
@@ -111,6 +126,71 @@ export class StoreScene extends Phaser.Scene {
 
   private textStyle(fontSize: number, color = '#ffffff'): Phaser.Types.GameObjects.Text.TextStyle {
     return { fontFamily: 'Arial', fontSize: `${fontSize}px`, color, backgroundColor: '#111827dd', padding: { x: 10, y: 7 } }
+  }
+
+  private startClock() {
+    this.clockTimer?.destroy()
+    this.clockTimer = this.time.addEvent({
+      delay: CLOCK_STEP_MS,
+      loop: true,
+      callback: () => {
+        if (!this.storeOpen) return
+        this.currentMinutes += CLOCK_STEP_MINUTES
+        if (this.currentMinutes >= CLOSING_MINUTES) this.closeStore()
+        this.updateClockLabel()
+      },
+    })
+  }
+
+  private closeStore() {
+    if (!this.storeOpen) return
+    this.storeOpen = false
+    this.currentMinutes = CLOSING_MINUTES
+    this.autoSpawn = false
+    this.spawnTimer?.destroy()
+    this.spawnTimer = undefined
+    const snapshot = this.simulation.closeDay(this.day)
+    this.showDaySummary(snapshot)
+    this.setStatus('Magasin fermé. Les clients présents terminent leurs achats.', '#fbbf24')
+    this.updateMetrics()
+  }
+
+  private showDaySummary(snapshot: ReturnType<StoreSimulation['closeDay']>) {
+    this.summaryLabel?.destroy()
+    this.summaryLabel = this.add.text(this.scale.width - 20, 20,
+      `Bilan jour ${snapshot.day}\n` +
+      `CA : ${snapshot.revenue.toFixed(0)} €\n` +
+      `Résultat : ${snapshot.profit.toFixed(0)} €\n` +
+      `Clients servis : ${snapshot.servedCustomers}\n` +
+      `Clients perdus : ${snapshot.lostCustomers}\n` +
+      `Articles vendus : ${snapshot.articlesSold}\n` +
+      `Satisfaction : ${snapshot.averageSatisfaction.toFixed(0)} %\n` +
+      `Attente : ${snapshot.averageQueueSeconds.toFixed(1)} s\n\n` +
+      `Appuyez sur N pour le jour suivant`,
+      this.textStyle(15, '#fef3c7'),
+    ).setOrigin(1, 0).setScrollFactor(0).setDepth(1200)
+  }
+
+  private startNextDay() {
+    if (this.storeOpen || this.customers.size > 0) {
+      this.setStatus(this.storeOpen ? 'La journée est déjà en cours.' : 'Attendez le départ des derniers clients.', '#fbbf24')
+      return
+    }
+    this.day += 1
+    this.currentMinutes = OPENING_MINUTES
+    this.storeOpen = true
+    this.summaryLabel?.destroy()
+    this.summaryLabel = undefined
+    this.simulation.startDay()
+    this.setStatus(`Jour ${this.day} ouvert.`, '#86efac')
+    this.updateClockLabel()
+    this.updateMetrics()
+  }
+
+  private updateClockLabel() {
+    const hours = Math.floor(this.currentMinutes / 60)
+    const minutes = this.currentMinutes % 60
+    this.clockLabel.setText(`Jour ${this.day} · ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} · ${this.storeOpen ? 'OUVERT' : 'FERMÉ'}`)
   }
 
   private placeSelected() {
@@ -136,9 +216,7 @@ export class StoreScene extends Phaser.Scene {
     }
   }
 
-  private syncSimulation() {
-    this.simulation.syncBuildings(this.grid.getBuildings())
-  }
+  private syncSimulation() { this.simulation.syncBuildings(this.grid.getBuildings()) }
 
   private select(type: keyof typeof BUILDINGS) {
     this.selected = BUILDINGS[type]
@@ -156,11 +234,15 @@ export class StoreScene extends Phaser.Scene {
   }
 
   private toggleAutoSpawn() {
+    if (!this.storeOpen) {
+      this.setStatus('Le magasin est fermé.', '#f87171')
+      return
+    }
     this.autoSpawn = !this.autoSpawn
     this.spawnTimer?.destroy()
     this.spawnTimer = undefined
     if (this.autoSpawn) {
-      this.spawnTimer = this.time.addEvent({ delay: 2600, loop: true, callback: () => void this.spawnCustomer() })
+      this.spawnTimer = this.time.addEvent({ delay: 2_000, loop: true, callback: () => void this.spawnCustomer() })
       this.setStatus('Arrivées automatiques activées.', '#86efac')
     } else {
       this.setStatus('Arrivées automatiques désactivées.')
@@ -176,105 +258,103 @@ export class StoreScene extends Phaser.Scene {
   }
 
   private async spawnCustomer() {
+    if (!this.storeOpen) {
+      this.setStatus('Le magasin est fermé.', '#f87171')
+      return
+    }
     this.syncSimulation()
     const shelves = this.grid.getBuildings('shelf')
     const checkouts = this.grid.getBuildings('checkout')
-    const shelf = this.simulation.getAvailableShelf(shelves)
+    const shoppingPlan = this.simulation.createShoppingPlan(shelves)
     const checkout = this.simulation.chooseCheckout(checkouts)
-    if (!shelf || !checkout) {
+    if (!shoppingPlan.length || !checkout) {
       this.simulation.metrics.lostCustomers += 1
-      this.setStatus(!shelf ? 'Aucun rayon approvisionné disponible.' : 'Aucune caisse disponible.', '#fbbf24')
+      this.setStatus(!shoppingPlan.length ? 'Aucun rayon approvisionné disponible.' : 'Aucune caisse disponible.', '#fbbf24')
       this.updateMetrics()
       return
     }
 
     const id = `C${this.nextCustomer++}`
     const entry: GridCell = { x: 0, y: 0 }
-    const shelfPath = this.navigation.findPathToAny(entry, this.grid.getAdjacentWalkableCells(shelf))
-    const checkoutPath = shelfPath.length
-      ? this.navigation.findPathToAny(shelfPath.at(-1)!, this.grid.getAdjacentWalkableCells(checkout))
-      : []
-    const exitPath = checkoutPath.length ? this.navigation.findPath(checkoutPath.at(-1)!, entry) : []
-    if (!shelfPath.length || !checkoutPath.length || !exitPath.length) {
-      this.simulation.metrics.lostCustomers += 1
-      this.setStatus(`Le client ${id} ne trouve pas de parcours complet.`, '#f87171')
-      this.updateMetrics()
-      return
-    }
-
     const colors = [0xf97316, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899, 0xeab308]
     const customer = new CustomerAgent(this, this.grid, id, entry, colors[this.nextCustomer % colors.length])
     this.customers.set(id, customer)
-    void this.runCustomerCycle(customer, shelf, checkout, shelfPath, checkoutPath, exitPath)
+    void this.runCustomerCycle(customer, shoppingPlan, checkout)
     this.updateMetrics()
   }
 
   private async runCustomerCycle(
     customer: CustomerAgent,
-    shelf: PlacedBuilding,
+    shoppingPlan: Array<{ shelf: PlacedBuilding; requestedQuantity: number }>,
     checkout: PlacedBuilding,
-    shelfPath: GridCell[],
-    checkoutPath: GridCell[],
-    exitPath: GridCell[],
   ) {
     let queued = false
     let satisfaction = 100
+    const basketLines: BasketLine[] = []
     try {
-      this.setStatus(`${customer.id} se dirige vers un rayon…`)
-      this.drawPath(shelfPath)
-      await customer.follow(shelfPath)
-      await this.wait(450)
-      const product = this.simulation.takeProduct(shelf.id)
-      if (!product) throw new Error('stock')
-      this.drawBuildings()
-      this.updateMetrics()
+      for (const planned of shoppingPlan) {
+        const path = this.navigation.findPathToAny(customer.position, this.grid.getAdjacentWalkableCells(planned.shelf))
+        if (!path.length) continue
+        this.setStatus(`${customer.id} cherche ${this.simulation.getShelfState(planned.shelf.id)?.product.name ?? 'un produit'}…`)
+        this.drawPath(path)
+        await customer.follow(path)
+        await this.wait(650)
+        const line = this.simulation.takeItems(planned.shelf.id, planned.requestedQuantity)
+        if (line) basketLines.push(line)
+        const basket = this.simulation.summarizeBasket(basketLines)
+        customer.setBasketCount(basket.articleCount)
+        this.drawBuildings()
+        this.updateMetrics()
+      }
 
+      const basket = this.simulation.summarizeBasket(basketLines)
+      if (basket.articleCount === 0) throw new Error('empty-basket')
+
+      const checkoutPath = this.navigation.findPathToAny(customer.position, this.grid.getAdjacentWalkableCells(checkout))
+      if (!checkoutPath.length) throw new Error('checkout-blocked')
       const position = this.simulation.enqueue(checkout.id, customer.id)
       queued = true
-      this.setStatus(`${customer.id} rejoint la caisse · position ${position + 1}.`)
+      this.setStatus(`${customer.id} rejoint la caisse avec ${basket.articleCount} article(s) · position ${position + 1}.`)
       this.drawPath(checkoutPath)
       await customer.follow(checkoutPath)
-      this.drawQueues()
+      await this.repositionQueue(checkout)
 
       const queueStartedAt = performance.now()
       while (!this.simulation.isFirst(checkout.id, customer.id)) {
         const queueTime = performance.now() - queueStartedAt
-        satisfaction = Math.max(0, 100 - Math.round(queueTime / 90))
+        satisfaction = Math.max(0, 100 - Math.round(queueTime / 180))
         customer.setMood(satisfaction)
-        this.drawQueues()
+        await this.repositionQueue(checkout)
         this.updateMetrics()
         if (queueTime >= MAX_QUEUE_WAIT_MS) throw new Error('impatient')
-        await this.wait(250)
+        await this.wait(350)
       }
 
       const queueTimeMs = performance.now() - queueStartedAt
-      satisfaction = Math.max(20, 100 - Math.round(queueTimeMs / 100))
+      const payment = this.simulation.choosePaymentMethod()
+      const checkoutDuration = this.simulation.getCheckoutDurationMs(basket.articleCount, payment)
+      satisfaction = Math.max(15, 100 - Math.round(queueTimeMs / 180) - Math.round(checkoutDuration / 800))
       customer.setMood(satisfaction)
       this.simulation.startCheckout(checkout.id)
-      this.setStatus(`${customer.id} est en cours d’encaissement…`)
-      await this.wait(900)
-      this.simulation.finishCheckout(
-        checkout.id,
-        customer.id,
-        product.salePrice,
-        product.purchasePrice,
-        queueTimeMs,
-        satisfaction,
-      )
+      await this.moveCustomerToCheckout(customer, checkout)
+      this.setStatus(`${customer.id} : ${basket.articleCount} article(s), paiement ${this.paymentLabel(payment)} · ${(checkoutDuration / 1000).toFixed(1)} s.`)
+      await this.wait(checkoutDuration)
+      this.simulation.finishCheckout(checkout.id, customer.id, basket, payment, queueTimeMs, satisfaction)
       queued = false
-      this.drawQueues()
+      await this.repositionQueue(checkout)
 
-      const refreshedExitPath = this.navigation.findPath(customer.position, { x: 0, y: 0 })
-      if (!refreshedExitPath.length) throw new Error('exit-blocked')
-      this.drawPath(refreshedExitPath)
-      await customer.follow(refreshedExitPath)
-      this.setStatus(`${customer.id} a terminé ses achats · satisfaction ${satisfaction} %.`, '#86efac')
+      const exitPath = this.navigation.findPath(customer.position, { x: 0, y: 0 })
+      if (!exitPath.length) throw new Error('exit-blocked')
+      this.drawPath(exitPath)
+      await customer.follow(exitPath)
+      this.setStatus(`${customer.id} a payé ${basket.saleTotal.toFixed(0)} € · satisfaction ${satisfaction} %.`, '#86efac')
     } catch (error) {
       this.simulation.abandon(queued ? checkout.id : undefined, customer.id, satisfaction)
       const reason = error instanceof Error && error.message === 'impatient'
         ? 'a perdu patience dans la file.'
-        : 'quitte le magasin sans achat.'
+        : 'quitte le magasin sans finaliser ses achats.'
       this.setStatus(`${customer.id} ${reason}`, '#f87171')
+      await this.repositionQueue(checkout)
     } finally {
       customer.destroy()
       this.customers.delete(customer.id)
@@ -285,20 +365,44 @@ export class StoreScene extends Phaser.Scene {
     }
   }
 
+  private paymentLabel(payment: PaymentMethod) {
+    return payment === 'contactless' ? 'sans contact' : payment === 'card' ? 'carte' : 'espèces'
+  }
+
+  private async repositionQueue(checkout: PlacedBuilding) {
+    const queue = this.simulation.getQueue(checkout.id)
+    const adjacent = this.grid.getAdjacentWalkableCells(checkout)[0]
+    if (!adjacent) return
+    const base = this.grid.gridToScreen(adjacent.x, adjacent.y)
+    const moves = queue.map((customerId, index) => {
+      const customer = this.customers.get(customerId)
+      if (!customer) return Promise.resolve()
+      return customer.moveVisualTo(base.x - index * 24, base.y + 26 + index * 14, 220)
+    })
+    await Promise.all(moves)
+    this.drawQueues()
+  }
+
+  private async moveCustomerToCheckout(customer: CustomerAgent, checkout: PlacedBuilding) {
+    const adjacent = this.grid.getAdjacentWalkableCells(checkout)[0]
+    if (!adjacent) return
+    const p = this.grid.gridToScreen(adjacent.x, adjacent.y)
+    await customer.moveVisualTo(p.x + 8, p.y + 18, 180)
+  }
+
   private wait(duration: number) {
     return new Promise<void>(resolve => this.time.delayedCall(duration, resolve))
   }
 
-  private setStatus(message: string, color = '#cbd5e1') {
-    this.statusLabel.setText(message).setColor(color)
-  }
+  private setStatus(message: string, color = '#cbd5e1') { this.statusLabel.setText(message).setColor(color) }
 
   private updateMetrics() {
     const m = this.simulation.metrics
     this.metricsLabel.setText(
       `Trésorerie ${m.cash.toFixed(0)} € · CA ${m.revenue.toFixed(0)} € · Résultat ${m.profit.toFixed(0)} €\n` +
-      `Clients ${this.customers.size} · Servis ${m.servedCustomers} · Perdus ${m.lostCustomers} · Stock ${this.simulation.getTotalStock()} · Auto ${this.autoSpawn ? 'ON' : 'OFF'}\n` +
-      `Satisfaction ${this.simulation.getAverageSatisfaction().toFixed(0)} % · Attente moyenne ${this.simulation.getAverageQueueSeconds().toFixed(1)} s`,
+      `Clients ${this.customers.size} · Servis ${m.servedCustomers} · Perdus ${m.lostCustomers} · Articles ${m.articlesSold} · Stock ${this.simulation.getTotalStock()}\n` +
+      `Satisfaction ${this.simulation.getAverageSatisfaction().toFixed(0)} % · Attente ${this.simulation.getAverageQueueSeconds().toFixed(1)} s · Auto ${this.autoSpawn ? 'ON' : 'OFF'}\n` +
+      `Paiements : sans contact ${m.contactlessPayments} · carte ${m.cardPayments} · espèces ${m.cashPayments}`,
     )
   }
 
@@ -351,14 +455,14 @@ export class StoreScene extends Phaser.Scene {
     const shelfState = building.definition.type === 'shelf' ? this.simulation.getShelfState(building.id) : undefined
     for (const cell of this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)) {
       const p = this.grid.gridToScreen(cell.x, cell.y)
-      if (building.definition.type === 'shelf') this.box(p.x, p.y, 44, shelfState?.stock ? 0xb07a4f : 0x64748b)
+      if (building.definition.type === 'shelf') this.box(p.x, p.y, 44, shelfState?.stock ? shelfState.product.color : 0x64748b)
       if (building.definition.type === 'checkout') this.box(p.x, p.y, 24, 0x2563eb)
     }
     if (shelfState) {
       const p = this.grid.gridToScreen(building.gridX, building.gridY)
-      this.buildingsLayer.fillStyle(0xffffff, .95).fillRoundedRect(p.x - 15, p.y - 66, 30, 15, 4)
-      const label = this.add.text(p.x, p.y - 59, `${shelfState.stock}/${shelfState.capacity}`, {
-        fontSize: '10px', color: '#111827', fontStyle: 'bold',
+      this.buildingsLayer.fillStyle(0xffffff, .95).fillRoundedRect(p.x - 24, p.y - 70, 48, 20, 4)
+      const label = this.add.text(p.x, p.y - 60, `${shelfState.product.shortName} ${shelfState.stock}/${shelfState.capacity}`, {
+        fontSize: '9px', color: '#111827', fontStyle: 'bold',
       }).setOrigin(.5).setDepth(35)
       this.shelfLabels.push(label)
     }
@@ -374,9 +478,10 @@ export class StoreScene extends Phaser.Scene {
       if (!adjacent) continue
       const p = this.grid.gridToScreen(adjacent.x, adjacent.y)
       queue.forEach((customerId, index) => {
-        const y = p.y + 18 + index * 10
-        this.queueLayer.fillStyle(0x38bdf8, .75).fillCircle(p.x, y, 4)
-        const label = this.add.text(p.x + 8, y, customerId, { fontSize: '9px', color: '#bae6fd' }).setOrigin(0, .5).setDepth(34)
+        const x = p.x - index * 24
+        const y = p.y + 26 + index * 14
+        this.queueLayer.lineStyle(2, 0x38bdf8, .7).strokeCircle(x, y, 10)
+        const label = this.add.text(x, y + 14, `${index + 1}`, { fontSize: '9px', color: '#bae6fd' }).setOrigin(.5).setDepth(34)
         this.queueLabels.push(label)
       })
     }
