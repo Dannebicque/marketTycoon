@@ -8,14 +8,17 @@ export class CustomerAgent {
   constructor(
     private scene: Phaser.Scene,
     private grid: GridManager,
+    readonly id: string,
     start: GridCell,
+    color: number,
   ) {
     this.current = start
     const p = this.grid.gridToScreen(start.x, start.y)
     const shadow = scene.add.ellipse(0, 10, 22, 10, 0x000000, .25)
-    const body = scene.add.circle(0, -2, 9, 0xf97316)
+    const body = scene.add.circle(0, -2, 9, color)
     const head = scene.add.circle(0, -17, 6, 0xf5c2a8)
-    this.sprite = scene.add.container(p.x, p.y + 10, [shadow, body, head]).setDepth(100)
+    const label = scene.add.text(0, -32, id.slice(-2), { fontSize: '9px', color: '#ffffff' }).setOrigin(.5)
+    this.sprite = scene.add.container(p.x, p.y + 10, [shadow, body, head, label]).setDepth(100)
   }
 
   get position() {
