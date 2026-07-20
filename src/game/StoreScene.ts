@@ -9,6 +9,7 @@ import {
   type PlacedEdge,
 } from './GridManager'
 import { NavigationGrid } from './NavigationGrid'
+import { StoreSimulation } from './StoreSimulation'
 
 const BUILDINGS: Record<string, BuildingDefinition> = {
   shelf: { type: 'shelf', width: 1, height: 3, price: 100 },
@@ -20,6 +21,7 @@ const BUILDINGS: Record<string, BuildingDefinition> = {
 export class StoreScene extends Phaser.Scene {
   private grid = new GridManager(16, 16, 64, 32, 700, 80)
   private navigation = new NavigationGrid(this.grid)
+  private simulation = new StoreSimulation()
   private gridLayer!: Phaser.GameObjects.Graphics
   private pathLayer!: Phaser.GameObjects.Graphics
   private buildingsLayer!: Phaser.GameObjects.Graphics
@@ -29,10 +31,13 @@ export class StoreScene extends Phaser.Scene {
   private selected: BuildingDefinition = BUILDINGS.shelf
   private selectedLabel!: Phaser.GameObjects.Text
   private statusLabel!: Phaser.GameObjects.Text
+  private metricsLabel!: Phaser.GameObjects.Text
   private isDragging = false
   private lastDragKey = ''
-  private customer?: CustomerAgent
-  private customerRunning = false
+  private customers = new Map<string, CustomerAgent>()
+  private nextCustomer = 1
+  private autoSpawn = false
+  private spawnTimer?: Phaser.Time.TimerEvent
 
   constructor() { super('StoreScene') }
 
@@ -41,14 +46,12 @@ export class StoreScene extends Phaser.Scene {
     this.pathLayer = this.add.graphics().setDepth(20)
     this.buildingsLayer = this.add.graphics().setDepth(30)
     this.previewLayer = this.add.graphics().setDepth(40)
-    this.selectedLabel = this.add.text(18, 18, '', {
-      fontFamily: 'Arial', fontSize: '18px', color: '#fff', backgroundColor: '#111827dd', padding: { x: 10, y: 8 },
-    }).setScrollFactor(0).setDepth(1000)
-    this.statusLabel = this.add.text(18, 62, 'Construisez un rayon et une caisse, puis appuyez sur C.', {
-      fontFamily: 'Arial', fontSize: '15px', color: '#cbd5e1', backgroundColor: '#111827cc', padding: { x: 10, y: 7 },
-    }).setScrollFactor(0).setDepth(1000)
+    this.selectedLabel = this.add.text(18, 18, '', this.textStyle(18)).setScrollFactor(0).setDepth(1000)
+    this.statusLabel = this.add.text(18, 62, 'Placez au moins un rayon et une caisse.', this.textStyle(15, '#cbd5e1')).setScrollFactor(0).setDepth(1000)
+    this.metricsLabel = this.add.text(18, 106, '', this.textStyle(14, '#bfdbfe')).setScrollFactor(0).setDepth(1000)
 
     this.updateSelectedLabel()
+    this.updateMetrics()
     this.drawGrid()
     this.input.mouse?.disableContextMenu()
 
@@ -63,6 +66,7 @@ export class StoreScene extends Phaser.Scene {
       if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
       if (pointer.rightButtonDown()) {
         this.grid.removeAt(this.hovered.x, this.hovered.y, this.direction)
+        this.syncSimulation()
       } else {
         this.isDragging = true
         this.lastDragKey = ''
@@ -70,6 +74,7 @@ export class StoreScene extends Phaser.Scene {
       }
       this.drawBuildings()
       this.drawPreview()
+      this.updateMetrics()
     })
 
     this.input.on('pointerup', () => {
@@ -86,25 +91,47 @@ export class StoreScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-TWO', () => this.select('checkout'))
     this.input.keyboard?.on('keydown-THREE', () => this.select('wall'))
     this.input.keyboard?.on('keydown-FOUR', () => this.select('door'))
-    this.input.keyboard?.on('keydown-C', () => void this.runCustomerCycle())
+    this.input.keyboard?.on('keydown-C', () => void this.spawnCustomer())
+    this.input.keyboard?.on('keydown-S', () => this.toggleAutoSpawn())
+    this.input.keyboard?.on('keydown-A', () => this.restock())
     this.input.keyboard?.on('keydown-ESC', () => {
       this.previewLayer.clear()
       this.hovered = { x: -1, y: -1 }
     })
     this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      this.cameras.main.setZoom(Phaser.Math.Clamp(this.cameras.main.zoom - dy * 0.001, .5, 2))
+      this.cameras.main.setZoom(Phaser.Math.Clamp(this.cameras.main.zoom - dy * .001, .5, 2))
     })
   }
 
+  private textStyle(fontSize: number, color = '#ffffff'): Phaser.Types.GameObjects.Text.TextStyle {
+    return { fontFamily: 'Arial', fontSize: `${fontSize}px`, color, backgroundColor: '#111827dd', padding: { x: 10, y: 7 } }
+  }
+
   private placeSelected() {
-    this.grid.place(this.selected, this.hovered.x, this.hovered.y, this.direction)
+    if (!this.simulation.canSpend(this.selected.price)) {
+      this.setStatus('Trésorerie insuffisante pour construire cet élément.', '#f87171')
+      return
+    }
+    if (this.grid.place(this.selected, this.hovered.x, this.hovered.y, this.direction)) {
+      this.simulation.spend(this.selected.price)
+      this.syncSimulation()
+    }
   }
 
   private placeDraggedWall() {
     const key = `${this.hovered.x}:${this.hovered.y}:${this.direction % 2}`
     if (key === this.lastDragKey || !this.grid.isInside(this.hovered.x, this.hovered.y)) return
     this.lastDragKey = key
-    if (this.grid.place(this.selected, this.hovered.x, this.hovered.y, this.direction)) this.drawBuildings()
+    if (!this.simulation.canSpend(this.selected.price)) return
+    if (this.grid.place(this.selected, this.hovered.x, this.hovered.y, this.direction)) {
+      this.simulation.spend(this.selected.price)
+      this.drawBuildings()
+      this.updateMetrics()
+    }
+  }
+
+  private syncSimulation() {
+    this.simulation.syncBuildings(this.grid.getBuildings())
   }
 
   private select(type: keyof typeof BUILDINGS) {
@@ -119,64 +146,105 @@ export class StoreScene extends Phaser.Scene {
     const orientation = this.selected.type === 'wall' || this.selected.type === 'door'
       ? (this.direction % 2 === 0 ? 'axe X' : 'axe Y')
       : `rotation ${this.direction * 90}°`
-    this.selectedLabel.setText(`${names[this.selected.type]} · ${orientation}`)
+    this.selectedLabel.setText(`${names[this.selected.type]} · ${orientation} · ${this.selected.price} €`)
   }
 
-  private async runCustomerCycle() {
-    if (this.customerRunning) return
-    const shelf = this.grid.getBuildings('shelf')[0]
-    const checkout = this.grid.getBuildings('checkout')[0]
+  private toggleAutoSpawn() {
+    this.autoSpawn = !this.autoSpawn
+    this.spawnTimer?.destroy()
+    this.spawnTimer = undefined
+    if (this.autoSpawn) {
+      this.spawnTimer = this.time.addEvent({ delay: 2600, loop: true, callback: () => void this.spawnCustomer() })
+      this.setStatus('Arrivées automatiques activées.', '#86efac')
+    } else {
+      this.setStatus('Arrivées automatiques désactivées.')
+    }
+    this.updateMetrics()
+  }
+
+  private restock() {
+    if (this.simulation.restockAll()) this.setStatus('Tous les rayons ont été réapprovisionnés.', '#86efac')
+    else this.setStatus('Trésorerie insuffisante pour réapprovisionner.', '#f87171')
+    this.updateMetrics()
+    this.drawBuildings()
+  }
+
+  private async spawnCustomer() {
+    this.syncSimulation()
+    const shelves = this.grid.getBuildings('shelf')
+    const checkouts = this.grid.getBuildings('checkout')
+    const shelf = this.simulation.getAvailableShelf(shelves)
+    const checkout = this.simulation.chooseCheckout(checkouts)
     if (!shelf || !checkout) {
-      this.setStatus('Il faut au moins un rayon et une caisse pour accueillir un client.', '#fbbf24')
+      this.simulation.metrics.lostCustomers += 1
+      this.setStatus(!shelf ? 'Aucun rayon approvisionné disponible.' : 'Aucune caisse disponible.', '#fbbf24')
+      this.updateMetrics()
       return
     }
 
+    const id = `C${this.nextCustomer++}`
     const entry: GridCell = { x: 0, y: 0 }
     const shelfPath = this.navigation.findPathToAny(entry, this.grid.getAdjacentWalkableCells(shelf))
-    if (shelfPath.length === 0) {
-      this.setStatus('Le rayon est inaccessible depuis l’entrée.', '#f87171')
-      return
-    }
-    const checkoutPath = this.navigation.findPathToAny(
-      shelfPath.at(-1)!,
-      this.grid.getAdjacentWalkableCells(checkout),
-    )
-    if (checkoutPath.length === 0) {
-      this.setStatus('La caisse est inaccessible depuis le rayon.', '#f87171')
-      return
-    }
-    const exitPath = this.navigation.findPath(checkoutPath.at(-1)!, entry)
-    if (exitPath.length === 0) {
-      this.setStatus('Le client ne peut pas rejoindre la sortie.', '#f87171')
+    const checkoutPath = shelfPath.length
+      ? this.navigation.findPathToAny(shelfPath.at(-1)!, this.grid.getAdjacentWalkableCells(checkout))
+      : []
+    const exitPath = checkoutPath.length ? this.navigation.findPath(checkoutPath.at(-1)!, entry) : []
+    if (!shelfPath.length || !checkoutPath.length || !exitPath.length) {
+      this.simulation.metrics.lostCustomers += 1
+      this.setStatus(`Le client ${id} ne trouve pas de parcours complet.`, '#f87171')
+      this.updateMetrics()
       return
     }
 
-    this.customerRunning = true
-    this.customer?.destroy()
-    this.customer = new CustomerAgent(this, this.grid, entry)
+    const colors = [0xf97316, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899, 0xeab308]
+    const customer = new CustomerAgent(this, this.grid, id, entry, colors[this.nextCustomer % colors.length])
+    this.customers.set(id, customer)
+    void this.runCustomerCycle(customer, shelf, checkout, shelfPath, checkoutPath, exitPath)
+    this.updateMetrics()
+  }
 
+  private async runCustomerCycle(
+    customer: CustomerAgent,
+    shelf: PlacedBuilding,
+    checkout: PlacedBuilding,
+    shelfPath: GridCell[],
+    checkoutPath: GridCell[],
+    exitPath: GridCell[],
+  ) {
+    let queued = false
     try {
-      this.setStatus('Le client se dirige vers le rayon…')
+      this.setStatus(`${customer.id} se dirige vers un rayon…`)
       this.drawPath(shelfPath)
-      await this.customer.follow(shelfPath)
-      await this.wait(650)
+      await customer.follow(shelfPath)
+      await this.wait(450)
+      const product = this.simulation.takeProduct(shelf.id)
+      if (!product) throw new Error('stock')
 
-      this.setStatus('Produit trouvé. Direction la caisse…')
+      const position = this.simulation.enqueue(checkout.id, customer.id)
+      queued = true
+      this.setStatus(`${customer.id} rejoint la caisse · position ${position + 1}.`)
       this.drawPath(checkoutPath)
-      await this.customer.follow(checkoutPath)
-      await this.wait(850)
+      await customer.follow(checkoutPath)
 
-      this.setStatus('Paiement effectué. Le client quitte le magasin…')
+      while (!this.simulation.isFirst(checkout.id, customer.id)) await this.wait(250)
+      this.simulation.startCheckout(checkout.id)
+      this.setStatus(`${customer.id} est en cours d’encaissement…`)
+      await this.wait(900)
+      this.simulation.finishCheckout(checkout.id, customer.id, product.salePrice, product.purchasePrice)
+      queued = false
+
       this.drawPath(exitPath)
-      await this.customer.follow(exitPath)
-      await this.wait(300)
-
-      this.customer.destroy()
-      this.customer = undefined
-      this.pathLayer.clear()
-      this.setStatus('Cycle terminé : entrée → rayon → caisse → sortie.', '#86efac')
+      await customer.follow(exitPath)
+      this.setStatus(`${customer.id} a terminé ses achats.`, '#86efac')
+    } catch {
+      this.simulation.abandon(queued ? checkout.id : undefined, customer.id)
+      this.setStatus(`${customer.id} quitte le magasin sans achat.`, '#f87171')
     } finally {
-      this.customerRunning = false
+      customer.destroy()
+      this.customers.delete(customer.id)
+      this.pathLayer.clear()
+      this.updateMetrics()
+      this.drawBuildings()
     }
   }
 
@@ -188,10 +256,18 @@ export class StoreScene extends Phaser.Scene {
     this.statusLabel.setText(message).setColor(color)
   }
 
+  private updateMetrics() {
+    const m = this.simulation.metrics
+    this.metricsLabel.setText(
+      `Trésorerie ${m.cash.toFixed(0)} € · CA ${m.revenue.toFixed(0)} € · Résultat ${m.profit.toFixed(0)} €\n` +
+      `Clients ${this.customers.size} · Servis ${m.servedCustomers} · Perdus ${m.lostCustomers} · Stock ${this.simulation.getTotalStock()} · Auto ${this.autoSpawn ? 'ON' : 'OFF'}`,
+    )
+  }
+
   private drawPath(path: GridCell[]) {
     this.pathLayer.clear()
     if (path.length < 2) return
-    this.pathLayer.lineStyle(4, 0x38bdf8, .65).beginPath()
+    this.pathLayer.lineStyle(4, 0x38bdf8, .5).beginPath()
     path.forEach((cell, index) => {
       const p = this.grid.gridToScreen(cell.x, cell.y)
       if (index === 0) this.pathLayer.moveTo(p.x, p.y + 16)
@@ -211,6 +287,7 @@ export class StoreScene extends Phaser.Scene {
     this.previewLayer.clear()
     if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
     const valid = this.grid.canPlace(this.selected, this.hovered.x, this.hovered.y, this.direction)
+      && this.simulation.canSpend(this.selected.price)
     const color = valid ? 0x22c55e : 0xef4444
     if (this.selected.type === 'wall' || this.selected.type === 'door') {
       const p = this.grid.gridToScreen(this.hovered.x, this.hovered.y)
@@ -230,10 +307,16 @@ export class StoreScene extends Phaser.Scene {
   }
 
   private drawBuilding(building: PlacedBuilding) {
+    const shelfState = building.definition.type === 'shelf' ? this.simulation.getShelfState(building.id) : undefined
     for (const cell of this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)) {
       const p = this.grid.gridToScreen(cell.x, cell.y)
-      if (building.definition.type === 'shelf') this.box(p.x, p.y, 44, 0xb07a4f)
+      if (building.definition.type === 'shelf') this.box(p.x, p.y, 44, shelfState?.stock ? 0xb07a4f : 0x64748b)
       if (building.definition.type === 'checkout') this.box(p.x, p.y, 24, 0x2563eb)
+    }
+    if (shelfState) {
+      const p = this.grid.gridToScreen(building.gridX, building.gridY)
+      this.buildingsLayer.fillStyle(0xffffff, .9).fillRect(p.x - 12, p.y - 62, 24, 12)
+      this.add.text(p.x, p.y - 56, `${shelfState.stock}`, { fontSize: '10px', color: '#111827' }).setOrigin(.5).setDepth(35)
     }
   }
 
