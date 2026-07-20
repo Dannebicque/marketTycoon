@@ -132,7 +132,9 @@ const checkouts = ref<any[]>([])
 const selectedItem = computed(() => [...shelves.value, ...checkouts.value].find(item => item.id === selectedId.value))
 
 function getScene(): SceneLike | null {
-  return game?.scene.getScene('StoreScene') as unknown as SceneLike ?? null
+  if (!game) return null
+  const scene = game.scene.getScene('StoreScene')
+  return scene ? scene as unknown as SceneLike : null
 }
 
 function selectTool(tool: ToolKey) {
