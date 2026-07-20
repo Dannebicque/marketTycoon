@@ -74,42 +74,27 @@ export class GridManager {
     return cells
   }
 
-  isInside(x: number, y: number) {
-    return x >= 0 && y >= 0 && x < this.columns && y < this.rows
+  isInside(x: number, y: number) { return x >= 0 && y >= 0 && x < this.columns && y < this.rows }
+  isCellOccupied(x: number, y: number) { return this.occupied.has(`${x}:${y}`) }
+  isWalkable(x: number, y: number) { return this.isInside(x, y) && !this.isCellOccupied(x, y) }
+
+  getBuildingAt(x: number, y: number) {
+    const id = this.occupied.get(`${x}:${y}`)
+    return id ? this.buildings.get(id) : undefined
   }
 
-  isCellOccupied(x: number, y: number) {
-    return this.occupied.has(`${x}:${y}`)
-  }
+  getEdgeAxis(direction: Direction): EdgeAxis { return direction % 2 === 0 ? 'x' : 'y' }
+  getEdgeKey(x: number, y: number, direction: Direction) { return `${x}:${y}:${this.getEdgeAxis(direction)}` }
 
-  isWalkable(x: number, y: number) {
-    return this.isInside(x, y) && !this.isCellOccupied(x, y)
-  }
-
-  getEdgeAxis(direction: Direction): EdgeAxis {
-    return direction % 2 === 0 ? 'x' : 'y'
-  }
-
-  getEdgeKey(x: number, y: number, direction: Direction) {
-    return `${x}:${y}:${this.getEdgeAxis(direction)}`
-  }
-
-  /**
-   * Les arêtes dessinées partent du sommet haut de la tuile :
-   * - axe x : segment haut → droite, frontière avec la cellule y - 1 ;
-   * - axe y : segment haut → gauche, frontière avec la cellule x - 1.
-   */
   getEdgeBetween(from: GridCell, to: GridCell) {
-    if (to.x === from.x - 1 && to.y === from.y) return this.edges.get(`${from.x}:${from.y}:y`)
-    if (to.x === from.x + 1 && to.y === from.y) return this.edges.get(`${to.x}:${to.y}:y`)
-    if (to.y === from.y - 1 && to.x === from.x) return this.edges.get(`${from.x}:${from.y}:x`)
-    if (to.y === from.y + 1 && to.x === from.x) return this.edges.get(`${to.x}:${to.y}:x`)
+    if (to.x === from.x + 1 && to.y === from.y) return this.edges.get(`${from.x}:${from.y}:y`)
+    if (to.x === from.x - 1 && to.y === from.y) return this.edges.get(`${to.x}:${to.y}:y`)
+    if (to.y === from.y + 1 && to.x === from.x) return this.edges.get(`${from.x}:${from.y}:x`)
+    if (to.y === from.y - 1 && to.x === from.x) return this.edges.get(`${to.x}:${to.y}:x`)
     return undefined
   }
 
-  isMovementBlocked(from: GridCell, to: GridCell) {
-    return this.getEdgeBetween(from, to)?.type === 'wall'
-  }
+  isMovementBlocked(from: GridCell, to: GridCell) { return this.getEdgeBetween(from, to)?.type === 'wall' }
 
   getWalkableNeighbours(cell: GridCell) {
     return [
