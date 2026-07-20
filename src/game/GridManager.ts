@@ -32,6 +32,7 @@ export class GridManager {
   private occupied = new Map<string, string>()
   private buildings = new Map<string, PlacedBuilding>()
   private edges = new Map<string, PlacedEdge>()
+  private viewRotation: Direction = 0
 
   constructor(
     public columns: number,
@@ -42,20 +43,47 @@ export class GridManager {
     public originY: number,
   ) {}
 
+  get rotation() { return this.viewRotation }
+
+  rotateView(step: -1 | 1) {
+    this.viewRotation = ((this.viewRotation + step + 4) % 4) as Direction
+    return this.viewRotation
+  }
+
+  getViewDirection(direction: Direction): Direction {
+    return ((direction + this.viewRotation) % 4) as Direction
+  }
+
   gridToScreen(x: number, y: number) {
+    const transformed = this.transformForView(x, y)
     return {
-      x: this.originX + (x - y) * this.tileWidth / 2,
-      y: this.originY + (x + y) * this.tileHeight / 2,
+      x: this.originX + (transformed.x - transformed.y) * this.tileWidth / 2,
+      y: this.originY + (transformed.x + transformed.y) * this.tileHeight / 2,
     }
   }
 
   screenToGrid(x: number, y: number) {
     const rx = x - this.originX
     const ry = y - this.originY
-    return {
+    const transformed = {
       x: Math.floor(rx / this.tileWidth + ry / this.tileHeight),
       y: Math.floor(ry / this.tileHeight - rx / this.tileWidth),
     }
+    return this.inverseTransformForView(transformed.x, transformed.y)
+  }
+
+  private transformForView(x: number, y: number): GridCell {
+    if (this.viewRotation === 1) return { x: this.rows - 1 - y, y: x }
+    if (this.viewRotation === 2) return { x: this.columns - 1 - x, y: this.rows - 1 - y }
+    if (this.viewRotation === 3) return { x: y, y: this.columns - 1 - x }
+    return { x, y }
+  }
+
+  private inverseTransformForView(x: number, y: number): GridCell {
+    if (this.viewRotation === 1) return { x: y, y: this.rows - 1 - x }
+    if (this.viewRotation === 2) return { x: this.columns - 1 - x, y: this.rows - 1 - y }
+    if (this.viewRotation === 3) return { x: this.columns - 1 - y, y: x }
+    return { x, y }
   }
 
   getSize(definition: BuildingDefinition, direction: Direction) {
@@ -81,6 +109,19 @@ export class GridManager {
   getBuildingAt(x: number, y: number) {
     const id = this.occupied.get(`${x}:${y}`)
     return id ? this.buildings.get(id) : undefined
+  }
+
+  getBorderWalkableCells() {
+    const cells: GridCell[] = []
+    for (let x = 0; x < this.columns; x++) {
+      if (this.isWalkable(x, 0)) cells.push({ x, y: 0 })
+      if (this.rows > 1 && this.isWalkable(x, this.rows - 1)) cells.push({ x, y: this.rows - 1 })
+    }
+    for (let y = 1; y < this.rows - 1; y++) {
+      if (this.isWalkable(0, y)) cells.push({ x: 0, y })
+      if (this.columns > 1 && this.isWalkable(this.columns - 1, y)) cells.push({ x: this.columns - 1, y })
+    }
+    return cells
   }
 
   getEdgeAxis(direction: Direction): EdgeAxis { return direction % 2 === 0 ? 'x' : 'y' }
