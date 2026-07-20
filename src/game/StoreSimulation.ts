@@ -140,7 +140,6 @@ export class StoreSimulation {
       const queue = this.checkoutQueues.get(checkoutId) ?? []
       const index = queue.indexOf(customerId)
       if (index >= 0) queue.splice(index, 1)
-      this.checkoutBusy.delete(checkoutId)
     }
     this.metrics.lostCustomers += 1
     this.metrics.satisfactionTotal += satisfaction
