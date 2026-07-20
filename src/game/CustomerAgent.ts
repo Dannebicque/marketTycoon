@@ -4,6 +4,7 @@ import { GridManager, type GridCell } from './GridManager'
 export class CustomerAgent {
   private sprite: Phaser.GameObjects.Container
   private body: Phaser.GameObjects.Arc
+  private basketLabel: Phaser.GameObjects.Text
   private current: GridCell
 
   constructor(
@@ -18,8 +19,13 @@ export class CustomerAgent {
     const shadow = scene.add.ellipse(0, 10, 22, 10, 0x000000, .25)
     this.body = scene.add.circle(0, -2, 9, color)
     const head = scene.add.circle(0, -17, 6, 0xf5c2a8)
-    const label = scene.add.text(0, -34, id, { fontSize: '10px', color: '#ffffff', backgroundColor: '#111827cc', padding: { x: 3, y: 1 } }).setOrigin(.5)
-    this.sprite = scene.add.container(p.x, p.y + 10, [shadow, this.body, head, label]).setDepth(100)
+    const label = scene.add.text(0, -34, id, {
+      fontSize: '10px', color: '#ffffff', backgroundColor: '#111827cc', padding: { x: 3, y: 1 },
+    }).setOrigin(.5)
+    this.basketLabel = scene.add.text(12, -7, '', {
+      fontSize: '9px', color: '#fef3c7', backgroundColor: '#78350fcc', padding: { x: 3, y: 1 },
+    }).setOrigin(0, .5)
+    this.sprite = scene.add.container(p.x, p.y + 10, [shadow, this.body, head, label, this.basketLabel]).setDepth(100)
   }
 
   get position() { return this.current }
@@ -40,10 +46,27 @@ export class CustomerAgent {
     this.body.setFillStyle(color)
   }
 
+  setBasketCount(count: number) {
+    this.basketLabel.setText(count > 0 ? `🛒 ${count}` : '')
+  }
+
   moveInstantly(cell: GridCell) {
     this.current = cell
     const p = this.grid.gridToScreen(cell.x, cell.y)
     this.sprite.setPosition(p.x, p.y + 10)
+  }
+
+  moveVisualTo(x: number, y: number, duration = 180) {
+    return new Promise<void>(resolve => {
+      this.scene.tweens.add({
+        targets: this.sprite,
+        x,
+        y,
+        duration,
+        ease: 'Sine.easeOut',
+        onComplete: () => resolve(),
+      })
+    })
   }
 
   destroy() { this.sprite.destroy(true) }
@@ -55,7 +78,7 @@ export class CustomerAgent {
         targets: this.sprite,
         x: p.x,
         y: p.y + 10,
-        duration: 230,
+        duration: 260,
         ease: 'Linear',
         onComplete: () => resolve(),
       })
