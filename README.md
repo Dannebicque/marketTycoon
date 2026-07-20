@@ -8,24 +8,23 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 - rayons, caisses, murs et portes ;
 - construction continue des murs ;
 - pathfinding A* respectant murs et portes ;
+- choix automatique d’une cellule d’entrée accessible sur le bord du magasin ;
+- validation du premier trajet avant l’apparition d’un client ;
 - plusieurs clients simultanés ;
 - arrivées manuelles ou automatiques ;
 - paniers de 1 à 9 articles répartis sur 1 à 3 rayons ;
 - quatre catégories de produits : épicerie, frais, boissons et hygiène ;
-- couleur et libellé propres à chaque catégorie ;
 - choix de la caisse la moins chargée ;
 - clients physiquement positionnés dans les files ;
 - patience, satisfaction et abandon des files trop longues ;
 - durée de scan proportionnelle au nombre d’articles ;
 - paiements sans contact, carte et espèces avec durées différentes ;
-- suivi du nombre d’articles et des moyens de paiement ;
 - stock propre à chaque rayon et compteurs actualisés ;
-- réapprovisionnement global ;
 - trésorerie, chiffre d’affaires et résultat ;
 - horloge accélérée de 8 h à 20 h ;
-- fermeture automatique du magasin ;
-- bilan de fin de journée ;
-- passage au jour suivant.
+- fermeture automatique et bilan de fin de journée ;
+- rotation de la scène par quarts de tour ;
+- déplacement et zoom de la caméra.
 
 ## Lancer le projet
 
@@ -46,32 +45,36 @@ Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:517
 | `4` | Sélectionner une porte |
 | Clic gauche | Placer l’élément ou tracer des murs |
 | Clic droit | Supprimer l’élément ou l’arête orientée |
-| `R` | Faire pivoter ou changer l’axe |
+| `R` | Faire pivoter l’objet ou changer l’axe |
 | `C` | Faire entrer un client |
-| `S` | Activer ou couper les arrivées automatiques |
+| `Maj + S` | Activer ou couper les arrivées automatiques |
 | `A` | Réapprovisionner tous les rayons |
 | `N` | Démarrer le jour suivant après fermeture |
+| `Q` / `E` | Tourner la scène de 90° |
+| Flèches | Déplacer la caméra |
+| Bouton central + glisser | Déplacer la caméra à la souris |
 | Molette | Zoomer ou dézoomer |
+
+La rotation est bloquée tant que des clients sont présents, afin de ne pas interrompre leurs animations en cours.
 
 ## Scénario de test
 
-1. Construire plusieurs rayons afin d’obtenir différentes catégories de produits.
-2. Construire au moins une caisse.
-3. Activer les arrivées automatiques avec `S`.
-4. Observer les clients visiter plusieurs rayons et remplir leur panier.
-5. Vérifier le nombre d’articles affiché à côté de chaque client.
-6. Observer les clients occuper des positions successives dans la file.
-7. Comparer les durées de caisse selon le panier et le moyen de paiement.
-8. Laisser l’horloge atteindre 20 h et consulter le bilan.
-9. Attendre le départ des derniers clients, puis appuyer sur `N`.
+1. Construire plusieurs rayons et au moins une caisse.
+2. Créer une enceinte avec des murs et conserver une porte ou un passage accessible depuis le bord.
+3. Faire entrer un client avec `C`.
+4. Vérifier que le client apparaît sur une cellule de bord accessible et ne traverse aucun mur.
+5. Fermer toutes les entrées avec des murs et vérifier qu’aucun client n’apparaît.
+6. Tourner la scène avec `Q` et `E` lorsqu’elle est vide.
+7. Déplacer la vue avec les flèches ou le bouton central.
+8. Vérifier que la sélection de cases reste correcte après rotation et déplacement.
 
 ## Architecture
 
-- `GridManager` : occupation des cellules, arêtes et règles de collision ;
+- `GridManager` : occupation, collisions, transformation et rotation de la vue ;
 - `NavigationGrid` : calcul A* et règles de traversée ;
 - `CustomerAgent` : représentation, panier, humeur et déplacement ;
 - `StoreSimulation` : produits, stocks, paniers, files, paiements et économie ;
-- `StoreScene` : cycle journalier, orchestration et rendu Phaser.
+- `StoreScene` : cycle journalier, caméra, orchestration et rendu Phaser.
 
 ## Prochaines étapes techniques
 
