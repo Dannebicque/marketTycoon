@@ -3,7 +3,7 @@
     <aside class="panel">
       <p class="eyebrow">Prototype jouable</p>
       <h1>Market Tycoon</h1>
-      <p>Construis le magasin, approvisionne les rayons et accueille plusieurs clients.</p>
+      <p>Construis le magasin, diversifie les rayons et gère les clients sur une journée complète.</p>
 
       <h2>Construction</h2>
       <dl>
@@ -18,7 +18,11 @@
         <div><dt>C</dt><dd>Ajouter un client</dd></div>
         <div><dt>S</dt><dd>Arrivées automatiques</dd></div>
         <div><dt>A</dt><dd>Réapprovisionner</dd></div>
+        <div><dt>N</dt><dd>Jour suivant</dd></div>
       </dl>
+
+      <h2>Fonctionnement</h2>
+      <p>Les clients prennent 1 à 9 articles sur plusieurs rayons. Le temps de caisse dépend du panier et du paiement.</p>
 
       <h2>Contrôles</h2>
       <dl>
