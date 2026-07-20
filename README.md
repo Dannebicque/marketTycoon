@@ -6,7 +6,8 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 
 - grille logique 16 × 16 avec projection isométrique ;
 - aperçu vert ou rouge avant construction ;
-- placement de rayons occupant plusieurs cases ;
+- catalogue de construction avec rayons, caisses, murs et portes ;
+- tailles d’occupation différentes selon l’élément ;
 - rotation avec la touche `R` ;
 - suppression avec le clic droit ;
 - zoom avec la molette ;
@@ -25,15 +26,21 @@ Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:517
 
 | Commande | Action |
 |---|---|
-| Clic gauche | Placer un rayon |
-| Clic droit | Supprimer un rayon |
-| `R` | Faire pivoter le rayon |
+| `1` | Sélectionner un rayon |
+| `2` | Sélectionner une caisse |
+| `3` | Sélectionner un mur |
+| `4` | Sélectionner une porte |
+| Clic gauche | Placer l’élément sélectionné |
+| Clic droit | Supprimer un élément |
+| `R` | Faire pivoter l’élément |
+| `Échap` | Masquer l’aperçu |
 | Molette | Zoomer ou dézoomer |
 
 ## Prochaines étapes possibles
 
-1. Ajouter plusieurs catégories de bâtiments : murs, portes, caisses et réserves.
-2. Créer une grille de navigation distincte de la grille de construction.
-3. Ajouter le pathfinding A* et les premiers clients.
-4. Remplacer les formes vectorielles par des sprites isométriques.
-5. Ajouter un état de jeu Pinia et la sauvegarde.
+1. Ajouter une vraie construction continue des murs.
+2. Imposer qu’une porte soit intégrée à un mur.
+3. Créer une grille de navigation distincte de la grille de construction.
+4. Ajouter le pathfinding A* et les premiers clients.
+5. Remplacer les formes vectorielles par des sprites isométriques.
+6. Ajouter un état de jeu Pinia et la sauvegarde.
