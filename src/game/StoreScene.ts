@@ -18,6 +18,8 @@ const BUILDINGS: Record<string, BuildingDefinition> = {
   door: { type: 'door', width: 1, height: 1, price: 150 },
 }
 
+const MAX_QUEUE_WAIT_MS = 9_000
+
 export class StoreScene extends Phaser.Scene {
   private grid = new GridManager(16, 16, 64, 32, 700, 80)
   private navigation = new NavigationGrid(this.grid)
@@ -25,6 +27,7 @@ export class StoreScene extends Phaser.Scene {
   private gridLayer!: Phaser.GameObjects.Graphics
   private pathLayer!: Phaser.GameObjects.Graphics
   private buildingsLayer!: Phaser.GameObjects.Graphics
+  private queueLayer!: Phaser.GameObjects.Graphics
   private previewLayer!: Phaser.GameObjects.Graphics
   private hovered = { x: -1, y: -1 }
   private direction: Direction = 0
@@ -32,6 +35,8 @@ export class StoreScene extends Phaser.Scene {
   private selectedLabel!: Phaser.GameObjects.Text
   private statusLabel!: Phaser.GameObjects.Text
   private metricsLabel!: Phaser.GameObjects.Text
+  private shelfLabels: Phaser.GameObjects.Text[] = []
+  private queueLabels: Phaser.GameObjects.Text[] = []
   private isDragging = false
   private lastDragKey = ''
   private customers = new Map<string, CustomerAgent>()
@@ -45,6 +50,7 @@ export class StoreScene extends Phaser.Scene {
     this.gridLayer = this.add.graphics()
     this.pathLayer = this.add.graphics().setDepth(20)
     this.buildingsLayer = this.add.graphics().setDepth(30)
+    this.queueLayer = this.add.graphics().setDepth(32)
     this.previewLayer = this.add.graphics().setDepth(40)
     this.selectedLabel = this.add.text(18, 18, '', this.textStyle(18)).setScrollFactor(0).setDepth(1000)
     this.statusLabel = this.add.text(18, 62, 'Placez au moins un rayon et une caisse.', this.textStyle(15, '#cbd5e1')).setScrollFactor(0).setDepth(1000)
@@ -212,6 +218,7 @@ export class StoreScene extends Phaser.Scene {
     exitPath: GridCell[],
   ) {
     let queued = false
+    let satisfaction = 100
     try {
       this.setStatus(`${customer.id} se dirige vers un rayon…`)
       this.drawPath(shelfPath)
@@ -219,30 +226,60 @@ export class StoreScene extends Phaser.Scene {
       await this.wait(450)
       const product = this.simulation.takeProduct(shelf.id)
       if (!product) throw new Error('stock')
+      this.drawBuildings()
+      this.updateMetrics()
 
       const position = this.simulation.enqueue(checkout.id, customer.id)
       queued = true
       this.setStatus(`${customer.id} rejoint la caisse · position ${position + 1}.`)
       this.drawPath(checkoutPath)
       await customer.follow(checkoutPath)
+      this.drawQueues()
 
-      while (!this.simulation.isFirst(checkout.id, customer.id)) await this.wait(250)
+      const queueStartedAt = performance.now()
+      while (!this.simulation.isFirst(checkout.id, customer.id)) {
+        const queueTime = performance.now() - queueStartedAt
+        satisfaction = Math.max(0, 100 - Math.round(queueTime / 90))
+        customer.setMood(satisfaction)
+        this.drawQueues()
+        this.updateMetrics()
+        if (queueTime >= MAX_QUEUE_WAIT_MS) throw new Error('impatient')
+        await this.wait(250)
+      }
+
+      const queueTimeMs = performance.now() - queueStartedAt
+      satisfaction = Math.max(20, 100 - Math.round(queueTimeMs / 100))
+      customer.setMood(satisfaction)
       this.simulation.startCheckout(checkout.id)
       this.setStatus(`${customer.id} est en cours d’encaissement…`)
       await this.wait(900)
-      this.simulation.finishCheckout(checkout.id, customer.id, product.salePrice, product.purchasePrice)
+      this.simulation.finishCheckout(
+        checkout.id,
+        customer.id,
+        product.salePrice,
+        product.purchasePrice,
+        queueTimeMs,
+        satisfaction,
+      )
       queued = false
+      this.drawQueues()
 
-      this.drawPath(exitPath)
-      await customer.follow(exitPath)
-      this.setStatus(`${customer.id} a terminé ses achats.`, '#86efac')
-    } catch {
-      this.simulation.abandon(queued ? checkout.id : undefined, customer.id)
-      this.setStatus(`${customer.id} quitte le magasin sans achat.`, '#f87171')
+      const refreshedExitPath = this.navigation.findPath(customer.position, { x: 0, y: 0 })
+      if (!refreshedExitPath.length) throw new Error('exit-blocked')
+      this.drawPath(refreshedExitPath)
+      await customer.follow(refreshedExitPath)
+      this.setStatus(`${customer.id} a terminé ses achats · satisfaction ${satisfaction} %.`, '#86efac')
+    } catch (error) {
+      this.simulation.abandon(queued ? checkout.id : undefined, customer.id, satisfaction)
+      const reason = error instanceof Error && error.message === 'impatient'
+        ? 'a perdu patience dans la file.'
+        : 'quitte le magasin sans achat.'
+      this.setStatus(`${customer.id} ${reason}`, '#f87171')
     } finally {
       customer.destroy()
       this.customers.delete(customer.id)
       this.pathLayer.clear()
+      this.drawQueues()
       this.updateMetrics()
       this.drawBuildings()
     }
@@ -260,7 +297,8 @@ export class StoreScene extends Phaser.Scene {
     const m = this.simulation.metrics
     this.metricsLabel.setText(
       `Trésorerie ${m.cash.toFixed(0)} € · CA ${m.revenue.toFixed(0)} € · Résultat ${m.profit.toFixed(0)} €\n` +
-      `Clients ${this.customers.size} · Servis ${m.servedCustomers} · Perdus ${m.lostCustomers} · Stock ${this.simulation.getTotalStock()} · Auto ${this.autoSpawn ? 'ON' : 'OFF'}`,
+      `Clients ${this.customers.size} · Servis ${m.servedCustomers} · Perdus ${m.lostCustomers} · Stock ${this.simulation.getTotalStock()} · Auto ${this.autoSpawn ? 'ON' : 'OFF'}\n` +
+      `Satisfaction ${this.simulation.getAverageSatisfaction().toFixed(0)} % · Attente moyenne ${this.simulation.getAverageQueueSeconds().toFixed(1)} s`,
     )
   }
 
@@ -302,8 +340,11 @@ export class StoreScene extends Phaser.Scene {
 
   private drawBuildings() {
     this.buildingsLayer.clear()
+    this.shelfLabels.forEach(label => label.destroy())
+    this.shelfLabels = []
     for (const building of this.grid.getBuildings().sort((a, b) => a.gridX + a.gridY - b.gridX - b.gridY)) this.drawBuilding(building)
     for (const edge of this.grid.getEdges().sort((a, b) => a.gridX + a.gridY - b.gridX - b.gridY)) this.drawEdge(edge)
+    this.drawQueues()
   }
 
   private drawBuilding(building: PlacedBuilding) {
@@ -315,8 +356,29 @@ export class StoreScene extends Phaser.Scene {
     }
     if (shelfState) {
       const p = this.grid.gridToScreen(building.gridX, building.gridY)
-      this.buildingsLayer.fillStyle(0xffffff, .9).fillRect(p.x - 12, p.y - 62, 24, 12)
-      this.add.text(p.x, p.y - 56, `${shelfState.stock}`, { fontSize: '10px', color: '#111827' }).setOrigin(.5).setDepth(35)
+      this.buildingsLayer.fillStyle(0xffffff, .95).fillRoundedRect(p.x - 15, p.y - 66, 30, 15, 4)
+      const label = this.add.text(p.x, p.y - 59, `${shelfState.stock}/${shelfState.capacity}`, {
+        fontSize: '10px', color: '#111827', fontStyle: 'bold',
+      }).setOrigin(.5).setDepth(35)
+      this.shelfLabels.push(label)
+    }
+  }
+
+  private drawQueues() {
+    this.queueLayer.clear()
+    this.queueLabels.forEach(label => label.destroy())
+    this.queueLabels = []
+    for (const checkout of this.grid.getBuildings('checkout')) {
+      const queue = this.simulation.getQueue(checkout.id)
+      const adjacent = this.grid.getAdjacentWalkableCells(checkout)[0]
+      if (!adjacent) continue
+      const p = this.grid.gridToScreen(adjacent.x, adjacent.y)
+      queue.forEach((customerId, index) => {
+        const y = p.y + 18 + index * 10
+        this.queueLayer.fillStyle(0x38bdf8, .75).fillCircle(p.x, y, 4)
+        const label = this.add.text(p.x + 8, y, customerId, { fontSize: '9px', color: '#bae6fd' }).setOrigin(0, .5).setDepth(34)
+        this.queueLabels.push(label)
+      })
     }
   }
 
