@@ -15,6 +15,9 @@ export interface StoreMetrics {
   profit: number
   servedCustomers: number
   lostCustomers: number
+  satisfactionTotal: number
+  satisfactionSamples: number
+  totalQueueTimeMs: number
 }
 
 export class StoreSimulation {
@@ -28,6 +31,9 @@ export class StoreSimulation {
     profit: 0,
     servedCustomers: 0,
     lostCustomers: 0,
+    satisfactionTotal: 0,
+    satisfactionSamples: 0,
+    totalQueueTimeMs: 0,
   }
 
   syncBuildings(buildings: PlacedBuilding[]) {
@@ -55,9 +61,7 @@ export class StoreSimulation {
     }
   }
 
-  canSpend(amount: number) {
-    return this.metrics.cash >= amount
-  }
+  canSpend(amount: number) { return this.metrics.cash >= amount }
 
   spend(amount: number) {
     if (!this.canSpend(amount)) return false
@@ -108,11 +112,16 @@ export class StoreSimulation {
     return this.checkoutQueues.get(checkoutId)?.[0] === customerId && !this.checkoutBusy.has(checkoutId)
   }
 
-  startCheckout(checkoutId: string) {
-    this.checkoutBusy.add(checkoutId)
-  }
+  startCheckout(checkoutId: string) { this.checkoutBusy.add(checkoutId) }
 
-  finishCheckout(checkoutId: string, customerId: string, salePrice: number, purchasePrice: number) {
+  finishCheckout(
+    checkoutId: string,
+    customerId: string,
+    salePrice: number,
+    purchasePrice: number,
+    queueTimeMs: number,
+    satisfaction: number,
+  ) {
     const queue = this.checkoutQueues.get(checkoutId) ?? []
     const index = queue.indexOf(customerId)
     if (index >= 0) queue.splice(index, 1)
@@ -121,9 +130,12 @@ export class StoreSimulation {
     this.metrics.revenue += salePrice
     this.metrics.profit += salePrice - purchasePrice
     this.metrics.servedCustomers += 1
+    this.metrics.totalQueueTimeMs += queueTimeMs
+    this.metrics.satisfactionTotal += satisfaction
+    this.metrics.satisfactionSamples += 1
   }
 
-  abandon(checkoutId: string | undefined, customerId: string) {
+  abandon(checkoutId: string | undefined, customerId: string, satisfaction = 0) {
     if (checkoutId) {
       const queue = this.checkoutQueues.get(checkoutId) ?? []
       const index = queue.indexOf(customerId)
@@ -131,17 +143,29 @@ export class StoreSimulation {
       this.checkoutBusy.delete(checkoutId)
     }
     this.metrics.lostCustomers += 1
+    this.metrics.satisfactionTotal += satisfaction
+    this.metrics.satisfactionSamples += 1
   }
 
-  queueLength(checkoutId: string) {
-    return this.checkoutQueues.get(checkoutId)?.length ?? 0
-  }
+  queueLength(checkoutId: string) { return this.checkoutQueues.get(checkoutId)?.length ?? 0 }
+  queuePosition(checkoutId: string, customerId: string) { return this.checkoutQueues.get(checkoutId)?.indexOf(customerId) ?? -1 }
+  getQueue(checkoutId: string) { return [...(this.checkoutQueues.get(checkoutId) ?? [])] }
 
   getTotalStock() {
     return [...this.shelves.values()].reduce((total, shelf) => total + shelf.stock, 0)
   }
 
-  getShelfState(buildingId: string) {
-    return this.shelves.get(buildingId)
+  getShelfState(buildingId: string) { return this.shelves.get(buildingId) }
+
+  getAverageSatisfaction() {
+    return this.metrics.satisfactionSamples
+      ? this.metrics.satisfactionTotal / this.metrics.satisfactionSamples
+      : 100
+  }
+
+  getAverageQueueSeconds() {
+    return this.metrics.servedCustomers
+      ? this.metrics.totalQueueTimeMs / this.metrics.servedCustomers / 1000
+      : 0
   }
 }
