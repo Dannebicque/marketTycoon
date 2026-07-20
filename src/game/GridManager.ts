@@ -2,6 +2,8 @@ export type Direction = 0 | 1 | 2 | 3
 export type BuildingType = 'shelf' | 'checkout' | 'wall' | 'door'
 export type EdgeAxis = 'x' | 'y'
 
+export interface GridCell { x: number; y: number }
+
 export interface BuildingDefinition {
   type: BuildingType
   width: number
@@ -64,9 +66,8 @@ export class GridManager {
 
   getFootprint(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
     if (this.isEdgeType(definition.type)) return []
-
     const size = this.getSize(definition, direction)
-    const cells: Array<{ x: number; y: number }> = []
+    const cells: GridCell[] = []
     for (let dy = 0; dy < size.height; dy++) {
       for (let dx = 0; dx < size.width; dx++) cells.push({ x: x + dx, y: y + dy })
     }
@@ -77,6 +78,14 @@ export class GridManager {
     return x >= 0 && y >= 0 && x < this.columns && y < this.rows
   }
 
+  isCellOccupied(x: number, y: number) {
+    return this.occupied.has(`${x}:${y}`)
+  }
+
+  isWalkable(x: number, y: number) {
+    return this.isInside(x, y) && !this.isCellOccupied(x, y)
+  }
+
   getEdgeAxis(direction: Direction): EdgeAxis {
     return direction % 2 === 0 ? 'x' : 'y'
   }
@@ -85,38 +94,60 @@ export class GridManager {
     return `${x}:${y}:${this.getEdgeAxis(direction)}`
   }
 
+  getEdgeBetween(from: GridCell, to: GridCell) {
+    if (to.x === from.x + 1 && to.y === from.y) return this.edges.get(`${from.x}:${from.y}:x`)
+    if (to.x === from.x - 1 && to.y === from.y) return this.edges.get(`${to.x}:${to.y}:x`)
+    if (to.y === from.y + 1 && to.x === from.x) return this.edges.get(`${from.x}:${from.y}:y`)
+    if (to.y === from.y - 1 && to.x === from.x) return this.edges.get(`${to.x}:${to.y}:y`)
+    return undefined
+  }
+
+  isMovementBlocked(from: GridCell, to: GridCell) {
+    return this.getEdgeBetween(from, to)?.type === 'wall'
+  }
+
+  getWalkableNeighbours(cell: GridCell) {
+    return [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+    ].filter(next => this.isWalkable(next.x, next.y) && !this.isMovementBlocked(cell, next))
+  }
+
+  getAdjacentWalkableCells(building: PlacedBuilding) {
+    const footprint = this.getFootprint(building.definition, building.gridX, building.gridY, building.direction)
+    const candidates = new Map<string, GridCell>()
+    for (const cell of footprint) {
+      for (const neighbour of [
+        { x: cell.x + 1, y: cell.y }, { x: cell.x - 1, y: cell.y },
+        { x: cell.x, y: cell.y + 1 }, { x: cell.x, y: cell.y - 1 },
+      ]) {
+        if (this.isWalkable(neighbour.x, neighbour.y)) candidates.set(`${neighbour.x}:${neighbour.y}`, neighbour)
+      }
+    }
+    return [...candidates.values()]
+  }
+
   canPlace(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
     if (!this.isInside(x, y)) return false
-
-    if (definition.type === 'wall') {
-      return !this.edges.has(this.getEdgeKey(x, y, direction))
-    }
-
-    if (definition.type === 'door') {
-      return this.edges.get(this.getEdgeKey(x, y, direction))?.type === 'wall'
-    }
-
+    if (definition.type === 'wall') return !this.edges.has(this.getEdgeKey(x, y, direction))
+    if (definition.type === 'door') return this.edges.get(this.getEdgeKey(x, y, direction))?.type === 'wall'
     return this.getFootprint(definition, x, y, direction)
-      .every(cell => this.isInside(cell.x, cell.y) && !this.occupied.has(`${cell.x}:${cell.y}`))
+      .every(cell => this.isInside(cell.x, cell.y) && !this.isCellOccupied(cell.x, cell.y))
   }
 
   place(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
     if (!this.canPlace(definition, x, y, direction)) return null
-
     if (this.isEdgeType(definition.type)) {
       const key = this.getEdgeKey(x, y, direction)
       const edge: PlacedEdge = {
-        id: crypto.randomUUID(),
-        type: definition.type,
-        gridX: x,
-        gridY: y,
-        axis: this.getEdgeAxis(direction),
-        direction,
+        id: crypto.randomUUID(), type: definition.type, gridX: x, gridY: y,
+        axis: this.getEdgeAxis(direction), direction,
       }
       this.edges.set(key, edge)
       return edge
     }
-
     const building: PlacedBuilding = { id: crypto.randomUUID(), definition, gridX: x, gridY: y, direction }
     this.buildings.set(building.id, building)
     this.getFootprint(definition, x, y, direction)
@@ -125,11 +156,7 @@ export class GridManager {
   }
 
   removeAt(x: number, y: number, direction?: Direction) {
-    if (direction !== undefined) {
-      const edgeKey = this.getEdgeKey(x, y, direction)
-      if (this.edges.delete(edgeKey)) return true
-    }
-
+    if (direction !== undefined && this.edges.delete(this.getEdgeKey(x, y, direction))) return true
     const id = this.occupied.get(`${x}:${y}`)
     if (!id) return false
     const building = this.buildings.get(id)
@@ -140,13 +167,12 @@ export class GridManager {
     return true
   }
 
-  getBuildings() {
-    return [...this.buildings.values()]
+  getBuildings(type?: 'shelf' | 'checkout') {
+    const values = [...this.buildings.values()]
+    return type ? values.filter(building => building.definition.type === type) : values
   }
 
-  getEdges() {
-    return [...this.edges.values()]
-  }
+  getEdges() { return [...this.edges.values()] }
 
   private isEdgeType(type: BuildingType): type is 'wall' | 'door' {
     return type === 'wall' || type === 'door'
