@@ -94,11 +94,16 @@ export class GridManager {
     return `${x}:${y}:${this.getEdgeAxis(direction)}`
   }
 
+  /**
+   * Les arêtes dessinées partent du sommet haut de la tuile :
+   * - axe x : segment haut → droite, frontière avec la cellule y - 1 ;
+   * - axe y : segment haut → gauche, frontière avec la cellule x - 1.
+   */
   getEdgeBetween(from: GridCell, to: GridCell) {
-    if (to.x === from.x + 1 && to.y === from.y) return this.edges.get(`${from.x}:${from.y}:x`)
-    if (to.x === from.x - 1 && to.y === from.y) return this.edges.get(`${to.x}:${to.y}:x`)
-    if (to.y === from.y + 1 && to.x === from.x) return this.edges.get(`${from.x}:${from.y}:y`)
-    if (to.y === from.y - 1 && to.x === from.x) return this.edges.get(`${to.x}:${to.y}:y`)
+    if (to.x === from.x - 1 && to.y === from.y) return this.edges.get(`${from.x}:${from.y}:y`)
+    if (to.x === from.x + 1 && to.y === from.y) return this.edges.get(`${to.x}:${to.y}:y`)
+    if (to.y === from.y - 1 && to.x === from.x) return this.edges.get(`${from.x}:${from.y}:x`)
+    if (to.y === from.y + 1 && to.x === from.x) return this.edges.get(`${to.x}:${to.y}:x`)
     return undefined
   }
 
