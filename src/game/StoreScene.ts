@@ -1,5 +1,11 @@
 import Phaser from 'phaser'
-import { GridManager, type BuildingDefinition, type Direction, type PlacedBuilding } from './GridManager'
+import {
+  GridManager,
+  type BuildingDefinition,
+  type Direction,
+  type PlacedBuilding,
+  type PlacedEdge,
+} from './GridManager'
 
 const BUILDINGS: Record<string, BuildingDefinition> = {
   shelf: { type: 'shelf', width: 1, height: 3, price: 100 },
@@ -38,7 +44,7 @@ export class StoreScene extends Phaser.Scene {
     })
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
-      if (pointer.rightButtonDown()) this.grid.removeAt(this.hovered.x, this.hovered.y)
+      if (pointer.rightButtonDown()) this.grid.removeAt(this.hovered.x, this.hovered.y, this.direction)
       else this.grid.place(this.selected, this.hovered.x, this.hovered.y, this.direction)
       this.drawBuildings()
       this.drawPreview()
@@ -71,7 +77,10 @@ export class StoreScene extends Phaser.Scene {
 
   private updateSelectedLabel() {
     const names = { shelf: 'Rayon', checkout: 'Caisse', wall: 'Mur', door: 'Porte' }
-    this.selectedLabel.setText(`${names[this.selected.type]} · rotation ${this.direction * 90}°`)
+    const orientation = this.selected.type === 'wall' || this.selected.type === 'door'
+      ? (this.direction % 2 === 0 ? 'axe X' : 'axe Y')
+      : `rotation ${this.direction * 90}°`
+    this.selectedLabel.setText(`${names[this.selected.type]} · ${orientation}`)
   }
 
   private drawGrid() {
@@ -84,8 +93,16 @@ export class StoreScene extends Phaser.Scene {
   private drawPreview() {
     this.previewLayer.clear()
     if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
+
     const valid = this.grid.canPlace(this.selected, this.hovered.x, this.hovered.y, this.direction)
     const color = valid ? 0x22c55e : 0xef4444
+
+    if (this.selected.type === 'wall' || this.selected.type === 'door') {
+      const p = this.grid.gridToScreen(this.hovered.x, this.hovered.y)
+      this.drawEdgePreview(p.x, p.y, this.direction, color)
+      return
+    }
+
     for (const cell of this.grid.getFootprint(this.selected, this.hovered.x, this.hovered.y, this.direction)) {
       const p = this.grid.gridToScreen(cell.x, cell.y)
       this.diamond(this.previewLayer, p.x, p.y, color, .5, color)
@@ -94,22 +111,28 @@ export class StoreScene extends Phaser.Scene {
 
   private drawBuildings() {
     this.buildingsLayer.clear()
+
     for (const building of this.grid.getBuildings().sort((a, b) => a.gridX + a.gridY - b.gridX - b.gridY)) {
       this.drawBuilding(building)
+    }
+
+    for (const edge of this.grid.getEdges().sort((a, b) => a.gridX + a.gridY - b.gridX - b.gridY)) {
+      this.drawEdge(edge)
     }
   }
 
   private drawBuilding(building: PlacedBuilding) {
-    const cells = this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)
-    for (const cell of cells) {
+    for (const cell of this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)) {
       const p = this.grid.gridToScreen(cell.x, cell.y)
-      switch (building.definition.type) {
-        case 'shelf': this.box(p.x, p.y, 44, 0xb07a4f); break
-        case 'checkout': this.box(p.x, p.y, 24, 0x2563eb); break
-        case 'wall': this.wall(p.x, p.y, building.direction); break
-        case 'door': this.door(p.x, p.y, building.direction); break
-      }
+      if (building.definition.type === 'shelf') this.box(p.x, p.y, 44, 0xb07a4f)
+      if (building.definition.type === 'checkout') this.box(p.x, p.y, 24, 0x2563eb)
     }
+  }
+
+  private drawEdge(edge: PlacedEdge) {
+    const p = this.grid.gridToScreen(edge.gridX, edge.gridY)
+    if (edge.type === 'wall') this.wall(p.x, p.y, edge.direction)
+    else this.door(p.x, p.y, edge.direction)
   }
 
   private diamond(g: Phaser.GameObjects.Graphics, x: number, y: number, color: number, alpha: number, line: number) {
@@ -126,19 +149,57 @@ export class StoreScene extends Phaser.Scene {
     g.fillStyle(color).beginPath().moveTo(x, y - height).lineTo(x + w, y + d - height).lineTo(x, y + d * 2 - height).lineTo(x - w, y + d - height).closePath().fillPath()
   }
 
+  private edgeEndpoints(x: number, y: number, direction: Direction) {
+    const w = this.grid.tileWidth / 2
+    const h = this.grid.tileHeight / 2
+    return direction % 2 === 0
+      ? { start: { x, y }, end: { x: x + w, y: y + h } }
+      : { start: { x, y }, end: { x: x - w, y: y + h } }
+  }
+
+  private drawEdgePreview(x: number, y: number, direction: Direction, color: number) {
+    const { start, end } = this.edgeEndpoints(x, y, direction)
+    this.previewLayer.lineStyle(7, color, .8).beginPath()
+      .moveTo(start.x, start.y).lineTo(end.x, end.y).strokePath()
+  }
+
   private wall(x: number, y: number, direction: Direction) {
     const g = this.buildingsLayer
-    const horizontal = direction % 2 === 0
-    const left = horizontal ? { x: x - 30, y: y + 15 } : { x: x, y }
-    const right = horizontal ? { x: x + 30, y: y + 15 } : { x: x, y: y + 30 }
-    g.lineStyle(10, 0xcbd5e1, 1).beginPath().moveTo(left.x, left.y - 46).lineTo(right.x, right.y - 46).strokePath()
-    g.lineStyle(3, 0x64748b, 1).beginPath().moveTo(left.x, left.y).lineTo(left.x, left.y - 46).lineTo(right.x, right.y - 46).lineTo(right.x, right.y).strokePath()
+    const { start, end } = this.edgeEndpoints(x, y, direction)
+    const height = 46
+
+    g.fillStyle(0xcbd5e1, 1).beginPath()
+      .moveTo(start.x, start.y)
+      .lineTo(end.x, end.y)
+      .lineTo(end.x, end.y - height)
+      .lineTo(start.x, start.y - height)
+      .closePath().fillPath()
+    g.lineStyle(2, 0x64748b, 1).strokePath()
   }
 
   private door(x: number, y: number, direction: Direction) {
-    this.wall(x, y, direction)
     const g = this.buildingsLayer
-    g.fillStyle(0x7c3aed, 1).fillRect(x - 10, y - 36, 20, 34)
-    g.fillStyle(0xfacc15, 1).fillCircle(x + 5, y - 20, 2)
+    const { start, end } = this.edgeEndpoints(x, y, direction)
+    const height = 46
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const left = { x: start.x + dx * .18, y: start.y + dy * .18 }
+    const right = { x: start.x + dx * .82, y: start.y + dy * .82 }
+
+    g.lineStyle(5, 0xcbd5e1, 1).beginPath()
+      .moveTo(start.x, start.y - height).lineTo(left.x, left.y - height)
+      .moveTo(right.x, right.y - height).lineTo(end.x, end.y - height)
+      .strokePath()
+    g.lineStyle(3, 0x64748b, 1).beginPath()
+      .moveTo(start.x, start.y).lineTo(start.x, start.y - height)
+      .moveTo(end.x, end.y).lineTo(end.x, end.y - height)
+      .strokePath()
+    g.fillStyle(0x7c3aed, 1).beginPath()
+      .moveTo(left.x, left.y)
+      .lineTo(right.x, right.y)
+      .lineTo(right.x, right.y - height + 8)
+      .lineTo(left.x, left.y - height + 8)
+      .closePath().fillPath()
+    g.fillStyle(0xfacc15, 1).fillCircle(right.x - dx * .12, right.y - dy * .12 - 18, 2)
   }
 }
