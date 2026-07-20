@@ -7,24 +7,25 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 - grille logique 16 × 16 avec projection isométrique ;
 - rayons, caisses, murs et portes ;
 - construction continue des murs ;
-- murs portés par les arêtes et portes traversables ;
-- grille de navigation séparée ;
-- pathfinding A* respectant les murs dans les deux sens ;
-- vérification des collisions pendant le déplacement ;
+- pathfinding A* respectant murs et portes ;
 - plusieurs clients simultanés ;
 - arrivées manuelles ou automatiques ;
-- cycle client : entrée → rayon → caisse → sortie ;
+- paniers de 1 à 9 articles répartis sur 1 à 3 rayons ;
+- quatre catégories de produits : épicerie, frais, boissons et hygiène ;
+- couleur et libellé propres à chaque catégorie ;
 - choix de la caisse la moins chargée ;
-- files d’attente matérialisées près des caisses ;
-- encaissement séquentiel ;
-- patience limitée et abandon des files trop longues ;
-- satisfaction et temps d’attente moyen ;
-- stock propre à chaque rayon ;
-- compteur de stock actualisé après chaque achat ;
-- rupture de stock visible ;
+- clients physiquement positionnés dans les files ;
+- patience, satisfaction et abandon des files trop longues ;
+- durée de scan proportionnelle au nombre d’articles ;
+- paiements sans contact, carte et espèces avec durées différentes ;
+- suivi du nombre d’articles et des moyens de paiement ;
+- stock propre à chaque rayon et compteurs actualisés ;
 - réapprovisionnement global ;
-- trésorerie, chiffre d’affaires, résultat et compteurs clients ;
-- coûts de construction réellement débités.
+- trésorerie, chiffre d’affaires et résultat ;
+- horloge accélérée de 8 h à 20 h ;
+- fermeture automatique du magasin ;
+- bilan de fin de journée ;
+- passage au jour suivant.
 
 ## Lancer le projet
 
@@ -49,32 +50,33 @@ Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:517
 | `C` | Faire entrer un client |
 | `S` | Activer ou couper les arrivées automatiques |
 | `A` | Réapprovisionner tous les rayons |
+| `N` | Démarrer le jour suivant après fermeture |
 | Molette | Zoomer ou dézoomer |
 
 ## Scénario de test
 
-1. Construire au moins un rayon et une caisse.
-2. Entourer une zone avec des murs et conserver une ouverture ou une porte.
-3. Appuyer sur `C` et vérifier que le client contourne les murs.
-4. Ajouter un mur sur son trajet pour vérifier qu’il refuse de le traverser.
-5. Générer plusieurs clients et observer les files matérialisées.
-6. Vérifier que les compteurs `stock/capacité` diminuent après chaque achat.
-7. Observer la satisfaction et le temps d’attente moyen.
-8. Appuyer sur `A` pour acheter le stock manquant.
+1. Construire plusieurs rayons afin d’obtenir différentes catégories de produits.
+2. Construire au moins une caisse.
+3. Activer les arrivées automatiques avec `S`.
+4. Observer les clients visiter plusieurs rayons et remplir leur panier.
+5. Vérifier le nombre d’articles affiché à côté de chaque client.
+6. Observer les clients occuper des positions successives dans la file.
+7. Comparer les durées de caisse selon le panier et le moyen de paiement.
+8. Laisser l’horloge atteindre 20 h et consulter le bilan.
+9. Attendre le départ des derniers clients, puis appuyer sur `N`.
 
 ## Architecture
 
 - `GridManager` : occupation des cellules, arêtes et règles de collision ;
 - `NavigationGrid` : calcul A* et règles de traversée ;
-- `CustomerAgent` : représentation, humeur et déplacement sécurisé d’un client ;
-- `StoreSimulation` : stocks, files, patience, satisfaction et économie ;
-- `StoreScene` : orchestration, entrées et rendu Phaser.
+- `CustomerAgent` : représentation, panier, humeur et déplacement ;
+- `StoreSimulation` : produits, stocks, paniers, files, paiements et économie ;
+- `StoreScene` : cycle journalier, orchestration et rendu Phaser.
 
-## Prochaines étapes
+## Prochaines étapes techniques
 
-1. Ajouter plusieurs catégories de produits et affecter un produit à chaque rayon.
-2. Ajouter une horloge, des journées et un bilan de fermeture.
-3. Déplacer réellement les clients sur des positions successives dans les files.
-4. Ajouter ouverture et fermeture individuelles des caisses.
-5. Déplacer le HUD et les outils de gestion vers Vue et Pinia.
-6. Ajouter sauvegarde et chargement du magasin.
+1. Déplacer le HUD et les commandes vers Vue et Pinia.
+2. Ajouter sauvegarde et chargement du magasin.
+3. Ajouter des employés et l’ouverture individuelle des caisses.
+4. Ajouter les commandes fournisseurs et une réserve physique.
+5. Ajouter des objectifs, événements et progression du magasin.
