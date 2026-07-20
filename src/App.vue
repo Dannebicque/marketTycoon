@@ -16,20 +16,27 @@
       <h2>Simulation</h2>
       <dl>
         <div><dt>C</dt><dd>Ajouter un client</dd></div>
-        <div><dt>S</dt><dd>Arrivées automatiques</dd></div>
+        <div><dt>Maj + S</dt><dd>Arrivées automatiques</dd></div>
         <div><dt>A</dt><dd>Réapprovisionner</dd></div>
         <div><dt>N</dt><dd>Jour suivant</dd></div>
+      </dl>
+
+      <h2>Caméra</h2>
+      <dl>
+        <div><dt>Q / E</dt><dd>Tourner la scène</dd></div>
+        <div><dt>Flèches</dt><dd>Déplacer la vue</dd></div>
+        <div><dt>Bouton central</dt><dd>Faire glisser la vue</dd></div>
+        <div><dt>Molette</dt><dd>Zoomer</dd></div>
       </dl>
 
       <h2>Fonctionnement</h2>
       <p>Les clients prennent 1 à 9 articles sur plusieurs rayons. Le temps de caisse dépend du panier et du paiement.</p>
 
-      <h2>Contrôles</h2>
+      <h2>Construction</h2>
       <dl>
         <div><dt>Clic gauche</dt><dd>Placer / tracer un mur</dd></div>
         <div><dt>Clic droit</dt><dd>Supprimer</dd></div>
-        <div><dt>R</dt><dd>Faire pivoter</dd></div>
-        <div><dt>Molette</dt><dd>Zoomer</dd></div>
+        <div><dt>R</dt><dd>Faire pivoter l’objet</dd></div>
       </dl>
     </aside>
     <section ref="gameContainer" class="game-container" />
