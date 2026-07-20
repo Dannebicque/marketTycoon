@@ -35,7 +35,7 @@ npm run dev
 
 Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`.
 
-## Commandes
+## Commandes AZERTY
 
 | Commande | Action |
 |---|---|
@@ -48,12 +48,15 @@ Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:517
 | `R` | Faire pivoter l’objet ou changer l’axe |
 | `C` | Faire entrer un client |
 | `Maj + S` | Activer ou couper les arrivées automatiques |
-| `A` | Réapprovisionner tous les rayons |
+| `Maj + A` | Réapprovisionner tous les rayons |
 | `N` | Démarrer le jour suivant après fermeture |
-| `Q` / `E` | Tourner la scène de 90° |
+| `A` / `E` | Tourner la scène de 90° |
+| `ZQSD` | Déplacer la caméra |
 | Flèches | Déplacer la caméra |
 | Bouton central + glisser | Déplacer la caméra à la souris |
 | Molette | Zoomer ou dézoomer |
+
+Les commandes `A`, `E`, `Maj + A` et `Maj + S` sont interceptées avec `KeyboardEvent.key`. Elles suivent donc le caractère réellement produit par un clavier AZERTY, sans dépendre des positions QWERTY utilisées par certains moteurs de jeu.
 
 La rotation est bloquée tant que des clients sont présents, afin de ne pas interrompre leurs animations en cours.
 
@@ -63,9 +66,9 @@ La rotation est bloquée tant que des clients sont présents, afin de ne pas int
 2. Créer une enceinte avec des murs et conserver une porte ou un passage accessible depuis le bord.
 3. Faire entrer un client avec `C`.
 4. Vérifier que le client apparaît sur une cellule de bord accessible et ne traverse aucun mur.
-5. Fermer toutes les entrées avec des murs et vérifier qu’aucun client n’apparaît.
-6. Tourner la scène avec `Q` et `E` lorsqu’elle est vide.
-7. Déplacer la vue avec les flèches ou le bouton central.
+5. Attendre que tous les clients soient sortis.
+6. Tourner la scène avec `A` et `E`.
+7. Déplacer la vue avec `ZQSD`, les flèches ou le bouton central.
 8. Vérifier que la sélection de cases reste correcte après rotation et déplacement.
 
 ## Architecture
