@@ -1,4 +1,3 @@
-import type { CheckoutDefinition } from '../definitions'
 import { isCheckoutDefinition, isShelfDefinition } from '../definitions'
 import type { GridCell, PlacedBuilding } from '../GridManager'
 import { NavigationGrid } from '../NavigationGrid'
