@@ -17,6 +17,7 @@ export type {
   CustomerVisitCompleted,
   CustomerVisitOutcome,
   CustomerVisitRecord,
+  CustomerVisitSatisfaction,
   CustomerVisitStarted,
   CustomerVisitSummary,
 } from './CustomerVisitAnalyticsManager'
