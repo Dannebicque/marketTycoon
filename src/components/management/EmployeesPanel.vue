@@ -34,3 +34,18 @@ defineEmits<{ hire: [candidateId: string]; dismiss: [employeeId: string]; assign
 function role(key: string) { return props.roles.find(item => item.key === key) }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0) }
 </script>
+
+<style scoped>
+.employees-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+.employee-card,.candidate-card { margin-top:10px; padding:14px; border:1px solid #1e293b; border-radius:12px; background:#0f172a; }
+.employee-main { display:flex; align-items:center; gap:12px; }
+.employee-main > div { display:flex; flex-direction:column; gap:3px; }
+.employee-main small,.candidate-card p { color:#94a3b8; font-size:11px; line-height:1.45; }
+.employee-icon { display:grid; width:38px; height:38px; place-items:center; border-radius:10px; background:#1e293b; font-size:20px; }
+.quality-meter { height:7px; margin:12px 0; overflow:hidden; border-radius:999px; background:#1e293b; }
+.quality-meter span { display:block; height:100%; background:linear-gradient(90deg,#f59e0b,#4ade80); }
+.employee-meta { display:flex; justify-content:space-between; gap:12px; margin:8px 0; color:#cbd5e1; font-size:11px; }
+.employee-card select { width:100%; margin:8px 0; padding:8px; border:1px solid #334155; border-radius:8px; background:#020617; color:#e2e8f0; }
+.danger-action { padding:8px 10px; border:1px solid #7f1d1d; border-radius:8px; background:rgba(127,29,29,.22); color:#fecaca; cursor:pointer; }
+@media (max-width:900px) { .employees-layout { grid-template-columns:1fr; } }
+</style>
