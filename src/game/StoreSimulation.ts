@@ -1,14 +1,16 @@
+import { CustomerAnalyticsManager } from './analytics/CustomerAnalyticsManager'
 import { PRODUCTS, getProductDefinition, getProductsForCategories } from './catalog/products'
 import { SUPPLIERS } from './catalog/suppliers'
+import { MarketDemandManager } from './commerce/MarketDemandManager'
 import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition, StorageType } from './definitions'
 import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './definitions'
 import {
   createEquipmentInventory,
   getProductCapacity,
   isProductCompatible,
-  type EquipmentCompartmentState,
   type EquipmentInventoryState,
 } from './equipment/EquipmentInventory'
+import { gameEvents } from './events/gameEvents'
 import type { PlacedBuilding } from './GridManager'
 import { PurchaseOrderManager } from './logistics/PurchaseOrderManager'
 import { ReserveManager } from './logistics/ReserveManager'
@@ -26,6 +28,8 @@ export interface BasketLine {
   compartmentId: string
   product: ProductDefinition
   quantity: number
+  requestedQuantity?: number
+  satisfactionDelta?: number
 }
 
 export interface BasketSummary {
@@ -33,6 +37,13 @@ export interface BasketSummary {
   articleCount: number
   saleTotal: number
   purchaseTotal: number
+}
+
+export interface CustomerPurchaseContext {
+  customerId?: string
+  day?: number
+  priceSensitivity?: number
+  remainingBudget?: number
 }
 
 export interface StoreMetrics {
@@ -78,9 +89,13 @@ export class StoreSimulation {
   private checkoutBusy = new Set<string>()
   private buildings: PlacedBuilding[] = []
   private dayStart?: StoreMetrics
+  private currentDay = 1
+  private nextAnonymousCustomer = 1
 
   readonly reserve = new ReserveManager()
   readonly purchaseOrders = new PurchaseOrderManager()
+  readonly demand = new MarketDemandManager()
+  readonly customerAnalytics = new CustomerAnalyticsManager()
 
   readonly metrics: StoreMetrics = {
     cash: INITIAL_BUDGET, revenue: 0, profit: 0, constructionExpenses: 0,
@@ -89,6 +104,8 @@ export class StoreSimulation {
     totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0,
     cardPayments: 0, cashPayments: 0, checkoutIncidents: 0,
   }
+
+  setCurrentDay(day: number) { this.currentDay = Math.max(1, Math.floor(day)) }
 
   syncBuildings(buildings: PlacedBuilding[]) {
     this.buildings = buildings
@@ -106,10 +123,7 @@ export class StoreSimulation {
       this.shelfDefinitions.set(shelf.id, definition)
       if (!this.inventories.has(shelf.id)) this.inventories.set(shelf.id, createEquipmentInventory(shelf.id, definition))
     }
-
-    for (const checkout of checkouts) {
-      if (!this.checkoutQueues.has(checkout.id)) this.checkoutQueues.set(checkout.id, [])
-    }
+    for (const checkout of checkouts) if (!this.checkoutQueues.has(checkout.id)) this.checkoutQueues.set(checkout.id, [])
   }
 
   startDay() { this.dayStart = { ...this.metrics } }
@@ -119,7 +133,7 @@ export class StoreSimulation {
     const start = this.dayStart ?? this.emptySnapshotStart()
     const served = this.metrics.servedCustomers - start.servedCustomers
     const samples = this.metrics.satisfactionSamples - start.satisfactionSamples
-    return {
+    const snapshot = {
       day,
       revenue: this.metrics.revenue - start.revenue,
       constructionExpenses: this.metrics.constructionExpenses - start.constructionExpenses,
@@ -132,6 +146,8 @@ export class StoreSimulation {
       averageSatisfaction: samples > 0 ? (this.metrics.satisfactionTotal - start.satisfactionTotal) / samples : 100,
       averageQueueSeconds: served > 0 ? (this.metrics.totalQueueTimeMs - start.totalQueueTimeMs) / served / 1000 : 0,
     }
+    gameEvents.emit('store:day-closed', snapshot)
+    return snapshot
   }
 
   canSpend(amount: number) { return this.metrics.cash >= amount }
@@ -159,18 +175,11 @@ export class StoreSimulation {
     const definition = this.shelfDefinitions.get(buildingId)
     const compartment = inventory?.compartments.find(item => item.id === compartmentId)
     if (!inventory || !definition || !compartment) return false
-
-    if (compartment.productKey && compartment.quantity > 0) {
-      this.reserve.add(compartment.productKey, compartment.quantity, this.buildings)
-    }
-
+    if (compartment.productKey && compartment.quantity > 0) this.reserve.add(compartment.productKey, compartment.quantity, this.buildings)
     if (productKey === null) {
-      compartment.productKey = null
-      compartment.quantity = 0
-      compartment.capacity = 0
+      compartment.productKey = null; compartment.quantity = 0; compartment.capacity = 0
       return true
     }
-
     const product = getProductDefinition(productKey)
     if (!product || !isProductCompatible(definition, product)) return false
     compartment.productKey = product.key
@@ -182,8 +191,7 @@ export class StoreSimulation {
   restockCompartment(buildingId: string, compartmentId: string) {
     const compartment = this.getCompartment(buildingId, compartmentId)
     if (!compartment?.productKey) return false
-    const missing = compartment.capacity - compartment.quantity
-    const moved = this.reserve.withdraw(compartment.productKey, missing)
+    const moved = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
     compartment.quantity += moved
     return moved > 0
   }
@@ -195,21 +203,17 @@ export class StoreSimulation {
     for (const compartment of inventory.compartments) {
       if (!compartment.productKey) continue
       const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
-      compartment.quantity += quantity
-      moved += quantity
+      compartment.quantity += quantity; moved += quantity
     }
     return moved > 0
   }
 
   restockAll() {
     let moved = 0
-    for (const inventory of this.inventories.values()) {
-      for (const compartment of inventory.compartments) {
-        if (!compartment.productKey) continue
-        const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
-        compartment.quantity += quantity
-        moved += quantity
-      }
+    for (const inventory of this.inventories.values()) for (const compartment of inventory.compartments) {
+      if (!compartment.productKey) continue
+      const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
+      compartment.quantity += quantity; moved += quantity
     }
     return moved > 0
   }
@@ -226,10 +230,7 @@ export class StoreSimulation {
     return order
   }
 
-  processDeliveries(day: number) {
-    this.purchaseOrders.process(day, this.buildings, this.reserve)
-  }
-
+  processDeliveries(day: number) { this.purchaseOrders.process(day, this.buildings, this.reserve) }
   getSuppliers() { return SUPPLIERS }
   getPurchaseOrders() { return this.purchaseOrders.getOrders() }
   getReserveLines() { return this.reserve.getLines() }
@@ -249,18 +250,48 @@ export class StoreSimulation {
       const inventory = this.inventories.get(shelf.id)
       return (inventory?.compartments ?? []).filter(slot => slot.productKey && slot.quantity > 0).map(slot => ({ shelf, compartmentId: slot.id }))
     }).sort(() => Math.random() - .5)
-    const count = Math.min(available.length, randomBetween(1, 3))
-    return available.slice(0, count).map(item => ({ ...item, requestedQuantity: randomBetween(1, 3) }))
+    return available.slice(0, Math.min(available.length, randomBetween(1, 3))).map(item => ({ ...item, requestedQuantity: randomBetween(1, 3) }))
   }
 
-  takeItems(shelfId: string, compartmentId: string, requestedQuantity: number): BasketLine | null {
+  takeItems(shelfId: string, compartmentId: string, requestedQuantity: number, context: CustomerPurchaseContext = {}): BasketLine | null {
     const compartment = this.getCompartment(shelfId, compartmentId)
     if (!compartment?.productKey || compartment.quantity <= 0) return null
     const product = getProductDefinition(compartment.productKey)
     if (!product) return null
-    const quantity = Math.min(requestedQuantity, compartment.quantity)
+
+    const availableQuantity = Math.min(Math.max(0, Math.floor(requestedQuantity)), compartment.quantity)
+    if (!availableQuantity) return null
+    const customerId = context.customerId ?? `VISIT-${this.nextAnonymousCustomer++}`
+    const day = context.day ?? this.currentDay
+    const result = this.demand.evaluatePurchase(product, product.salePrice, availableQuantity, {
+      priceSensitivity: context.priceSensitivity ?? randomBetween(25, 95) / 100,
+      remainingBudget: context.remainingBudget,
+    })
+    const observation = this.customerAnalytics.record(day, customerId, product, availableQuantity, result)
+
+    gameEvents.emit('product:purchase-decision', {
+      day,
+      customerId,
+      productKey: product.key,
+      requestedQuantity: availableQuantity,
+      acceptedQuantity: result.acceptedQuantity,
+      decision: result.decision,
+      salePrice: product.salePrice,
+      marketPrice: observation.marketPrice,
+      priceRatio: result.priceRatio,
+      satisfactionDelta: result.satisfactionDelta,
+    })
+    if (result.decision === 'reject') {
+      gameEvents.emit('product:rejected-for-price', {
+        day, productKey: product.key, requestedQuantity: availableQuantity,
+        salePrice: product.salePrice, marketPrice: observation.marketPrice,
+      })
+      return null
+    }
+
+    const quantity = Math.min(result.acceptedQuantity, compartment.quantity)
     compartment.quantity -= quantity
-    return { shelfId, compartmentId, product, quantity }
+    return { shelfId, compartmentId, product, quantity, requestedQuantity: availableQuantity, satisfactionDelta: result.satisfactionDelta }
   }
 
   summarizeBasket(lines: BasketLine[]): BasketSummary {
@@ -274,8 +305,7 @@ export class StoreSimulation {
 
   choosePaymentMethod(accepted?: PaymentMethod[]): PaymentMethod {
     const available: PaymentMethod[] = accepted?.length ? accepted : ['contactless', 'card', 'cash']
-    const roll = Math.random()
-    const preferred: PaymentMethod = roll < .5 ? 'contactless' : roll < .85 ? 'card' : 'cash'
+    const roll = Math.random(), preferred: PaymentMethod = roll < .5 ? 'contactless' : roll < .85 ? 'card' : 'cash'
     return available.includes(preferred) ? preferred : available[Math.floor(Math.random() * available.length)]
   }
 
@@ -322,6 +352,14 @@ export class StoreSimulation {
     if (payment === 'contactless') this.metrics.contactlessPayments += 1
     if (payment === 'card') this.metrics.cardPayments += 1
     if (payment === 'cash') this.metrics.cashPayments += 1
+    for (const line of basket.lines) gameEvents.emit('product:sold', {
+      day: this.currentDay, productKey: line.product.key, quantity: line.quantity,
+      unitSalePrice: line.product.salePrice, unitCost: line.product.purchasePrice, checkoutId,
+    })
+    gameEvents.emit('checkout:completed', {
+      day: this.currentDay, checkoutId, customerId, articleCount: basket.articleCount,
+      total: basket.saleTotal, paymentMethod: payment, satisfaction,
+    })
     this.recalculateProfit()
   }
 
