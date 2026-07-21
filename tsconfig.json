@@ -17,7 +17,8 @@
       "@market-tycoon/simulation-engine": ["packages/simulation-engine/src/index.ts"],
       "@market-tycoon/economy": ["packages/economy/src/index.ts"],
       "@market-tycoon/analytics": ["packages/analytics/src/index.ts"],
-      "@market-tycoon/events": ["packages/events/src/index.ts"]
+      "@market-tycoon/events": ["packages/events/src/index.ts"],
+      "@market-tycoon/catalog": ["packages/catalog/src/index.ts"]
     }
   },
   "include": [
