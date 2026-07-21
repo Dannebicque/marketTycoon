@@ -1,15 +1,10 @@
+import type { BuildingCategory, BuildingDefinition } from './definitions'
+import { isEdgeDefinition } from './definitions'
+
 export type Direction = 0 | 1 | 2 | 3
-export type BuildingType = 'shelf' | 'checkout' | 'wall' | 'door'
 export type EdgeAxis = 'x' | 'y'
 
 export interface GridCell { x: number; y: number }
-
-export interface BuildingDefinition {
-  type: BuildingType
-  width: number
-  height: number
-  price: number
-}
 
 export interface PlacedBuilding {
   id: string
@@ -22,6 +17,7 @@ export interface PlacedBuilding {
 export interface PlacedEdge {
   id: string
   type: 'wall' | 'door'
+  definitionKey: 'wall' | 'door'
   gridX: number
   gridY: number
   axis: EdgeAxis
@@ -93,7 +89,7 @@ export class GridManager {
   }
 
   getFootprint(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
-    if (this.isEdgeType(definition.type)) return []
+    if (isEdgeDefinition(definition)) return []
     const size = this.getSize(definition, direction)
     const cells: GridCell[] = []
     for (let dy = 0; dy < size.height; dy++) {
@@ -162,19 +158,19 @@ export class GridManager {
 
   canPlace(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
     if (!this.isInside(x, y)) return false
-    if (definition.type === 'wall') return !this.edges.has(this.getEdgeKey(x, y, direction))
-    if (definition.type === 'door') return this.edges.get(this.getEdgeKey(x, y, direction))?.type === 'wall'
+    if (definition.category === 'wall') return !this.edges.has(this.getEdgeKey(x, y, direction))
+    if (definition.category === 'door') return this.edges.get(this.getEdgeKey(x, y, direction))?.type === 'wall'
     return this.getFootprint(definition, x, y, direction)
       .every(cell => this.isInside(cell.x, cell.y) && !this.isCellOccupied(cell.x, cell.y))
   }
 
   place(definition: BuildingDefinition, x: number, y: number, direction: Direction) {
     if (!this.canPlace(definition, x, y, direction)) return null
-    if (this.isEdgeType(definition.type)) {
+    if (isEdgeDefinition(definition)) {
       const key = this.getEdgeKey(x, y, direction)
       const edge: PlacedEdge = {
-        id: crypto.randomUUID(), type: definition.type, gridX: x, gridY: y,
-        axis: this.getEdgeAxis(direction), direction,
+        id: crypto.randomUUID(), type: definition.category, definitionKey: definition.key,
+        gridX: x, gridY: y, axis: this.getEdgeAxis(direction), direction,
       }
       this.edges.set(key, edge)
       return edge
@@ -198,14 +194,10 @@ export class GridManager {
     return true
   }
 
-  getBuildings(type?: 'shelf' | 'checkout') {
+  getBuildings(category?: Extract<BuildingCategory, 'shelf' | 'checkout'>) {
     const values = [...this.buildings.values()]
-    return type ? values.filter(building => building.definition.type === type) : values
+    return category ? values.filter(building => building.definition.category === category) : values
   }
 
   getEdges() { return [...this.edges.values()] }
-
-  private isEdgeType(type: BuildingType): type is 'wall' | 'door' {
-    return type === 'wall' || type === 'door'
-  }
 }
