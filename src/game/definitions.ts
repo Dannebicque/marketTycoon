@@ -24,17 +24,7 @@ export interface ProductDefinition {
 }
 
 export type BuildingCategory = 'shelf' | 'checkout' | 'wall' | 'door'
-export type BuildingKey =
-  | 'standard-shelf'
-  | 'fruit-shelf'
-  | 'refrigerated-shelf'
-  | 'freezer'
-  | 'bakery-shelf'
-  | 'standard-checkout'
-  | 'self-checkout'
-  | 'express-checkout'
-  | 'wall'
-  | 'door'
+export type BuildingKey = string
 
 interface BaseBuildingDefinition {
   key: BuildingKey
@@ -46,6 +36,10 @@ interface BaseBuildingDefinition {
   price: number
   color: number
   renderer: string
+  toolbar?: {
+    icon: string
+    order: number
+  }
 }
 
 export interface ShelfDefinition extends BaseBuildingDefinition {
@@ -81,6 +75,14 @@ export type BuildingDefinition =
   | CheckoutDefinition
   | WallDefinition
   | DoorDefinition
+
+export function defineBuilding<const T extends BuildingDefinition>(definition: T): T {
+  return definition
+}
+
+export function defineProduct<const T extends ProductDefinition>(definition: T): T {
+  return definition
+}
 
 export function isShelfDefinition(definition: BuildingDefinition): definition is ShelfDefinition {
   return definition.category === 'shelf'
