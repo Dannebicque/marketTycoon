@@ -69,8 +69,8 @@ import { getProductDefinition } from './game/catalog/products'
 import type { BuildingKey, ProductDefinition, StorageType } from './game/definitions'
 import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './game/definitions'
 import { EmployeeManager } from './game/employees/EmployeeManager'
+import { EmployeeRuntime } from './game/employees/EmployeeRuntime'
 import type { EmployeeRoleDefinition, EmployeeState } from './game/employees/employeeTypes'
-import type { PlacedBuilding } from './game/GridManager'
 import { deleteSaveGame, hasSaveGame, readSaveGame, SAVE_GAME_VERSION, storeSaveGame, type SaveGameV1 } from './game/save/SaveGame'
 import { StoreScene } from './game/StoreScene'
 
@@ -87,6 +87,8 @@ let game: Phaser.Game | null = null
 let refreshTimer: number | undefined
 let processedDay = 0
 let payrollProcessedDay = 1
+let employeeRuntime: EmployeeRuntime | null = null
+let workforcePoliciesInstalled = false
 
 const employeeManager = new EmployeeManager()
 const tools = BUILDINGS
@@ -106,8 +108,9 @@ const managementAlerts = computed(() => {
     else if (capacity.ratio >= .85) alerts.push(`La réserve ${storageLabel(capacity.type)} est presque pleine (${capacity.used}/${capacity.capacity}).`)
   }
   if (ui.shelfStock === 0) alerts.push('Aucun produit disponible dans les rayons.')
-  if (!employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques ne devraient pas être exploitées.')
+  if (!employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques sont fermées.')
   if (!employeeManager.hasRole('stocker')) alerts.push('Aucun employé de rayon : le réassort automatique est indisponible.')
+  if (!employeeManager.hasRole('technician')) alerts.push('Aucun technicien : les incidents de caisse dureront plus longtemps.')
   return alerts
 })
 
@@ -118,18 +121,41 @@ function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.
 function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') {
   const scene = getScene(); if (!scene) return
   if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return }
-  if (name === 'spawnCustomer') void scene.spawnCustomer(); else scene[name]()
+  if (name === 'spawnCustomer') void scene.spawnCustomer()
+  else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'
+  else scene[name]()
 }
 function assignProduct(buildingId: string, slotId: string, event: Event) { getScene()?.configureCompartment(buildingId, slotId, (event.target as HTMLSelectElement).value || null); refreshUi() }
 function restockSlot(buildingId: string, slotId: string) { getScene()?.restockCompartment(buildingId, slotId); refreshUi() }
 function restockEquipment(buildingId: string) { getScene()?.restockEquipment(buildingId); refreshUi() }
 function submitOrder(supplierKey: string, lines: Array<{ productKey: string; quantity: number }>) { const scene = getScene(); if (!scene) return; const order = scene.simulation.createPurchaseOrder(supplierKey, lines, scene.day); orderMessageType.value = order ? 'success' : 'error'; orderMessage.value = order ? `${order.id} enregistrée. Livraison prévue au jour ${order.expectedDay}.` : 'Le bon de commande n’a pas pu être enregistré.'; refreshUi() }
 
-function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; refreshEmployees() }
-function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); refreshEmployees() }
-function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); refreshEmployees() }
+function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; syncWorkforce() }
+function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); syncWorkforce() }
+function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); syncWorkforce() }
 function refreshCandidates() { employeeManager.refreshCandidates(getScene()?.day ?? 1); refreshEmployees() }
 function refreshEmployees() { employees.value = employeeManager.getEmployees(); candidates.value = employeeManager.getCandidates(); employeeRoles.value = employeeManager.getRoles() }
+function syncWorkforce() { employeeRuntime?.sync(); refreshEmployees(); refreshUi() }
+
+function ensureEmployeeRuntime(scene: StoreScene) {
+  if (!employeeRuntime) employeeRuntime = new EmployeeRuntime(scene, employeeManager)
+  employeeRuntime.sync()
+  if (workforcePoliciesInstalled) return
+  workforcePoliciesInstalled = true
+
+  const originalChooseCheckout = scene.simulation.chooseCheckout.bind(scene.simulation)
+  scene.simulation.chooseCheckout = (available, basket, payment) => originalChooseCheckout(available.filter(checkout => employeeRuntime?.isCheckoutStaffed(checkout)), basket, payment)
+
+  const originalCheckoutTiming = scene.simulation.getCheckoutTiming.bind(scene.simulation)
+  scene.simulation.getCheckoutTiming = (checkout, articleCount, payment) => {
+    const timing = originalCheckoutTiming(checkout, articleCount, payment)
+    if (!timing.incident) return timing
+    void employeeRuntime?.requestRepair(checkout)
+    const quality = employeeManager.getAverageQuality('technician')
+    const repairDelay = quality > 0 ? Math.max(900, Math.round(3_800 * (1.15 - quality / 130))) : 4_000
+    return { ...timing, durationMs: Math.max(0, timing.durationMs - 4_000 + repairDelay) }
+  }
+}
 
 function applyPayroll(day: number) {
   const scene = getScene(); if (!scene || payrollProcessedDay >= day) return
@@ -162,6 +188,8 @@ function saveGame() {
 function loadGame() {
   const save = readSaveGame(), scene = getScene()
   if (!save || !scene || scene.customers.size) { saveMessage.value = 'Chargement impossible pendant la présence de clients.'; return }
+  employeeRuntime?.destroy()
+  employeeRuntime = null
   for (const edge of scene.grid.getEdges()) scene.grid.removeAt(edge.gridX, edge.gridY, edge.direction)
   for (const building of scene.grid.getBuildings()) scene.grid.removeAt(building.gridX, building.gridY)
 
@@ -190,12 +218,16 @@ function loadGame() {
   Object.assign(scene.simulation.metrics, save.metrics)
   scene.simulation.reserve.importState(save.reserve)
   scene.simulation.purchaseOrders.importState(save.purchaseOrders)
-  employeeManager.importState(save.employees)
+  employeeManager.importState({
+    ...save.employees,
+    employees: save.employees.employees?.map(employee => ({ ...employee, assignedBuildingId: employee.assignedBuildingId ? idMap.get(employee.assignedBuildingId) : undefined })),
+  })
   scene.day = save.day
   scene.currentMinutes = save.currentMinutes
   processedDay = save.day
   payrollProcessedDay = save.day
   scene.rotateScene(1); scene.rotateScene(-1)
+  ensureEmployeeRuntime(scene)
   refreshEmployees(); refreshUi()
   saveMessage.value = `Partie du ${new Date(save.savedAt).toLocaleString('fr-FR')} chargée.`
 }
@@ -204,6 +236,7 @@ function deleteCurrentSave() { deleteSaveGame(); saveAvailable.value = false; sa
 
 function refreshUi() {
   const scene = getScene(); if (!scene) return
+  ensureEmployeeRuntime(scene)
   const simulation = scene.simulation
   simulation.syncBuildings(scene.grid.getBuildings())
   if (processedDay !== scene.day) { simulation.processDeliveries(scene.day); applyPayroll(scene.day); employeeManager.refreshCandidates(scene.day); processedDay = scene.day }
@@ -213,7 +246,7 @@ function refreshUi() {
   const buildings = scene.grid.getBuildings()
   shelves.value = buildings.filter(b => isShelfDefinition(b.definition)).map(building => { const definition = building.definition, inventory = simulation.getEquipmentInventory(building.id); const slots = (inventory?.compartments ?? []).map(slot => { const product = slot.productKey ? getProductDefinition(slot.productKey) : undefined; return { ...slot, productName: product?.name ?? 'Vide', reserveQuantity: product ? simulation.getReserveQuantity(product.key) : 0, color: product ? `#${product.color.toString(16).padStart(6, '0')}` : '#334155' } }); return { id: building.id, type: 'shelf', buildingName: definition.name, description: definition.description, columns: definition.layout.columns, levels: definition.layout.levels, slots, stock: slots.reduce((sum, slot) => sum + slot.quantity, 0), capacity: slots.reduce((sum, slot) => sum + slot.capacity, 0), configuredSlots: slots.filter(slot => slot.productKey).length, compatibleProducts: simulation.getCompatibleProducts(building.id).map(product => ({ key: product.key, name: product.name, capacity: product.capacities[definition.layout.compartmentType] ?? 0 })), columnGroups: Array.from({ length: definition.layout.columns }, (_, index) => ({ index, slots: slots.filter(slot => slot.column === index).sort((a, b) => b.level - a.level) })) } })
   storages.value = buildings.filter(b => isStorageDefinition(b.definition)).map(building => { const type = building.definition.storageType, capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { id: building.id, type: 'storage', buildingName: building.definition.name, description: building.definition.description, storageType: type, capacity, used, free: Math.max(0, capacity - used), ratio: capacity ? used / capacity : 0 } })
-  checkouts.value = buildings.filter(b => isCheckoutDefinition(b.definition)).map(building => { const assigned = employeeManager.getAssignedTo(building.id); return { id: building.id, type: 'checkout', buildingName: building.definition.name, description: building.definition.description, queueLength: simulation.queueLength(building.id), busy: simulation.isCheckoutBusy(building.id), payments: building.definition.acceptedPayments.map(paymentLabel), employeeName: assigned ? `${assigned.firstName} ${assigned.lastName}` : null } })
+  checkouts.value = buildings.filter(b => isCheckoutDefinition(b.definition)).map(building => { const assigned = employeeManager.getAssignedTo(building.id); return { id: building.id, type: 'checkout', buildingName: building.definition.name, description: building.definition.description, queueLength: simulation.queueLength(building.id), busy: simulation.isCheckoutBusy(building.id), payments: building.definition.acceptedPayments.map(paymentLabel), employeeName: assigned ? `${assigned.firstName} ${assigned.lastName}` : null, open: !building.definition.requiresEmployee || Boolean(assigned) } })
   suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); products.value = simulation.getProducts(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } }); selectedId.value = scene.selectedBuildingId; refreshEmployees()
 }
 
@@ -223,5 +256,5 @@ function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: '
 function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || managementOpen.value) return; const target = event.target as HTMLElement | null; if (target?.matches('input, textarea, select, button, [contenteditable="true"]')) return; const key = event.key.toLocaleLowerCase('fr-FR'), scene = getScene(); if (!scene) return; if (!event.shiftKey && key === 'a') scene.rotateScene(-1); if (!event.shiftKey && key === 'e') scene.rotateScene(1); if (event.shiftKey && key === 'a') command('restock'); if (event.shiftKey && key === 's') scene.toggleAutoSpawn() }
 
 onMounted(() => { if (!gameContainer.value) return; game = new Phaser.Game({ type: Phaser.AUTO, parent: gameContainer.value, width: gameContainer.value.clientWidth, height: gameContainer.value.clientHeight, backgroundColor: '#0f172a', scene: [StoreScene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }, render: { antialias: true } }); refreshEmployees(); window.addEventListener('keydown', handleAzertyShortcuts, { capture: true }); refreshTimer = window.setInterval(refreshUi, 250) })
-onBeforeUnmount(() => { window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
+onBeforeUnmount(() => { employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
 </script>
