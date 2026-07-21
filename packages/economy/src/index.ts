@@ -9,6 +9,16 @@ export type {
 } from './MarketDemandManager'
 export type { DemandProduct, PricingProduct } from './product'
 
-// Temporary compatibility exports. These implementations will move next.
-export { PurchaseOrderManager } from '../../../src/game/logistics/PurchaseOrderManager'
-export { ReserveManager } from '../../../src/game/logistics/ReserveManager'
+export { ReserveManager, getProductStorageType } from './ReserveManager'
+export type {
+  ReserveStockLine,
+  StorageBuilding,
+} from './ReserveManager'
+
+export { PurchaseOrderManager } from './PurchaseOrderManager'
+export type {
+  PurchaseOrder,
+  PurchaseOrderLine,
+  PurchaseOrderState,
+  PurchaseOrderStatus,
+} from './PurchaseOrderManager'
