@@ -1,5 +1,5 @@
+import type { ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { computed, ref, watch, type Ref } from 'vue'
-import type { ProductDefinition, StorageType } from '../game/definitions'
 
 export interface PurchaseCartLine {
   productKey: string
