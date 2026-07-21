@@ -1,9 +1,14 @@
-export { StorePricingManager } from '../../../src/game/pricing/StorePricingManager'
-export { MarketDemandManager } from '../../../src/game/commerce/MarketDemandManager'
+export { StorePricingManager } from './StorePricingManager'
+export type { ProductPricingSummary, StoreProductPricing } from './StorePricingManager'
+export { MarketDemandManager } from './MarketDemandManager'
 export type {
   CustomerPriceContext,
+  MarketDemandOptions,
   PurchaseDecision,
   PurchaseDecisionResult,
-} from '../../../src/game/commerce/MarketDemandManager'
+} from './MarketDemandManager'
+export type { DemandProduct, PricingProduct } from './product'
+
+// Temporary compatibility exports. These implementations will move next.
 export { PurchaseOrderManager } from '../../../src/game/logistics/PurchaseOrderManager'
 export { ReserveManager } from '../../../src/game/logistics/ReserveManager'
