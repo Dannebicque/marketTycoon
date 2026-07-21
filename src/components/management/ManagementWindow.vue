@@ -22,6 +22,7 @@
         <h2>Produits stockés</h2><div v-if="!reserveLines.length" class="empty-state">La réserve est vide.</div><div v-for="line in reserveLines" :key="line.productKey" class="reserve-line"><span>{{ line.productName }}</span><strong>{{ line.quantity }}</strong></div>
       </div>
 
+      <CustomerAnalyticsPanel v-else-if="tab === 'customers'" v-bind="customerAnalytics" />
       <PricingPanel v-else-if="tab === 'pricing'" :lines="pricingLines" @update-price="(productKey, salePrice) => $emit('update-price', productKey, salePrice)" @apply-markup="$emit('apply-markup', $event)" />
       <EmployeesPanel v-else-if="tab === 'employees'" :employees="employees" :candidates="candidates" :roles="employeeRoles" :checkouts="checkouts" :payroll="payroll" @hire="$emit('hire', $event)" @dismiss="$emit('dismiss', $event)" @assign="(employeeId, buildingId) => $emit('assign', employeeId, buildingId)" @refresh-candidates="$emit('refresh-candidates')" />
       <PurchaseOrdersPanel v-else :suppliers="suppliers" :products="products" :storage-capacities="storageCapacities" :cash="ui.cash" :orders="orders" :message="orderMessage" :message-type="orderMessageType" @submit="(supplierKey, lines) => $emit('submit-order', supplierKey, lines)" />
@@ -29,17 +30,28 @@
   </div>
 </template>
 
-<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'pricing' | 'employees' | 'orders'</script>
+<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'customers' | 'pricing' | 'employees' | 'orders'</script>
 <script setup lang="ts">
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '../../game/analytics/CustomerAnalyticsManager'
 import type { ProductDefinition, StorageType } from '../../game/definitions'
 import type { EmployeeRoleDefinition, EmployeeState } from '../../game/employees/employeeTypes'
+import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
 import PricingPanel from './PricingPanel.vue'
 import PurchaseOrdersPanel from './PurchaseOrdersPanel.vue'
 
-const props = defineProps<{ tab: ManagementTab; ui: any; alerts: string[]; pendingOrders: any[]; suppliers: any[]; storageCapacities: any[]; reserveLines: any[]; orders: any[]; products: ProductDefinition[]; pricingLines: any[]; orderMessage: string; orderMessageType: 'success' | 'error'; employees: EmployeeState[]; candidates: EmployeeState[]; employeeRoles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number; hasSave: boolean; saveMessage: string }>()
+interface CustomerAnalyticsViewModel {
+  day: number
+  daySummary: CustomerAnalyticsSummary
+  allSummary: CustomerAnalyticsSummary
+  dayProducts: ProductCustomerAnalytics[]
+  allProducts: ProductCustomerAnalytics[]
+  recent: CustomerPurchaseObservation[]
+}
+
+const props = defineProps<{ tab: ManagementTab; ui: any; alerts: string[]; pendingOrders: any[]; suppliers: any[]; storageCapacities: any[]; reserveLines: any[]; orders: any[]; products: ProductDefinition[]; pricingLines: any[]; customerAnalytics: CustomerAnalyticsViewModel; orderMessage: string; orderMessageType: 'success' | 'error'; employees: EmployeeState[]; candidates: EmployeeState[]; employeeRoles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number; hasSave: boolean; saveMessage: string }>()
 defineEmits<{ close: []; 'update:tab': [tab: ManagementTab]; 'submit-order': [supplierKey: string, lines: Array<{ productKey: string; quantity: number }>]; 'update-price': [productKey: string, salePrice: number]; 'apply-markup': [markupRate: number]; hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': []; 'save-game': []; 'load-game': []; 'delete-save': [] }>()
-const tabs: Array<{ key: ManagementTab; label: string }> = [{ key: 'dashboard', label: 'Tableau de bord' }, { key: 'finances', label: 'Finances' }, { key: 'reserve', label: 'Réserve' }, { key: 'pricing', label: 'Prix & marges' }, { key: 'employees', label: 'Employés' }, { key: 'orders', label: 'Commandes' }]
+const tabs: Array<{ key: ManagementTab; label: string }> = [{ key: 'dashboard', label: 'Tableau de bord' }, { key: 'finances', label: 'Finances' }, { key: 'reserve', label: 'Réserve' }, { key: 'customers', label: 'Clients' }, { key: 'pricing', label: 'Prix & marges' }, { key: 'employees', label: 'Employés' }, { key: 'orders', label: 'Commandes' }]
 function supplierName(key: string) { return props.suppliers.find(item => item.key === key)?.name ?? key }
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'Ambiante' : type === 'cold' ? 'Froide' : 'Surgelée' }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value || 0) }
