@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import type { StorageType } from '../game/definitions'
+import type { StorageType } from '@market-tycoon/catalog'
 
 defineProps<{ selectedItem?: any; shelves: any[]; storages: any[]; checkouts: any[] }>()
 defineEmits<{
