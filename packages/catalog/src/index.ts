@@ -1,6 +1,7 @@
 export { CatalogRegistry } from './CatalogRegistry'
 export {
   defineBuilding,
+  defineEmployeeRole,
   defineProduct,
   getProductStorageType,
   isCheckoutDefinition,
@@ -17,6 +18,8 @@ export type {
   CheckoutDefinition,
   CompartmentType,
   DoorDefinition,
+  EmployeeRoleDefinition,
+  EmployeeRoleKey,
   EquipmentLayoutDefinition,
   PaymentMethod,
   ProductCatalogReader,
@@ -29,3 +32,23 @@ export type {
   SupplierDefinition,
   WallDefinition,
 } from './contracts'
+export {
+  BUILDINGS,
+  BUILDING_CATALOG,
+  BUILDING_REGISTRY,
+  CHECKOUT_BUILDINGS,
+  SHELF_BUILDINGS,
+  STORAGE_BUILDINGS,
+  getBuildingDefinition,
+  requireBuildingDefinition,
+} from './catalog/buildings'
+export {
+  PRODUCTS,
+  PRODUCT_CATALOG,
+  getProductDefinition,
+  getProductsForCategories,
+  requireProductDefinition,
+} from './catalog/products'
+export { SUPPLIERS, getSupplier } from './catalog/suppliers'
+export { EMPLOYEE_ROLES, getEmployeeRole } from './catalog/employees'
+export { productCatalogReader, supplierCatalogReader } from './catalog/readers'
