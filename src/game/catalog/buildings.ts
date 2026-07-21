@@ -42,7 +42,7 @@ export const BUILDINGS: BuildingDefinition[] = [...catalogMap.values()].sort(
 const standardShelf = catalogMap.get('standard-shelf')
 if (!standardShelf) throw new Error('Le catalogue doit contenir un équipement standard-shelf.')
 
-export const BUILDING_CATALOG = Object.assign(
+export const BUILDING_CATALOG: Record<string, BuildingDefinition> & { standardShelf: BuildingDefinition } = Object.assign(
   Object.fromEntries(catalogMap) as Record<string, BuildingDefinition>,
   { standardShelf },
 )
