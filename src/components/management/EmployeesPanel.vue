@@ -32,7 +32,8 @@
 </template>
 
 <script setup lang="ts">
-import type { EmployeeRoleDefinition, EmployeeState } from '../../game/employees/employeeTypes'
+import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
+import type { EmployeeState } from '../../game/employees/employeeTypes'
 const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number }>()
 defineEmits<{ hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': [] }>()
 function role(key: string) { return props.roles.find(item => item.key === key) }
