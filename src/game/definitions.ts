@@ -24,8 +24,14 @@ export interface ProductDefinition {
   category: ProductCategory
   name: string
   shortName: string
+  /** Prix conseillé initial du catalogue. */
   salePrice: number
+  /** Coût d’achat de référence avant conditions fournisseur. */
   purchasePrice: number
+  /** Prix moyen observé sur le marché. Par défaut, le prix conseillé est utilisé. */
+  marketPrice?: number
+  /** Sensibilité spécifique du produit au prix, entre 0 et 1. */
+  priceSensitivity?: number
   color: number
   capacities: Partial<Record<CompartmentType, number>>
   shelfLifeDays?: number
