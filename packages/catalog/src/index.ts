@@ -1,12 +1,31 @@
 export { CatalogRegistry } from './CatalogRegistry'
+export {
+  defineBuilding,
+  defineProduct,
+  getProductStorageType,
+  isCheckoutDefinition,
+  isEdgeDefinition,
+  isShelfDefinition,
+  isStorageDefinition,
+} from './contracts'
 export type {
+  BaseBuildingDefinition,
+  BuildingCategory,
+  BuildingDefinition,
+  BuildingKey,
+  BuildingToolbarDefinition,
+  CheckoutDefinition,
   CompartmentType,
+  DoorDefinition,
+  EquipmentLayoutDefinition,
   PaymentMethod,
   ProductCatalogReader,
   ProductCategory,
   ProductDefinition,
+  ShelfDefinition,
   StorageDefinition,
   StorageType,
   SupplierCatalogReader,
   SupplierDefinition,
+  WallDefinition,
 } from './contracts'
