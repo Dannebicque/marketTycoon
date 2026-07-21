@@ -26,24 +26,33 @@ function validateBuilding(definition: BuildingDefinition, filename: string) {
   }
 }
 
-const catalog = new Map<string, BuildingDefinition>()
+const catalogMap = new Map<string, BuildingDefinition>()
 
 for (const [filename, module] of Object.entries(modules)) {
   const definition = module.default
   validateBuilding(definition, filename)
-  if (catalog.has(definition.key)) throw new Error(`Clé d’équipement dupliquée : ${definition.key}`)
-  catalog.set(definition.key, definition)
+  if (catalogMap.has(definition.key)) throw new Error(`Clé d’équipement dupliquée : ${definition.key}`)
+  catalogMap.set(definition.key, definition)
 }
 
-export const BUILDING_CATALOG: ReadonlyMap<string, BuildingDefinition> = catalog
-export const BUILDINGS: BuildingDefinition[] = [...catalog.values()].sort(
+export const BUILDINGS: BuildingDefinition[] = [...catalogMap.values()].sort(
   (a, b) => (a.toolbar?.order ?? 1_000) - (b.toolbar?.order ?? 1_000),
 )
+
+const standardShelf = catalogMap.get('standard-shelf')
+if (!standardShelf) throw new Error('Le catalogue doit contenir un équipement standard-shelf.')
+
+export const BUILDING_CATALOG = Object.assign(
+  Object.fromEntries(catalogMap) as Record<string, BuildingDefinition>,
+  { standardShelf },
+)
+
+export const BUILDING_REGISTRY: ReadonlyMap<string, BuildingDefinition> = catalogMap
 export const SHELF_BUILDINGS = BUILDINGS.filter(item => item.category === 'shelf')
 export const CHECKOUT_BUILDINGS = BUILDINGS.filter(item => item.category === 'checkout')
 
 export function getBuildingDefinition(key: string): BuildingDefinition | undefined {
-  return BUILDING_CATALOG.get(key)
+  return catalogMap.get(key)
 }
 
 export function requireBuildingDefinition(key: string): BuildingDefinition {
