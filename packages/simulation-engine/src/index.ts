@@ -7,6 +7,12 @@ export type {
   ShoppingPlanItem,
   StoreMetrics,
 } from './StoreSimulation'
+export { CustomerVisitRegistry } from './CustomerVisitRegistry'
+export type {
+  AbandonCustomerVisitOptions,
+  CompleteCustomerVisitOptions,
+  StartCustomerVisitOptions,
+} from './CustomerVisitRegistry'
 export { GridManager } from './GridManager'
 export type {
   Direction,
