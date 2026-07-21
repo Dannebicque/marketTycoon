@@ -16,8 +16,8 @@ export interface CustomerVisitRecord {
   profileKey: string
   budget: number
   priceSensitivity: number
-  timeAvailableMs: number
-  demandingness: number
+  availableTimeMs: number
+  requirement: number
   loyalty: number
   startedAt: number
   completedAt: number
@@ -101,7 +101,7 @@ export class CustomerVisitAnalyticsManager {
     const record: CustomerVisitRecord = {
       id: crypto.randomUUID(), day: active.day, customerId, profileKey: active.profile.profileKey,
       budget: active.profile.budget, priceSensitivity: active.profile.priceSensitivity,
-      timeAvailableMs: active.profile.timeAvailableMs, demandingness: active.profile.demandingness,
+      availableTimeMs: active.profile.availableTimeMs, requirement: active.profile.requirement,
       loyalty: active.profile.loyalty, startedAt: active.startedAt, completedAt,
       durationMs: Math.max(0, completedAt - active.startedAt), outcome: result.outcome,
       abandonReason: result.reason, articleCount: Math.max(0, result.articleCount),
@@ -136,7 +136,7 @@ function summarizeVisits(visits: CustomerVisitRecord[]): CustomerVisitSummary {
   }
 }
 
-function cloneProfile(profile: CustomerProfile): CustomerProfile { return { ...profile, preferredCategories: [...profile.preferredCategories], preferredPaymentMethods: [...profile.preferredPaymentMethods] } }
+function cloneProfile(profile: CustomerProfile): CustomerProfile { return { ...profile, preferredCategories: [...profile.preferredCategories] } }
 function cloneVisit(visit: CustomerVisitRecord): CustomerVisitRecord { return { ...visit, satisfaction: { ...visit.satisfaction } } }
 function sum<T>(items: T[], selector: (item: T) => number) { return items.reduce((total, item) => total + selector(item), 0) }
 function average<T>(items: T[], selector: (item: T) => number) { return items.length ? sum(items, selector) / items.length : 0 }
