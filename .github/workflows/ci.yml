@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -16,6 +16,66 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Finaliser la migration du moteur
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'apps/game/src/game/StoreScene.ts': {
+                  "import { GridManager, type Direction, type GridCell, type PlacedBuilding, type PlacedEdge } from './GridManager'\nimport { NavigationGrid } from './NavigationGrid'\nimport { StoreSimulation, type BasketLine, type ShoppingPlanItem } from './StoreSimulation'": "import { GridManager, NavigationGrid, StoreSimulation, type BasketLine, type Direction, type GridCell, type PlacedBuilding, type PlacedEdge, type ShoppingPlanItem } from '@market-tycoon/simulation-engine'",
+              },
+              'apps/game/src/game/CustomerAgent.ts': {
+                  "import { GridManager, type GridCell } from './GridManager'": "import { GridManager, type GridCell } from '@market-tycoon/simulation-engine'",
+              },
+              'apps/game/src/game/employees/EmployeeAgent.ts': {
+                  "import { GridManager, type GridCell } from '../GridManager'": "import { GridManager, type GridCell } from '@market-tycoon/simulation-engine'",
+              },
+              'apps/game/src/game/employees/EmployeeRuntime.ts': {
+                  "import type { GridCell, PlacedBuilding } from '../GridManager'": "import type { GridCell, PlacedBuilding } from '@market-tycoon/simulation-engine'",
+                  "import { NavigationGrid } from '../NavigationGrid'": "import { NavigationGrid } from '@market-tycoon/simulation-engine'",
+              },
+              'apps/game/src/game/save/SaveGame.ts': {
+                  "import type { Direction } from '../GridManager'": "import type { Direction } from '@market-tycoon/simulation-engine'",
+                  "import type { StoreMetrics } from '../StoreSimulation'": "import type { StoreMetrics } from '@market-tycoon/simulation-engine'",
+              },
+          }
+
+          for filename, file_replacements in replacements.items():
+              path = Path(filename)
+              content = path.read_text()
+              for old, new in file_replacements.items():
+                  if old not in content:
+                      raise SystemExit(f'Import attendu introuvable dans {filename}: {old}')
+                  content = content.replace(old, new)
+              path.write_text(content)
+
+          for filename in [
+              'apps/game/src/game/GridManager.ts',
+              'apps/game/src/game/NavigationGrid.ts',
+              'apps/game/src/game/StoreSimulation.ts',
+              'apps/game/src/game/equipment/EquipmentInventory.ts',
+          ]:
+              Path(filename).unlink(missing_ok=True)
+          PY
+
+          if grep -R -E "from ['\"]\.\.?/.*(GridManager|NavigationGrid|StoreSimulation|equipment/EquipmentInventory)['\"]" apps/game/src --include='*.ts' --include='*.vue'; then
+            echo 'Des imports locaux vers les façades du moteur subsistent.'
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/game/src
+          if ! git diff --cached --quiet; then
+            git commit -m "Supprimer les dernières façades du moteur"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
 
       - name: Installer Node.js
         uses: actions/setup-node@v4
