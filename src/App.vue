@@ -147,6 +147,7 @@ const orderMessageType = ref<'success' | 'error'>('success')
 let game: Phaser.Game | null = null
 let refreshTimer: number | undefined
 let processedDay = 0
+let uiReady = false
 
 const tools = BUILDINGS
 const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
@@ -163,6 +164,7 @@ const orderPreview = computed(() => {
   const storageType: StorageType | null = product ? (product.requiresFreezing ? 'frozen' : product.requiresRefrigeration ? 'cold' : 'ambient') : null
   const storage = storageCapacities.value.find(item => item.type === storageType)
   const errors: string[] = []
+  if (!uiReady) return { merchandiseTotal, deliveryFee, total, storageFree: 0, errors }
   if (!supplier) errors.push('Sélectionnez un fournisseur valide.')
   if (!product) errors.push('Ce produit n’est pas proposé par le fournisseur sélectionné.')
   if (quantity < 1) errors.push('La quantité doit être au moins égale à 1.')
@@ -202,7 +204,7 @@ function refreshUi() {
   shelves.value = buildings.filter(b => isShelfDefinition(b.definition)).map(building => { const definition = building.definition, inventory = simulation.getEquipmentInventory(building.id); const slots = (inventory?.compartments ?? []).map(slot => { const product = slot.productKey ? getProductDefinition(slot.productKey) : undefined; return { ...slot, productName: product?.name ?? 'Vide', reserveQuantity: product ? simulation.getReserveQuantity(product.key) : 0, color: product ? `#${product.color.toString(16).padStart(6, '0')}` : '#334155' } }); return { id: building.id, type: 'shelf', buildingName: definition.name, description: definition.description, columns: definition.layout.columns, levels: definition.layout.levels, slots, stock: slots.reduce((sum, slot) => sum + slot.quantity, 0), capacity: slots.reduce((sum, slot) => sum + slot.capacity, 0), configuredSlots: slots.filter(slot => slot.productKey).length, compatibleProducts: simulation.getCompatibleProducts(building.id).map(product => ({ key: product.key, name: product.name, capacity: product.capacities[definition.layout.compartmentType] ?? 0 })), columnGroups: Array.from({ length: definition.layout.columns }, (_, index) => ({ index, slots: slots.filter(slot => slot.column === index).sort((a, b) => b.level - a.level) })) } })
   storages.value = buildings.filter(b => isStorageDefinition(b.definition)).map(building => { const type = building.definition.storageType, capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { id: building.id, type: 'storage', buildingName: building.definition.name, description: building.definition.description, storageType: type, capacity, used, free: Math.max(0, capacity - used), ratio: capacity ? used / capacity : 0 } })
   checkouts.value = buildings.filter(b => isCheckoutDefinition(b.definition)).map(building => ({ id: building.id, type: 'checkout', buildingName: building.definition.name, description: building.definition.description, queueLength: simulation.queueLength(building.id), busy: simulation.isCheckoutBusy(building.id), payments: building.definition.acceptedPayments.map(paymentLabel) }))
-  suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } }); selectedId.value = scene.selectedBuildingId
+  suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } }); selectedId.value = scene.selectedBuildingId; uiReady = true
 }
 
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'ambiante' : type === 'cold' ? 'froide' : 'surgelée' }
