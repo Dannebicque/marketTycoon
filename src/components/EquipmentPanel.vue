@@ -37,14 +37,21 @@
 
     <template v-else-if="selectedItem?.type === 'checkout'">
       <div class="selection-type">Caisse</div><p class="panel-help">{{ selectedItem.description }}</p>
-      <dl class="detail-list"><div><dt>File</dt><dd>{{ selectedItem.queueLength }}</dd></div><div><dt>État</dt><dd>{{ selectedItem.busy ? 'Encaissement' : 'Disponible' }}</dd></div><div><dt>Paiements</dt><dd>{{ selectedItem.payments.join(', ') }}</dd></div></dl>
+      <dl class="detail-list">
+        <div><dt>Ouverture</dt><dd :class="selectedItem.open ? 'positive-text' : 'negative-text'">{{ selectedItem.open ? 'Ouverte' : 'Fermée' }}</dd></div>
+        <div><dt>Caissier</dt><dd>{{ selectedItem.employeeName ?? 'Aucun' }}</dd></div>
+        <div><dt>File</dt><dd>{{ selectedItem.queueLength }}</dd></div>
+        <div><dt>État</dt><dd>{{ selectedItem.busy ? 'Encaissement' : selectedItem.open ? 'Disponible' : 'Hors service' }}</dd></div>
+        <div><dt>Paiements</dt><dd>{{ selectedItem.payments.join(', ') }}</dd></div>
+      </dl>
+      <button v-if="!selectedItem.open" class="panel-action" @click="$emit('open-management', 'employees')">Affecter un caissier</button>
     </template>
 
     <template v-else>
       <p class="panel-help">Clique sur un équipement dans la scène pour le configurer.</p>
       <h3>Rayons</h3><button v-for="item in shelves" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.stock }}/{{ item.capacity }}</strong></button>
       <h3>Réserves</h3><button v-for="item in storages" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.used }}/{{ item.capacity }}</strong></button>
-      <h3>Caisses</h3><button v-for="item in checkouts" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.queueLength }}</strong></button>
+      <h3>Caisses</h3><button v-for="item in checkouts" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.open ? item.queueLength : 'Fermée' }}</strong></button>
     </template>
   </aside>
 </template>
@@ -58,7 +65,7 @@ defineEmits<{
   'assign-product': [buildingId: string, slotId: string, event: Event]
   'restock-slot': [buildingId: string, slotId: string]
   'restock-equipment': [buildingId: string]
-  'open-management': [tab: 'reserve']
+  'open-management': [tab: 'reserve' | 'employees']
 }>()
 
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'ambiante' : type === 'cold' ? 'froide' : 'surgelée' }
