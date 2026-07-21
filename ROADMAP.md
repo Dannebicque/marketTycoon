@@ -30,10 +30,15 @@ Cette feuille de route organise l’évolution du prototype vers un véritable j
 
 ### 1. Sensibilité des clients aux prix
 
-- [ ] Ajouter un prix de marché et une sensibilité au prix par produit
-- [ ] Introduire des décisions d’achat : accepter, réduire, refuser ou substituer
-- [ ] Faire varier la satisfaction selon l’écart au marché
-- [ ] Comptabiliser les ventes perdues pour prix excessif
+- [x] Ajouter un prix de marché et une sensibilité au prix par produit
+- [x] Introduire des décisions d’achat : accepter, réduire ou refuser
+- [x] Intégrer ces décisions dans le retrait réel du stock en rayon
+- [x] Comptabiliser les quantités et le chiffre d’affaires potentiel perdus
+- [x] Ajouter un écran de suivi commercial par produit et par période
+- [x] Produire des diagnostics pour ajuster les tarifs
+- [ ] Conserver une sensibilité stable pendant toute la visite d’un client
+- [ ] Faire varier la satisfaction finale selon l’écart au marché
+- [ ] Proposer un produit de substitution après un refus
 - [ ] Ajouter une élasticité configurable par profil client
 
 ### 2. Coût réel du stock
@@ -46,11 +51,13 @@ Cette feuille de route organise l’évolution du prototype vers un véritable j
 
 ### 3. Statistiques par produit
 
+- [x] Quantités demandées, acceptées et refusées
+- [x] Conversion et chiffre d’affaires potentiel perdu
 - [ ] Quantités vendues, chiffre d’affaires et marge brute
-- [ ] Refus liés au prix et ruptures
+- [ ] Ruptures et demandes perdues
 - [ ] Rotation du stock et jours de couverture
-- [ ] Historique journalier
-- [ ] Tableau de performance produit
+- [ ] Historique journalier consolidé
+- [ ] Tableau de performance produit complet
 
 ### 4. Promotions
 
@@ -105,24 +112,25 @@ Cette feuille de route organise l’évolution du prototype vers un véritable j
 
 ## Professionnalisation continue
 
-- [ ] Bus d’événements métier typé
-- [ ] Validation centralisée des catalogues
+- [x] Bus d’événements métier typé
+- [x] Validation centralisée des catalogues
 - [ ] Tests unitaires des managers
 - [ ] Tests de sauvegarde et de migration
 - [ ] Tests des règles économiques
 - [ ] Tests des comportements clients
-- [ ] CI de typecheck et build
+- [x] CI de typecheck et build
+- [x] Conservation des diagnostics de CI sous forme d’artefacts
 - [ ] Journal métier pour le diagnostic
 - [ ] Réduction progressive du rôle d’orchestrateur de `App.vue`
-- [ ] Documentation des décisions d’architecture
+- [x] Documentation des décisions d’architecture
 
 ## Prochain lot d’implémentation
 
-Le prochain lot cible **v0.4 — Intelligence commerciale** dans cet ordre :
+Le prochain lot poursuit **v0.4 — Intelligence commerciale** dans cet ordre :
 
-1. bus d’événements métier ;
-2. modèle de demande et sensibilité au prix ;
-3. coût moyen pondéré du stock ;
-4. statistiques par produit ;
-5. écran d’analyse commerciale ;
-6. persistance et tests.
+1. stabiliser la sensibilité et le budget pendant toute une visite client ;
+2. relier les décisions de prix à la satisfaction finale ;
+3. persister l’historique analytique dans la sauvegarde ;
+4. calculer le coût moyen pondéré du stock ;
+5. ajouter les ventes et marges réelles au tableau produit ;
+6. introduire les substitutions et promotions.
