@@ -2,9 +2,9 @@ import { isCheckoutDefinition, isShelfDefinition } from '@market-tycoon/catalog'
 import type { GridCell, PlacedBuilding } from '../GridManager'
 import { NavigationGrid } from '../NavigationGrid'
 import type { StoreScene } from '../StoreScene'
-import type { EmployeeManager } from './EmployeeManager'
+import type { EmployeeManager } from '@market-tycoon/employees'
 import { EmployeeAgent } from './EmployeeAgent'
-import type { EmployeeState } from './employeeTypes'
+import type { EmployeeState } from '@market-tycoon/employees'
 
 interface RepairRequest {
   checkoutId: string

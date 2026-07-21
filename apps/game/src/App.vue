@@ -71,12 +71,12 @@ import { BUILDINGS, getBuildingDefinition } from '@market-tycoon/catalog'
 import { getProductDefinition } from '@market-tycoon/catalog'
 import type { BuildingKey, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
-import { EmployeeManager } from './game/employees/EmployeeManager'
-import { EmployeeRuntime } from './game/employees/EmployeeRuntime'
+import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
+import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
 import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
-import type { EmployeeState } from './game/employees/employeeTypes'
-import { deleteSaveGame, hasSaveGame, readSaveGame, SAVE_GAME_VERSION, storeSaveGame, type SaveGameV1 } from './game/save/SaveGame'
-import { StoreScene } from './game/StoreScene'
+import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
+import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'
+import { StoreScene } from './phaser/StoreScene'
 
 const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')

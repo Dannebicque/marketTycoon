@@ -190,3 +190,12 @@ src/
 ```
 
 Cette cible sera atteinte par extractions successives, sans réécriture complète.
+
+## Frontières des packages
+
+- `apps/game` contient Vue, Phaser, les agents visuels et les adaptateurs navigateur.
+- `packages/employees` contient l’état, le recrutement, l’affectation et les règles métier des employés.
+- `packages/save` contient le format versionné, la sérialisation et l’analyse des sauvegardes.
+- `apps/game/src/infrastructure/LocalStorageSaveRepository.ts` est l’adaptateur navigateur de persistance.
+- aucun package ne peut importer `apps/*` ni sortir de son propre dossier par un chemin relatif.
+- `npm run architecture:check` vérifie ces frontières en CI.

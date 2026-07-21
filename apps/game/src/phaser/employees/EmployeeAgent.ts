@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { GridManager, type GridCell } from '../GridManager'
-import type { EmployeeState } from './employeeTypes'
+import type { EmployeeState } from '@market-tycoon/employees'
 
 const ROLE_COLORS: Record<string, number> = {
   cashier: 0x2563eb,
