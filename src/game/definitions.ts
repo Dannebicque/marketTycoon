@@ -10,6 +10,8 @@ export type ProductCategory =
   | 'frozen'
   | 'bakery'
 
+export type StorageType = 'ambient' | 'cold' | 'frozen'
+
 export type CompartmentType =
   | 'standard-shelf'
   | 'fruit-bin'
@@ -31,7 +33,7 @@ export interface ProductDefinition {
   requiresFreezing?: boolean
 }
 
-export type BuildingCategory = 'shelf' | 'checkout' | 'wall' | 'door'
+export type BuildingCategory = 'shelf' | 'checkout' | 'storage' | 'wall' | 'door'
 export type BuildingKey = string
 
 export interface BuildingToolbarDefinition {
@@ -68,6 +70,13 @@ export interface ShelfDefinition extends BaseBuildingDefinition {
   customerPickupTimeMs: number
 }
 
+export interface StorageDefinition extends BaseBuildingDefinition {
+  category: 'storage'
+  storageType: StorageType
+  capacity: number
+  electricityCostPerDay?: number
+}
+
 export interface CheckoutDefinition extends BaseBuildingDefinition {
   category: 'checkout'
   scanTimePerArticleMs: number
@@ -81,7 +90,7 @@ export interface CheckoutDefinition extends BaseBuildingDefinition {
 export interface WallDefinition extends BaseBuildingDefinition { category: 'wall' }
 export interface DoorDefinition extends BaseBuildingDefinition { category: 'door' }
 
-export type BuildingDefinition = ShelfDefinition | CheckoutDefinition | WallDefinition | DoorDefinition
+export type BuildingDefinition = ShelfDefinition | StorageDefinition | CheckoutDefinition | WallDefinition | DoorDefinition
 
 export function defineBuilding<T extends BuildingDefinition>(definition: T): T { return definition }
 export function defineProduct<T extends ProductDefinition>(definition: T): T { return definition }
@@ -90,10 +99,20 @@ export function isShelfDefinition(definition: BuildingDefinition): definition is
   return definition.category === 'shelf'
 }
 
+export function isStorageDefinition(definition: BuildingDefinition): definition is StorageDefinition {
+  return definition.category === 'storage'
+}
+
 export function isCheckoutDefinition(definition: BuildingDefinition): definition is CheckoutDefinition {
   return definition.category === 'checkout'
 }
 
 export function isEdgeDefinition(definition: BuildingDefinition): definition is WallDefinition | DoorDefinition {
   return definition.category === 'wall' || definition.category === 'door'
+}
+
+export function getProductStorageType(product: ProductDefinition): StorageType {
+  if (product.requiresFreezing) return 'frozen'
+  if (product.requiresRefrigeration) return 'cold'
+  return 'ambient'
 }
