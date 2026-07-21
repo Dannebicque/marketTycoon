@@ -1,13 +1,5 @@
-export interface DemandProduct {
-  key: string
-  purchasePrice: number
-  salePrice: number
-  marketPrice?: number
-  priceSensitivity?: number
-}
+import type { ProductDefinition } from '@market-tycoon/catalog'
 
-export interface PricingProduct {
-  key: string
-  purchasePrice: number
-  salePrice: number
-}
+export type DemandProduct = Pick<ProductDefinition, 'key' | 'purchasePrice' | 'salePrice' | 'marketPrice' | 'priceSensitivity'>
+
+export type PricingProduct = Pick<ProductDefinition, 'key' | 'purchasePrice' | 'salePrice'>
