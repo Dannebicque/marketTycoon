@@ -19,7 +19,7 @@
         :title="tool.description"
         @click="selectTool(tool.key)"
       >
-        <span class="tool-icon">{{ iconFor(tool.category, tool.key) }}</span>
+        <span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span>
         <span>{{ tool.name }}</span>
         <small>{{ tool.price }} €</small>
       </button>
@@ -193,19 +193,6 @@ function refreshUi() {
 
 function paymentLabel(value: string) {
   return value === 'contactless' ? 'sans contact' : value === 'card' ? 'carte' : 'espèces'
-}
-
-function iconFor(category: string, key: string) {
-  if (key === 'freezer') return '❄'
-  if (key === 'fruit-shelf') return '🍎'
-  if (key === 'refrigerated-shelf') return '◫'
-  if (key === 'bakery-shelf') return '🥖'
-  if (key === 'self-checkout') return '🤖'
-  if (key === 'express-checkout') return '⚡'
-  if (category === 'shelf') return '▥'
-  if (category === 'checkout') return '▣'
-  if (category === 'wall') return '▤'
-  return '▯'
 }
 
 function money(value: number) {
