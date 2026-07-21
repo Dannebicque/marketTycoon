@@ -11,7 +11,7 @@ export default defineBuilding({
   color: 0x22c55e,
   renderer: 'refrigerated-shelf',
   toolbar: { icon: '🧊', order: 30 },
-  capacity: 30,
+  layout: { columns: 3, levels: 4, compartmentType: 'refrigerated-shelf' },
   allowedProductCategories: ['fresh'],
   refrigerated: true,
   electricityCostPerDay: 12,
