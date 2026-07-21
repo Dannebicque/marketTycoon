@@ -42,3 +42,10 @@ function supplierName(key: string) { return props.suppliers.find(item => item.ke
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'Ambiante' : type === 'cold' ? 'Froide' : 'Surgelée' }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value || 0) }
 </script>
+
+<style scoped>
+.save-actions { display:grid; grid-template-columns:1fr auto auto; gap:10px; margin:16px 0; }
+.save-actions .panel-action { margin:0; }
+.danger-action { padding:10px 12px; border:1px solid #7f1d1d; border-radius:8px; background:rgba(127,29,29,.22); color:#fecaca; cursor:pointer; }
+@media (max-width:700px) { .save-actions { grid-template-columns:1fr; } }
+</style>
