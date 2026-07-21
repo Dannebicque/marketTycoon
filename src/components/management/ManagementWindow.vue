@@ -33,11 +33,11 @@
 
 <script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'customers' | 'pricing' | 'employees' | 'orders' | 'settings'</script>
 <script setup lang="ts">
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
+import type { EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '../../game/analytics/CustomerAnalyticsManager'
-import type { ProductDefinition, StorageType } from '../../game/definitions'
-import type { EmployeeRoleDefinition, EmployeeState } from '../../game/employees/employeeTypes'
+import type { EmployeeState } from '../../game/employees/employeeTypes'
 import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
 import PricingPanel from './PricingPanel.vue'
