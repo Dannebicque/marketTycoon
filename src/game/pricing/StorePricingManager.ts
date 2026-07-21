@@ -49,7 +49,7 @@ export class StorePricingManager {
   }
 
   getSummary(product: ProductDefinition): ProductPricingSummary {
-    const salePrice = this.getSalePrice(product)
+    const salePrice = product.salePrice
     const unitMargin = salePrice - product.purchasePrice
     return {
       productKey: product.key,
