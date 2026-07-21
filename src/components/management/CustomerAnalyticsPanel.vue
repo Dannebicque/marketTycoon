@@ -51,8 +51,8 @@
 </template>
 
 <script setup lang="ts">
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
 import { computed, ref } from 'vue'
-import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '../../game/analytics/CustomerAnalyticsManager'
 
 const props = defineProps<{
   day: number
