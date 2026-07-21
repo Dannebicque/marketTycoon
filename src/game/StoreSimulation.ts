@@ -1,6 +1,7 @@
 import { PRODUCTS, getProductDefinition, getProductsForCategories } from './catalog/products'
-import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition } from './definitions'
-import { isCheckoutDefinition, isShelfDefinition } from './definitions'
+import { SUPPLIERS } from './catalog/suppliers'
+import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition, StorageType } from './definitions'
+import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './definitions'
 import {
   createEquipmentInventory,
   getProductCapacity,
@@ -9,6 +10,8 @@ import {
   type EquipmentInventoryState,
 } from './equipment/EquipmentInventory'
 import type { PlacedBuilding } from './GridManager'
+import { PurchaseOrderManager } from './logistics/PurchaseOrderManager'
+import { ReserveManager } from './logistics/ReserveManager'
 
 export type { PaymentMethod, ProductDefinition } from './definitions'
 
@@ -73,7 +76,11 @@ export class StoreSimulation {
   private shelfDefinitions = new Map<string, ShelfDefinition>()
   private checkoutQueues = new Map<string, string[]>()
   private checkoutBusy = new Set<string>()
+  private buildings: PlacedBuilding[] = []
   private dayStart?: StoreMetrics
+
+  readonly reserve = new ReserveManager()
+  readonly purchaseOrders = new PurchaseOrderManager()
 
   readonly metrics: StoreMetrics = {
     cash: INITIAL_BUDGET, revenue: 0, profit: 0, constructionExpenses: 0,
@@ -84,6 +91,7 @@ export class StoreSimulation {
   }
 
   syncBuildings(buildings: PlacedBuilding[]) {
+    this.buildings = buildings
     const shelves = buildings.filter(item => isShelfDefinition(item.definition))
     const checkouts = buildings.filter(item => isCheckoutDefinition(item.definition))
     const shelfIds = new Set(shelves.map(item => item.id))
@@ -93,18 +101,11 @@ export class StoreSimulation {
     for (const id of this.shelfDefinitions.keys()) if (!shelfIds.has(id)) this.shelfDefinitions.delete(id)
     for (const id of this.checkoutQueues.keys()) if (!checkoutIds.has(id)) this.checkoutQueues.delete(id)
 
-    shelves.forEach((shelf, index) => {
+    for (const shelf of shelves) {
       const definition = shelf.definition as ShelfDefinition
       this.shelfDefinitions.set(shelf.id, definition)
-      if (this.inventories.has(shelf.id)) return
-      const inventory = createEquipmentInventory(shelf.id, definition)
-      const compatible = this.getCompatibleProducts(shelf.id)
-      inventory.compartments.forEach((slot, slotIndex) => {
-        const product = compatible[(index + slotIndex) % Math.max(1, compatible.length)]
-        if (product) this.assignProductToCompartment(shelf.id, slot.id, product.key, true, inventory)
-      })
-      this.inventories.set(shelf.id, inventory)
-    })
+      if (!this.inventories.has(shelf.id)) this.inventories.set(shelf.id, createEquipmentInventory(shelf.id, definition))
+    }
 
     for (const checkout of checkouts) {
       if (!this.checkoutQueues.has(checkout.id)) this.checkoutQueues.set(checkout.id, [])
@@ -153,61 +154,90 @@ export class StoreSimulation {
     return getProductsForCategories(definition.allowedProductCategories).filter(product => isProductCompatible(definition, product))
   }
 
-  assignProductToCompartment(buildingId: string, compartmentId: string, productKey: string | null, fill = false, providedInventory?: EquipmentInventoryState) {
-    const inventory = providedInventory ?? this.inventories.get(buildingId)
+  assignProductToCompartment(buildingId: string, compartmentId: string, productKey: string | null) {
+    const inventory = this.inventories.get(buildingId)
     const definition = this.shelfDefinitions.get(buildingId)
     const compartment = inventory?.compartments.find(item => item.id === compartmentId)
     if (!inventory || !definition || !compartment) return false
+
+    if (compartment.productKey && compartment.quantity > 0) {
+      this.reserve.add(compartment.productKey, compartment.quantity, this.buildings)
+    }
+
     if (productKey === null) {
       compartment.productKey = null
       compartment.quantity = 0
       compartment.capacity = 0
       return true
     }
+
     const product = getProductDefinition(productKey)
     if (!product || !isProductCompatible(definition, product)) return false
     compartment.productKey = product.key
     compartment.capacity = getProductCapacity(definition, product)
-    compartment.quantity = fill ? compartment.capacity : 0
+    compartment.quantity = 0
     return true
   }
 
   restockCompartment(buildingId: string, compartmentId: string) {
     const compartment = this.getCompartment(buildingId, compartmentId)
     if (!compartment?.productKey) return false
-    const product = getProductDefinition(compartment.productKey)
-    if (!product) return false
     const missing = compartment.capacity - compartment.quantity
-    const cost = missing * product.purchasePrice
-    if (!this.canSpend(cost)) return false
-    this.metrics.cash -= cost
-    this.metrics.merchandiseExpenses += cost
-    compartment.quantity = compartment.capacity
-    this.recalculateProfit()
-    return true
+    const moved = this.reserve.withdraw(compartment.productKey, missing)
+    compartment.quantity += moved
+    return moved > 0
   }
 
   restockEquipment(buildingId: string) {
     const inventory = this.inventories.get(buildingId)
-    return inventory ? this.restockCompartments(inventory.compartments) : false
+    if (!inventory) return false
+    let moved = 0
+    for (const compartment of inventory.compartments) {
+      if (!compartment.productKey) continue
+      const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
+      compartment.quantity += quantity
+      moved += quantity
+    }
+    return moved > 0
   }
 
-  restockAll() { return this.restockCompartments([...this.inventories.values()].flatMap(item => item.compartments)) }
+  restockAll() {
+    let moved = 0
+    for (const inventory of this.inventories.values()) {
+      for (const compartment of inventory.compartments) {
+        if (!compartment.productKey) continue
+        const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
+        compartment.quantity += quantity
+        moved += quantity
+      }
+    }
+    return moved > 0
+  }
 
-  private restockCompartments(compartments: EquipmentCompartmentState[]) {
-    const lines = compartments.flatMap(compartment => {
-      if (!compartment.productKey) return []
-      const product = getProductDefinition(compartment.productKey)
-      return product ? [{ compartment, product }] : []
-    })
-    const cost = lines.reduce((total, line) => total + (line.compartment.capacity - line.compartment.quantity) * line.product.purchasePrice, 0)
-    if (!this.canSpend(cost)) return false
-    this.metrics.cash -= cost
-    this.metrics.merchandiseExpenses += cost
-    lines.forEach(line => { line.compartment.quantity = line.compartment.capacity })
+  createPurchaseOrder(supplierKey: string, lines: Array<{ productKey: string; quantity: number }>, day: number) {
+    const order = this.purchaseOrders.createOrder(supplierKey, lines, day)
+    if (!order || !this.canSpend(order.orderedTotal)) {
+      if (order) this.purchaseOrders.cancel(order.id)
+      return null
+    }
+    this.metrics.cash -= order.orderedTotal
+    this.metrics.merchandiseExpenses += order.orderedTotal
     this.recalculateProfit()
-    return true
+    return order
   }
+
+  processDeliveries(day: number) {
+    this.purchaseOrders.process(day, this.buildings, this.reserve)
+  }
+
+  getSuppliers() { return SUPPLIERS }
+  getPurchaseOrders() { return this.purchaseOrders.getOrders() }
+  getReserveLines() { return this.reserve.getLines() }
+  getReserveQuantity(productKey: string) { return this.reserve.getQuantity(productKey) }
+  getStorageCapacity(type: StorageType) { return this.reserve.getCapacity(this.buildings, type) }
+  getStorageUsed(type: StorageType) { return this.reserve.getUsed(type) }
+  getStorageFree(type: StorageType) { return this.reserve.getFree(this.buildings, type) }
+  hasStorage(type: StorageType) { return this.getStorageCapacity(type) > 0 }
 
   getAvailableShelves(buildings: PlacedBuilding[]) {
     return buildings.filter(building => isShelfDefinition(building.definition) && Boolean(this.inventories.get(building.id)?.compartments.some(slot => slot.productKey && slot.quantity > 0)))
@@ -313,7 +343,9 @@ export class StoreSimulation {
   getCompartment(buildingId: string, compartmentId: string) { return this.inventories.get(buildingId)?.compartments.find(item => item.id === compartmentId) }
   getEquipmentInventory(buildingId: string) { return this.inventories.get(buildingId) }
   getEquipmentInventories() { return [...this.inventories.values()] }
-  getTotalStock() { return [...this.inventories.values()].flatMap(item => item.compartments).reduce((total, slot) => total + slot.quantity, 0) }
+  getTotalShelfStock() { return [...this.inventories.values()].flatMap(item => item.compartments).reduce((total, slot) => total + slot.quantity, 0) }
+  getTotalReserveStock() { return this.reserve.getLines().reduce((total, line) => total + line.quantity, 0) }
+  getTotalStock() { return this.getTotalShelfStock() + this.getTotalReserveStock() }
   getProducts() { return PRODUCTS }
 
   getDayRevenue() { return this.metrics.revenue - (this.dayStart?.revenue ?? 0) }
@@ -325,12 +357,16 @@ export class StoreSimulation {
   getAverageQueueSeconds() { return this.metrics.servedCustomers ? this.metrics.totalQueueTimeMs / this.metrics.servedCustomers / 1000 : 0 }
 
   private applyDailyOperatingCosts(buildings: PlacedBuilding[]) {
-    const cost = buildings.reduce((total, building) => isShelfDefinition(building.definition) ? total + (building.definition.electricityCostPerDay ?? 0) : total, 0)
+    const cost = buildings.reduce((total, building) => {
+      if (isShelfDefinition(building.definition) || isStorageDefinition(building.definition)) return total + (building.definition.electricityCostPerDay ?? 0)
+      return total
+    }, 0)
     if (cost <= 0 || !this.canSpend(cost)) return
     this.metrics.cash -= cost
     this.metrics.operatingExpenses += cost
     this.recalculateProfit()
   }
+
   private recalculateProfit() { this.metrics.profit = this.metrics.revenue - this.metrics.constructionExpenses - this.metrics.merchandiseExpenses - this.metrics.operatingExpenses }
   private emptySnapshotStart(): StoreMetrics {
     return { cash: this.metrics.cash, revenue: 0, profit: 0, constructionExpenses: 0, merchandiseExpenses: 0, operatingExpenses: 0, servedCustomers: 0, lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0, totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0, cardPayments: 0, cashPayments: 0, checkoutIncidents: 0 }
