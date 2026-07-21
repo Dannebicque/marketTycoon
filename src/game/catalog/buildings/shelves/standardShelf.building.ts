@@ -11,7 +11,7 @@ export default defineBuilding({
   color: 0xb07a4f,
   renderer: 'standard-shelf',
   toolbar: { icon: '▥', order: 10 },
-  capacity: 24,
+  layout: { columns: 3, levels: 4, compartmentType: 'standard-shelf' },
   allowedProductCategories: ['grocery', 'drink', 'hygiene'],
   customerPickupTimeMs: 650,
 })
