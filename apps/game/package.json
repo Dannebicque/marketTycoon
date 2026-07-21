@@ -1,7 +1,22 @@
 {
   "name": "@market-tycoon/game",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Adaptateur Vue et Phaser de Market Tycoon"
+  "description": "Application Vue et Phaser de Market Tycoon",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@market-tycoon/analytics": "0.1.0",
+    "@market-tycoon/catalog": "0.3.0",
+    "@market-tycoon/economy": "0.1.0",
+    "@market-tycoon/events": "0.1.0",
+    "@market-tycoon/simulation-engine": "0.1.0",
+    "phaser": "^3.90.0",
+    "vue": "^3.5.17",
+    "vue-i18n": "^11.0.0"
+  }
 }

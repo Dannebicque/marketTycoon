@@ -8,16 +8,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run dev --workspace @market-tycoon/game",
     "typecheck": "vue-tsc --noEmit",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "npm run build --workspace @market-tycoon/game",
     "check": "npm run typecheck && npm run build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "phaser": "^3.90.0",
-    "vue": "^3.5.17",
-    "vue-i18n": "^11.0.0"
+    "preview": "npm run preview --workspace @market-tycoon/game"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
