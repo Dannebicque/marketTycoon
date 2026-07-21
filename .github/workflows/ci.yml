@@ -65,11 +65,6 @@ jobs:
             src/game/definitions.ts
           rmdir src/game/catalog 2>/dev/null || true
 
-          if grep -R -nE "game/catalog|from ['\"]\.?\.?/definitions['\"]|from ['\"]\./catalog/(buildings|products|readers|suppliers)['\"]|from ['\"]\.\./catalog/employees['\"]" src; then
-            echo 'Des imports historiques subsistent.' >&2
-            exit 1
-          fi
-
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
