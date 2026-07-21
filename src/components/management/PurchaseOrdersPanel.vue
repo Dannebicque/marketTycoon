@@ -23,7 +23,7 @@
       <div v-if="!cart.detailedLines.value.length" class="empty-state">Le bon de commande est vide.</div>
       <article v-for="line in cart.detailedLines.value" :key="line.productKey" class="cart-line">
         <div class="cart-product"><strong>{{ line.product.name }}</strong><small>{{ money(line.unitPrice) }} / unité · {{ storageLabel(line.storageType) }}</small></div>
-        <input :value="line.quantity" type="number" min="1" step="1" @change="cart.updateQuantity(line.productKey, Number(($event.target as HTMLInputElement).value))" />
+        <input :value="line.quantity" type="number" min="1" step="1" @change="onQuantityChange(line.productKey, $event)" />
         <strong>{{ money(line.lineTotal) }}</strong>
         <button class="cart-remove" type="button" title="Supprimer" @click="cart.removeLine(line.productKey)">×</button>
       </article>
@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { toRef } from 'vue'
 import type { ProductDefinition, StorageType } from '../../game/definitions'
 import { usePurchaseOrderCart } from '../../composables/usePurchaseOrderCart'
 
@@ -66,6 +66,9 @@ const emit = defineEmits<{ submit: [supplierKey: string, lines: Array<{ productK
 const storageTypes: StorageType[] = ['ambient', 'cold', 'frozen']
 const cart = usePurchaseOrderCart({ suppliers: toRef(props, 'suppliers'), products: toRef(props, 'products'), storageCapacities: toRef(props, 'storageCapacities'), cash: toRef(props, 'cash') })
 
+function onQuantityChange(productKey: string, event: Event) {
+  cart.updateQuantity(productKey, Number((event.target as HTMLInputElement).value))
+}
 function submitOrder() {
   if (cart.validationErrors.value.length || !cart.supplier.value) return
   emit('submit', cart.supplier.value.key, cart.lines.value.map(line => ({ ...line })))
