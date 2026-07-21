@@ -8,6 +8,10 @@ function validateProduct(product: ProductDefinition, filename: string) {
   if (!product.name?.trim()) throw new Error(`${product.key} : nom manquant.`)
   if (!product.shortName?.trim()) throw new Error(`${product.key} : nom court manquant.`)
   if (product.purchasePrice < 0 || product.salePrice < 0) throw new Error(`${product.key} : prix négatif.`)
+  if (product.marketPrice !== undefined && product.marketPrice <= 0) throw new Error(`${product.key} : prix de marché invalide.`)
+  if (product.priceSensitivity !== undefined && (product.priceSensitivity < 0 || product.priceSensitivity > 1)) {
+    throw new Error(`${product.key} : la sensibilité au prix doit être comprise entre 0 et 1.`)
+  }
   if (!Object.values(product.capacities).some(capacity => Number(capacity) > 0)) throw new Error(`${product.key} : aucune capacité de rangement valide.`)
   if (product.requiresFreezing && product.requiresRefrigeration) throw new Error(`${product.key} : contraintes de froid incohérentes.`)
   if (product.salePrice < product.purchasePrice) console.warn(`${product.key} est vendu à perte.`)
