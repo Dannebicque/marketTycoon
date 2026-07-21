@@ -12,6 +12,7 @@ export default defineConfig({
       '@market-tycoon/economy': packageSource('economy'),
       '@market-tycoon/analytics': packageSource('analytics'),
       '@market-tycoon/events': packageSource('events'),
+      '@market-tycoon/catalog': packageSource('catalog'),
     },
   },
 })
