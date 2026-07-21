@@ -10,6 +10,13 @@ export type ProductCategory =
   | 'frozen'
   | 'bakery'
 
+export type CompartmentType =
+  | 'standard-shelf'
+  | 'fruit-bin'
+  | 'refrigerated-shelf'
+  | 'freezer-shelf'
+  | 'bakery-display'
+
 export interface ProductDefinition {
   key: string
   category: ProductCategory
@@ -18,6 +25,7 @@ export interface ProductDefinition {
   salePrice: number
   purchasePrice: number
   color: number
+  capacities: Partial<Record<CompartmentType, number>>
   shelfLifeDays?: number
   requiresRefrigeration?: boolean
   requiresFreezing?: boolean
@@ -25,6 +33,17 @@ export interface ProductDefinition {
 
 export type BuildingCategory = 'shelf' | 'checkout' | 'wall' | 'door'
 export type BuildingKey = string
+
+export interface BuildingToolbarDefinition {
+  icon: string
+  order: number
+}
+
+export interface EquipmentLayoutDefinition {
+  columns: number
+  levels: number
+  compartmentType: CompartmentType
+}
 
 interface BaseBuildingDefinition {
   key: BuildingKey
@@ -36,15 +55,12 @@ interface BaseBuildingDefinition {
   price: number
   color: number
   renderer: string
-  toolbar?: {
-    icon: string
-    order: number
-  }
+  toolbar?: BuildingToolbarDefinition
 }
 
 export interface ShelfDefinition extends BaseBuildingDefinition {
   category: 'shelf'
-  capacity: number
+  layout: EquipmentLayoutDefinition
   allowedProductCategories: ProductCategory[]
   refrigerated?: boolean
   frozen?: boolean
@@ -62,27 +78,13 @@ export interface CheckoutDefinition extends BaseBuildingDefinition {
   breakdownChance?: number
 }
 
-export interface WallDefinition extends BaseBuildingDefinition {
-  category: 'wall'
-}
+export interface WallDefinition extends BaseBuildingDefinition { category: 'wall' }
+export interface DoorDefinition extends BaseBuildingDefinition { category: 'door' }
 
-export interface DoorDefinition extends BaseBuildingDefinition {
-  category: 'door'
-}
+export type BuildingDefinition = ShelfDefinition | CheckoutDefinition | WallDefinition | DoorDefinition
 
-export type BuildingDefinition =
-  | ShelfDefinition
-  | CheckoutDefinition
-  | WallDefinition
-  | DoorDefinition
-
-export function defineBuilding<const T extends BuildingDefinition>(definition: T): T {
-  return definition
-}
-
-export function defineProduct<const T extends ProductDefinition>(definition: T): T {
-  return definition
-}
+export function defineBuilding<T extends BuildingDefinition>(definition: T): T { return definition }
+export function defineProduct<T extends ProductDefinition>(definition: T): T { return definition }
 
 export function isShelfDefinition(definition: BuildingDefinition): definition is ShelfDefinition {
   return definition.category === 'shelf'
