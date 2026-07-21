@@ -117,6 +117,8 @@ export class CustomerVisitAnalyticsManager {
   private filter(day?: number) { return day === undefined ? this.visits : this.visits.filter(item => item.day === day) }
 }
 
+export const customerVisitAnalytics = new CustomerVisitAnalyticsManager()
+
 function summarizeVisits(visits: CustomerVisitRecord[]): CustomerVisitSummary {
   const completed = visits.filter(item => item.outcome === 'completed')
   return {
