@@ -1,7 +1,9 @@
-import { CustomerAnalyticsManager } from './analytics/CustomerAnalyticsManager'
+import { CustomerAnalyticsManager } from '@market-tycoon/analytics'
+import { MarketDemandManager, PurchaseOrderManager, ReserveManager } from '@market-tycoon/economy'
+import { gameEvents } from '@market-tycoon/events'
 import { PRODUCTS, getProductDefinition, getProductsForCategories } from './catalog/products'
+import { productCatalogReader, supplierCatalogReader } from './catalog/readers'
 import { SUPPLIERS } from './catalog/suppliers'
-import { MarketDemandManager } from './commerce/MarketDemandManager'
 import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition, StorageType } from './definitions'
 import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './definitions'
 import {
@@ -10,10 +12,7 @@ import {
   isProductCompatible,
   type EquipmentInventoryState,
 } from './equipment/EquipmentInventory'
-import { gameEvents } from './events/gameEvents'
 import type { PlacedBuilding } from './GridManager'
-import { PurchaseOrderManager } from './logistics/PurchaseOrderManager'
-import { ReserveManager } from './logistics/ReserveManager'
 
 export type { PaymentMethod, ProductDefinition } from './definitions'
 
@@ -92,8 +91,8 @@ export class StoreSimulation {
   private currentDay = 1
   private nextAnonymousCustomer = 1
 
-  readonly reserve = new ReserveManager()
-  readonly purchaseOrders = new PurchaseOrderManager()
+  readonly reserve = new ReserveManager(productCatalogReader)
+  readonly purchaseOrders = new PurchaseOrderManager(productCatalogReader, supplierCatalogReader)
   readonly demand = new MarketDemandManager()
   readonly customerAnalytics = new CustomerAnalyticsManager()
 
