@@ -1,4 +1,6 @@
 export type EmployeeRoleKey = string
+export type EmployeeStatus = 'available' | 'assigned' | 'working'
+export type EmployeeTaskType = 'idle' | 'checkout' | 'restocking' | 'repairing'
 
 export interface EmployeeRoleDefinition {
   key: EmployeeRoleKey
@@ -11,6 +13,13 @@ export interface EmployeeRoleDefinition {
   order: number
 }
 
+export interface EmployeeTaskState {
+  type: EmployeeTaskType
+  label: string
+  targetBuildingId?: string
+  startedAt?: number
+}
+
 export interface EmployeeState {
   id: string
   firstName: string
@@ -18,8 +27,10 @@ export interface EmployeeState {
   roleKey: EmployeeRoleKey
   quality: number
   dailySalary: number
-  status: 'available' | 'assigned'
+  status: EmployeeStatus
   assignedBuildingId?: string
+  currentTask?: EmployeeTaskState
+  completedTasks?: number
   hiredDay: number
 }
 
