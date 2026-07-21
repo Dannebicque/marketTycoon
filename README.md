@@ -8,7 +8,8 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 - pathfinding A* respectant murs et portes ;
 - plusieurs clients simultanés avec paniers multi-articles ;
 - stocks, files, paiements, satisfaction et bilan journalier ;
-- rotation, déplacement et zoom de la caméra ;
+- équipements composés d’emplacements configurables ;
+- capacité de rangement propre à chaque produit ;
 - interface Vue superposée à Phaser ;
 - équipements et produits chargés automatiquement depuis des définitions typées.
 
@@ -17,31 +18,89 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 Les grandes catégories sont volontairement figées dans `src/game/definitions.ts` :
 
 ```text
-BuildingCategory = shelf | checkout | wall | door
-ProductCategory  = grocery | fruit | vegetable | fresh | drink | hygiene | frozen | bakery
+BuildingCategory  = shelf | checkout | wall | door
+ProductCategory   = grocery | fruit | vegetable | fresh | drink | hygiene | frozen | bakery
+CompartmentType   = standard-shelf | fruit-bin | refrigerated-shelf | freezer-shelf | bakery-display
 ```
 
-Les clés précises des équipements et produits restent extensibles. Chaque objet est défini dans son propre fichier.
+Les clés précises restent extensibles. Chaque équipement et chaque produit est défini dans son propre fichier, chargé avec `import.meta.glob(..., { eager: true })`.
 
 ```text
-src/game/catalog/
-├── buildings.ts
-├── buildings/
-│   ├── shelves/*.building.ts
-│   ├── checkouts/*.building.ts
-│   └── edges/*.building.ts
-├── products.ts
-└── products/
-    └── <categorie>/*.product.ts
+src/game/
+├── definitions.ts
+├── equipment/
+│   └── EquipmentInventory.ts
+└── catalog/
+    ├── buildings.ts
+    ├── buildings/
+    │   ├── shelves/*.building.ts
+    │   ├── checkouts/*.building.ts
+    │   └── edges/*.building.ts
+    ├── products.ts
+    └── products/<categorie>/*.product.ts
 ```
 
-`buildings.ts` et `products.ts` utilisent `import.meta.glob(..., { eager: true })` pour découvrir automatiquement les fichiers. Les registres vérifient au démarrage :
+## Structure interne des équipements
 
-- l’unicité des clés ;
-- les noms, dimensions, prix et capacités ;
-- les catégories autorisées d’un rayon ;
-- les moyens de paiement d’une caisse ;
-- la cohérence des contraintes de conservation d’un produit.
+Un rayon ne possède plus une capacité globale. Il déclare une grille interne :
+
+```ts
+layout: {
+  columns: 3,
+  levels: 4,
+  compartmentType: 'standard-shelf',
+}
+```
+
+Cet exemple génère automatiquement douze emplacements :
+
+```text
+3 colonnes × 4 étagères = 12 emplacements
+```
+
+Chaque emplacement peut contenir une seule référence de produit. Deux emplacements différents du même meuble peuvent recevoir des produits différents.
+
+L’état réel est stocké par équipement placé :
+
+```ts
+interface EquipmentCompartmentState {
+  id: string
+  column: number
+  level: number
+  productKey: string | null
+  quantity: number
+  capacity: number
+}
+```
+
+## Capacité propre aux produits
+
+La capacité est déclarée dans le fichier du produit pour chaque type d’emplacement compatible :
+
+```ts
+export default defineProduct({
+  key: 'pasta',
+  category: 'grocery',
+  name: 'Pâtes',
+  shortName: 'PÂTES',
+  salePrice: 3.5,
+  purchasePrice: 1.4,
+  color: 0xd6a75f,
+  capacities: {
+    'standard-shelf': 30,
+  },
+})
+```
+
+Un produit volumineux peut avoir une capacité plus faible :
+
+```ts
+capacities: {
+  'standard-shelf': 6,
+}
+```
+
+Une capacité absente ou égale à zéro rend le produit incompatible avec ce type d’emplacement.
 
 ## Ajouter un équipement
 
@@ -65,13 +124,17 @@ export default defineBuilding({
   color: 0x65a30d,
   renderer: 'standard-shelf',
   toolbar: { icon: '🌿', order: 55 },
-  capacity: 28,
+  layout: {
+    columns: 3,
+    levels: 4,
+    compartmentType: 'standard-shelf',
+  },
   allowedProductCategories: ['grocery', 'fruit', 'vegetable'],
   customerPickupTimeMs: 750,
 })
 ```
 
-Aucun import manuel n’est nécessaire. Le nouvel équipement est chargé par Vite et apparaît dans `BUILDINGS`, puis dans la barre Vue. Un changement dans `StoreScene` n’est requis que pour ajouter une apparence `renderer` réellement nouvelle.
+Aucun import manuel n’est nécessaire. Un changement dans `StoreScene` n’est requis que pour une apparence réellement nouvelle.
 
 ## Ajouter un produit
 
@@ -93,28 +156,25 @@ export default defineProduct({
   purchasePrice: 1.5,
   color: 0x84cc16,
   shelfLifeDays: 5,
+  capacities: {
+    'fruit-bin': 34,
+  },
 })
 ```
 
-Le produit sera automatiquement disponible pour les rayons dont `allowedProductCategories` contient `fruit`.
+Le produit sera proposé uniquement dans les équipements compatibles avec sa catégorie, ses contraintes de froid et son type d’emplacement.
 
-## Équipements disponibles
+## Configurer un équipement
 
-### Rayons
+1. Placer un rayon dans la scène.
+2. Cliquer sur le rayon existant.
+3. Le panneau Vue affiche ses colonnes et ses étagères.
+4. Choisir un produit pour chaque emplacement.
+5. Réapprovisionner un emplacement ou le meuble entier.
 
-- rayon standard ;
-- fruits et légumes ;
-- rayon réfrigéré ;
-- congélateur ;
-- boulangerie.
+Le changement de produit vide volontairement l’emplacement. Il faut ensuite le réapprovisionner, ce qui débite le coût d’achat des marchandises.
 
-### Caisses
-
-- caisse classique ;
-- caisse automatique ;
-- caisse express.
-
-Chaque définition porte ses caractéristiques de gameplay : capacité, compatibilités, électricité, temps de prise, vitesse de scan, paiements, limite de panier et incidents.
+Les clients choisissent maintenant un emplacement précis et consomment son stock propre.
 
 ## Économie
 
@@ -150,12 +210,13 @@ npm run build
 | `2` | Caisse classique |
 | `3` | Mur |
 | `4` | Porte |
-| Clic gauche | Placer l’équipement |
+| Clic gauche sur une case vide | Placer l’équipement sélectionné |
+| Clic gauche sur un équipement | Sélectionner et configurer |
 | Clic droit | Supprimer |
 | `R` | Faire pivoter l’équipement |
 | `C` | Faire entrer un client |
 | `Maj + S` | Arrivées automatiques |
-| `Maj + A` | Réapprovisionner |
+| `Maj + A` | Réapprovisionner tous les emplacements |
 | `N` | Jour suivant |
 | `A` / `E` | Tourner la scène |
 | `ZQSD` ou flèches | Déplacer la caméra |
@@ -164,12 +225,13 @@ npm run build
 
 ## Composants principaux
 
-- `definitions.ts` : contrats et grandes catégories TypeScript ;
-- `catalog/buildings.ts` : autoload, validation et registre des équipements ;
-- `catalog/products.ts` : autoload, validation et registre des produits ;
+- `definitions.ts` : contrats, catégories et types d’emplacements ;
+- `equipment/EquipmentInventory.ts` : génération des emplacements, capacités et compatibilité ;
+- `catalog/buildings.ts` : autoload et validation des équipements ;
+- `catalog/products.ts` : autoload et validation des produits ;
 - `GridManager` : occupation, collisions et placement ;
 - `NavigationGrid` : pathfinding A* ;
 - `CustomerAgent` : représentation et déplacement ;
-- `StoreSimulation` : stocks, compatibilités, caisses et économie ;
-- `StoreScene` : orchestration et registre de rendu ;
-- `App.vue` : interface construite depuis les catalogues.
+- `StoreSimulation` : inventaires, consommation, réapprovisionnement et économie ;
+- `StoreScene` : sélection, orchestration et rendu ;
+- `App.vue` : configurateur des équipements.
