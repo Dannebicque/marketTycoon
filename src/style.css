@@ -39,9 +39,10 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .selection-row span { color:#cbd5e1; font-size:12px; }
 .selection-row strong { color:#f8fafc; font-size:11px; }
 .equipment-summary { margin:14px 0 10px; display:flex; justify-content:space-between; color:#94a3b8; font-size:12px; }
-.panel-action,.slot-action { border:1px solid #334155; border-radius:8px; background:#1e293b; cursor:pointer; }
+.panel-action,.slot-action,.secondary-action { border:1px solid #334155; border-radius:8px; background:#1e293b; cursor:pointer; }
 .panel-action { width:100%; margin:12px 0; padding:10px 12px; }
-.panel-action:not(:disabled):hover,.slot-action:hover { border-color:#4ade80; }
+.secondary-action { padding:10px 12px; color:#cbd5e1; }
+.panel-action:not(:disabled):hover,.slot-action:hover,.secondary-action:not(:disabled):hover { border-color:#4ade80; }
 .equipment-grid { display:grid; gap:9px; align-items:start; }
 .equipment-column { min-width:0; padding:7px; border:1px solid #1e293b; border-radius:11px; background:rgba(15,23,42,.62); }
 .equipment-column h3 { margin:0 0 7px; color:#94a3b8; font-size:11px; text-align:center; }
@@ -77,15 +78,26 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .reserve-line,.order-card { margin-top:8px; padding:11px 12px; border:1px solid #1e293b; border-radius:9px; background:#0f172a; }
 .reserve-line { display:flex; justify-content:space-between; }
 .order-card small { display:block; margin-top:6px; color:#94a3b8; }
-.orders-layout { display:grid; grid-template-columns:minmax(300px,.8fr) minmax(360px,1.2fr); gap:20px; align-items:start; }
+.orders-layout { display:grid; grid-template-columns:minmax(420px,1fr) minmax(340px,.85fr); gap:20px; align-items:start; }
 .order-form-card h2 { margin-top:0; }
 .field-label { display:block; margin:12px 0 5px; color:#94a3b8; font-size:11px; }
 .supplier-info { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
 .supplier-info span { padding:5px 7px; border-radius:999px; background:#1e293b; color:#cbd5e1; font-size:10px; }
+.order-add-line { display:grid; grid-template-columns:minmax(0,1fr) 110px 150px; gap:10px; align-items:end; margin-top:12px; }
+.order-add-line .panel-action { margin:0; }
+.cart-line { margin-top:8px; display:grid; grid-template-columns:minmax(0,1fr) 90px 90px 32px; gap:10px; align-items:center; padding:10px; border:1px solid #1e293b; border-radius:9px; background:#020617; }
+.cart-line input { width:100%; }
+.cart-product { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.cart-product small { color:#94a3b8; font-size:10px; }
+.cart-remove { width:30px; height:30px; border:1px solid #7f1d1d; border-radius:8px; background:rgba(127,29,29,.2); cursor:pointer; color:#fecaca; }
+.cart-actions { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:center; }
+.cart-actions .panel-action { margin:0; }
+.order-lines { margin:8px 0 0; padding-left:18px; color:#cbd5e1; font-size:11px; }
+.order-lines li + li { margin-top:3px; }
 .order-preview { margin-top:14px; padding:11px; border:1px solid #1e293b; border-radius:9px; background:#020617; }
 .order-preview > div { padding:5px 0; color:#94a3b8; font-size:12px; }
 .order-preview .total { margin-top:4px; padding-top:9px; border-top:1px solid #334155; color:#f8fafc; }
 .finance-list { margin-top:20px; padding:16px; border:1px solid #1e293b; border-radius:12px; background:#0f172a; }
 .finance-list .total { margin-top:6px; border-bottom:0; color:#f8fafc; }
 @media (max-width:1100px) { .hud { grid-template-columns:repeat(4,1fr); } .brand { grid-column:span 2; } .selection-panel { width:38vw; } .orders-layout { grid-template-columns:1fr; } }
-@media (max-width:760px) { .hud { right:8px; left:8px; grid-template-columns:repeat(2,1fr); max-height:190px; overflow-y:auto; } .brand { grid-column:span 2; } .build-toolbar { top:205px; left:8px; bottom:8px; width:82px; } .selection-panel { display:none; } .management-overlay { padding:8px; } .management-window { width:100%; height:96vh; } .management-nav { overflow-x:auto; } .kpi-grid,.finance-summary,.capacity-grid { grid-template-columns:1fr; } }
+@media (max-width:760px) { .hud { right:8px; left:8px; grid-template-columns:repeat(2,1fr); max-height:190px; overflow-y:auto; } .brand { grid-column:span 2; } .build-toolbar { top:205px; left:8px; bottom:8px; width:82px; } .selection-panel { display:none; } .management-overlay { padding:8px; } .management-window { width:100%; height:96vh; } .management-nav { overflow-x:auto; } .kpi-grid,.finance-summary,.capacity-grid { grid-template-columns:1fr; } .order-add-line,.cart-line { grid-template-columns:1fr; } .cart-actions { grid-template-columns:1fr; } }
