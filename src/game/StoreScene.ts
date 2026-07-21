@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { BUILDING_CATALOG, getBuildingDefinition } from './catalog/buildings'
 import type { BuildingDefinition, BuildingKey, PaymentMethod } from './definitions'
-import { isCheckoutDefinition, isShelfDefinition } from './definitions'
+import { isCheckoutDefinition } from './definitions'
 import { CustomerAgent } from './CustomerAgent'
 import { GridManager, type Direction, type GridCell, type PlacedBuilding, type PlacedEdge } from './GridManager'
 import { NavigationGrid } from './NavigationGrid'
@@ -167,7 +167,6 @@ export class StoreScene extends Phaser.Scene {
       this.setStatus('Il faut un emplacement approvisionné, une caisse et une entrée accessible.', '#fbbf24')
       return
     }
-
     const id = `C${this.nextCustomer++}`
     const colors = [0xf97316, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899, 0xeab308]
     const customer = new CustomerAgent(this, this.grid, id, route.entry, colors[this.nextCustomer % colors.length])
@@ -206,13 +205,12 @@ export class StoreScene extends Phaser.Scene {
         return
       }
       if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
-
       const existing = this.grid.getBuildingAt(this.hovered.x, this.hovered.y)
       if (pointer.rightButtonDown()) {
         if (existing?.id === this.selectedBuildingId) this.selectedBuildingId = null
         this.grid.removeAt(this.hovered.x, this.hovered.y, this.direction)
         this.syncSimulation()
-      } else if (existing) {
+      } else if (existing && this.selected.category !== 'wall' && this.selected.category !== 'door') {
         this.selectBuilding(existing.id)
         this.setStatus(`${existing.definition.name} sélectionné · configurez son contenu dans le panneau.`)
       } else {
@@ -243,15 +241,11 @@ export class StoreScene extends Phaser.Scene {
 
   private startClock() {
     this.clockTimer?.destroy()
-    this.clockTimer = this.time.addEvent({
-      delay: CLOCK_STEP_MS,
-      loop: true,
-      callback: () => {
-        if (!this.storeOpen) return
-        this.currentMinutes += CLOCK_STEP_MINUTES
-        if (this.currentMinutes >= CLOSING_MINUTES) this.closeStore()
-      },
-    })
+    this.clockTimer = this.time.addEvent({ delay: CLOCK_STEP_MS, loop: true, callback: () => {
+      if (!this.storeOpen) return
+      this.currentMinutes += CLOCK_STEP_MINUTES
+      if (this.currentMinutes >= CLOSING_MINUTES) this.closeStore()
+    } })
   }
 
   private closeStore() {
@@ -290,13 +284,9 @@ export class StoreScene extends Phaser.Scene {
   }
 
   private syncSimulation() { this.simulation.syncBuildings(this.grid.getBuildings()) }
-
   private findCustomerEntry(firstShelf: PlacedBuilding): CustomerRoute | undefined {
     const goals = this.grid.getAdjacentWalkableCells(firstShelf)
-    return this.grid.getBorderWalkableCells()
-      .map(entry => ({ entry, firstPath: this.navigation.findPathToAny(entry, goals) }))
-      .filter(route => route.firstPath.length > 0)
-      .sort((a, b) => a.firstPath.length - b.firstPath.length)[0]
+    return this.grid.getBorderWalkableCells().map(entry => ({ entry, firstPath: this.navigation.findPathToAny(entry, goals) })).filter(route => route.firstPath.length > 0).sort((a, b) => a.firstPath.length - b.firstPath.length)[0]
   }
 
   private async runCustomerCycle(customer: CustomerAgent, shoppingPlan: ShoppingPlanItem[], route: CustomerRoute) {
@@ -316,7 +306,6 @@ export class StoreScene extends Phaser.Scene {
         customer.setBasketCount(this.simulation.summarizeBasket(basketLines).articleCount)
         this.drawBuildings()
       }
-
       const basket = this.simulation.summarizeBasket(basketLines)
       if (!basket.articleCount) throw new Error('empty-basket')
       const checkouts = this.grid.getBuildings('checkout')
@@ -333,7 +322,6 @@ export class StoreScene extends Phaser.Scene {
       this.simulation.enqueue(checkout.id, customer.id)
       await customer.follow(checkoutPath)
       await this.repositionQueue(checkout)
-
       const queueStartedAt = performance.now()
       while (!this.simulation.isFirst(checkout.id, customer.id)) {
         const queueTime = performance.now() - queueStartedAt
@@ -342,7 +330,6 @@ export class StoreScene extends Phaser.Scene {
         if (queueTime >= MAX_QUEUE_WAIT_MS) throw new Error('impatient')
         await this.wait(350)
       }
-
       const queueTimeMs = performance.now() - queueStartedAt
       const timing = this.simulation.getCheckoutTiming(checkout, basket.articleCount, payment)
       satisfaction = Math.max(15, satisfaction - Math.round(timing.durationMs / 900) - (timing.incident ? 15 : 0))
@@ -371,7 +358,6 @@ export class StoreScene extends Phaser.Scene {
   }
 
   private paymentLabel(payment: PaymentMethod) { return payment === 'contactless' ? 'sans contact' : payment === 'card' ? 'carte' : 'espèces' }
-
   private async repositionQueue(checkout: PlacedBuilding) {
     const queue = this.simulation.getQueue(checkout.id)
     const adjacent = this.grid.getAdjacentWalkableCells(checkout)[0]
@@ -383,14 +369,12 @@ export class StoreScene extends Phaser.Scene {
     }))
     this.drawQueues()
   }
-
   private async moveCustomerToCheckout(customer: CustomerAgent, checkout: PlacedBuilding) {
     const adjacent = this.grid.getAdjacentWalkableCells(checkout)[0]
     if (!adjacent) return
     const p = this.grid.gridToScreen(adjacent.x, adjacent.y)
     await customer.moveVisualTo(p.x + 8, p.y + 18, 180)
   }
-
   private drawPath(path: GridCell[]) {
     this.pathLayer.clear()
     if (path.length < 2) return
@@ -402,7 +386,6 @@ export class StoreScene extends Phaser.Scene {
     })
     this.pathLayer.strokePath()
   }
-
   private drawGrid() {
     this.gridLayer.clear()
     for (let y = 0; y < this.grid.rows; y++) for (let x = 0; x < this.grid.columns; x++) {
@@ -410,13 +393,14 @@ export class StoreScene extends Phaser.Scene {
       this.diamond(this.gridLayer, p.x, p.y, 0x334155, .35, 0x64748b)
     }
   }
-
   private drawPreview() {
     this.previewLayer.clear()
-    if (!this.grid.isInside(this.hovered.x, this.hovered.y) || this.grid.getBuildingAt(this.hovered.x, this.hovered.y)) return
+    if (!this.grid.isInside(this.hovered.x, this.hovered.y)) return
+    const isEdgeTool = this.selected.category === 'wall' || this.selected.category === 'door'
+    if (!isEdgeTool && this.grid.getBuildingAt(this.hovered.x, this.hovered.y)) return
     const valid = this.grid.canPlace(this.selected, this.hovered.x, this.hovered.y, this.direction) && this.simulation.canSpend(this.selected.price)
     const color = valid ? 0x22c55e : 0xef4444
-    if (this.selected.category === 'wall' || this.selected.category === 'door') {
+    if (isEdgeTool) {
       const p = this.grid.gridToScreen(this.hovered.x, this.hovered.y)
       this.drawEdgePreview(p.x, p.y, this.direction, color)
       return
@@ -437,7 +421,6 @@ export class StoreScene extends Phaser.Scene {
     this.drawSelection()
     this.drawQueues()
   }
-
   private drawBuilding(building: PlacedBuilding) {
     const renderer = building.definition.renderer
     if (renderer === 'fruit-shelf') return this.drawShelfBoxes(building, 26, 0x84cc16, true)
@@ -449,7 +432,6 @@ export class StoreScene extends Phaser.Scene {
     if (renderer === 'standard-checkout') return this.drawCheckout(building, 28, 0x2563eb)
     this.drawShelfBoxes(building, 44, building.definition.color)
   }
-
   private drawColdShelf(building: PlacedBuilding, frozen: boolean) {
     this.drawShelfBoxes(building, 38, frozen ? 0x38bdf8 : 0x22c55e)
     for (const cell of this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)) {
@@ -457,7 +439,6 @@ export class StoreScene extends Phaser.Scene {
       this.buildingsLayer.lineStyle(2, 0xe0f2fe, .9).strokeRoundedRect(p.x - 20, p.y - 35, 40, 24, 4)
     }
   }
-
   private drawShelfBoxes(building: PlacedBuilding, height: number, color: number, open = false) {
     const inventory = this.simulation.getEquipmentInventory(building.id)
     const totalStock = inventory?.compartments.reduce((total, slot) => total + slot.quantity, 0) ?? 0
@@ -471,20 +452,16 @@ export class StoreScene extends Phaser.Scene {
       const products = [...new Set(configured.map(slot => getProductDefinition(slot.productKey!)?.shortName).filter(Boolean))]
       const capacity = configured.reduce((total, slot) => total + slot.capacity, 0)
       const p = this.grid.gridToScreen(building.gridX, building.gridY)
-      const label = this.add.text(p.x, p.y - height - 18, `${products.slice(0, 3).join(' · ') || 'VIDE'} ${totalStock}/${capacity}`, {
-        fontSize: '9px', color: '#111827', backgroundColor: '#ffffffdd', padding: { x: 3, y: 2 },
-      }).setOrigin(.5).setDepth(35)
+      const label = this.add.text(p.x, p.y - height - 18, `${products.slice(0, 3).join(' · ') || 'VIDE'} ${totalStock}/${capacity}`, { fontSize: '9px', color: '#111827', backgroundColor: '#ffffffdd', padding: { x: 3, y: 2 } }).setOrigin(.5).setDepth(35)
       this.shelfLabels.push(label)
     }
   }
-
   private drawCheckout(building: PlacedBuilding, height: number, color: number) {
     for (const cell of this.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)) {
       const p = this.grid.gridToScreen(cell.x, cell.y)
       this.box(p.x, p.y, height, color)
     }
   }
-
   private drawSelection() {
     this.selectionLayer.clear()
     if (!this.selectedBuildingId) return
@@ -495,7 +472,6 @@ export class StoreScene extends Phaser.Scene {
       this.diamond(this.selectionLayer, p.x, p.y, 0xfacc15, .12, 0xfacc15)
     }
   }
-
   private drawQueues() {
     this.queueLayer.clear()
     this.queueLabels.forEach(label => label.destroy())
@@ -511,23 +487,17 @@ export class StoreScene extends Phaser.Scene {
       })
     }
   }
-
   private drawEdge(edge: PlacedEdge) {
     const p = this.grid.gridToScreen(edge.gridX, edge.gridY)
     const direction = this.grid.getViewDirection(edge.direction)
     const { start, end } = this.edgeEndpoints(p.x, p.y, direction)
-    if (edge.type === 'wall') {
-      this.buildingsLayer.fillStyle(0xcbd5e1).beginPath().moveTo(start.x, start.y).lineTo(end.x, end.y).lineTo(end.x, end.y - 46).lineTo(start.x, start.y - 46).closePath().fillPath()
-    } else {
-      this.buildingsLayer.lineStyle(5, 0x7c3aed).beginPath().moveTo(start.x, start.y).lineTo(start.x, start.y - 42).moveTo(end.x, end.y).lineTo(end.x, end.y - 42).strokePath()
-    }
+    if (edge.type === 'wall') this.buildingsLayer.fillStyle(0xcbd5e1).beginPath().moveTo(start.x, start.y).lineTo(end.x, end.y).lineTo(end.x, end.y - 46).lineTo(start.x, start.y - 46).closePath().fillPath()
+    else this.buildingsLayer.lineStyle(5, 0x7c3aed).beginPath().moveTo(start.x, start.y).lineTo(start.x, start.y - 42).moveTo(end.x, end.y).lineTo(end.x, end.y - 42).strokePath()
   }
-
   private diamond(g: Phaser.GameObjects.Graphics, x: number, y: number, color: number, alpha: number, line: number) {
     const w = this.grid.tileWidth / 2, h = this.grid.tileHeight / 2
     g.fillStyle(color, alpha).lineStyle(1, line, .8).beginPath().moveTo(x, y).lineTo(x + w, y + h).lineTo(x, y + h * 2).lineTo(x - w, y + h).closePath().fillPath().strokePath()
   }
-
   private box(x: number, y: number, height: number, color: number) {
     const g = this.buildingsLayer, w = 25, d = 12
     const c = Phaser.Display.Color.ValueToColor(color)
@@ -535,17 +505,14 @@ export class StoreScene extends Phaser.Scene {
     g.fillStyle(c.clone().darken(10).color).beginPath().moveTo(x, y + d * 2).lineTo(x + w, y + d).lineTo(x + w, y + d - height).lineTo(x, y + d * 2 - height).closePath().fillPath()
     g.fillStyle(color).beginPath().moveTo(x, y - height).lineTo(x + w, y + d - height).lineTo(x, y + d * 2 - height).lineTo(x - w, y + d - height).closePath().fillPath()
   }
-
   private edgeEndpoints(x: number, y: number, direction: Direction) {
     const w = this.grid.tileWidth / 2, h = this.grid.tileHeight / 2
     return direction % 2 === 0 ? { start: { x, y }, end: { x: x + w, y: y + h } } : { start: { x, y }, end: { x: x - w, y: y + h } }
   }
-
   private drawEdgePreview(x: number, y: number, direction: Direction, color: number) {
     const { start, end } = this.edgeEndpoints(x, y, this.grid.getViewDirection(direction))
     this.previewLayer.lineStyle(7, color, .8).beginPath().moveTo(start.x, start.y).lineTo(end.x, end.y).strokePath()
   }
-
   private wait(duration: number) { return new Promise<void>(resolve => this.time.delayedCall(duration, resolve)) }
   private setStatus(message: string, color = '#cbd5e1') { this.statusLabel.setText(message).setColor(color) }
   private textStyle(fontSize: number, color = '#ffffff'): Phaser.Types.GameObjects.Text.TextStyle {
