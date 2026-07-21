@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -16,35 +16,11 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Corriger les imports du moteur
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          path = Path('apps/game/src/phaser/StoreScene.ts')
-          content = path.read_text()
-          old = "import { GridManager, type Direction, type GridCell, type PlacedBuilding, type PlacedEdge } from './GridManager'\nimport { NavigationGrid } from './NavigationGrid'\nimport { StoreSimulation, type BasketLine, type ShoppingPlanItem } from './StoreSimulation'"
-          new = "import {\n  GridManager,\n  NavigationGrid,\n  StoreSimulation,\n  type BasketLine,\n  type Direction,\n  type GridCell,\n  type PlacedBuilding,\n  type PlacedEdge,\n  type ShoppingPlanItem,\n} from '@market-tycoon/simulation-engine'"
-          if old not in content:
-              raise SystemExit('Les imports attendus de StoreScene.ts sont introuvables')
-          path.write_text(content.replace(old, new))
-          PY
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/game/src/phaser/StoreScene.ts
-          git commit -m "Corriger les imports de StoreScene vers simulation-engine"
-          git push origin HEAD:${{ github.head_ref }}
 
       - name: Installer les dépendances
         run: npm install
