@@ -3,14 +3,8 @@ import { getSupplier } from '../catalog/suppliers'
 import type { PlacedBuilding } from '../GridManager'
 import { ReserveManager } from './ReserveManager'
 
-export interface PurchaseOrderLine {
-  productKey: string
-  quantity: number
-  unitPrice: number
-}
-
+export interface PurchaseOrderLine { productKey: string; quantity: number; unitPrice: number }
 export type PurchaseOrderStatus = 'ordered' | 'delivered' | 'partially-delivered' | 'cancelled'
-
 export interface PurchaseOrder {
   id: string
   supplierKey: string
@@ -31,7 +25,6 @@ export class PurchaseOrderManager {
   createOrder(supplierKey: string, requestedLines: Array<{ productKey: string; quantity: number }>, day: number) {
     const supplier = getSupplier(supplierKey)
     if (!supplier) return null
-
     const lines = requestedLines.flatMap(line => {
       const product = getProductDefinition(line.productKey)
       if (!product || line.quantity <= 0 || !supplier.productKeys.includes(product.key)) return []
@@ -39,19 +32,7 @@ export class PurchaseOrderManager {
     })
     const merchandiseTotal = lines.reduce((total, line) => total + line.quantity * line.unitPrice, 0)
     if (!lines.length || merchandiseTotal < supplier.minimumOrderAmount) return null
-
-    const order: PurchaseOrder = {
-      id: `PO-${this.nextOrder++}`,
-      supplierKey,
-      orderedDay: day,
-      expectedDay: day + supplier.leadTimeDays,
-      status: 'ordered',
-      lines,
-      deliveryFee: supplier.deliveryFee,
-      orderedTotal: merchandiseTotal + supplier.deliveryFee,
-      deliveredTotal: 0,
-      rejectedLines: [],
-    }
+    const order: PurchaseOrder = { id: `PO-${this.nextOrder++}`, supplierKey, orderedDay: day, expectedDay: day + supplier.leadTimeDays, status: 'ordered', lines, deliveryFee: supplier.deliveryFee, orderedTotal: merchandiseTotal + supplier.deliveryFee, deliveredTotal: 0, rejectedLines: [] }
     this.orders.push(order)
     return order
   }
@@ -70,14 +51,11 @@ export class PurchaseOrderManager {
     }
   }
 
-  cancel(orderId: string) {
-    const order = this.orders.find(item => item.id === orderId)
-    if (!order || order.status !== 'ordered') return false
-    order.status = 'cancelled'
-    return true
-  }
-
-  getOrders() {
-    return this.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line })), rejectedLines: order.rejectedLines.map(line => ({ ...line })) }))
+  cancel(orderId: string) { const order = this.orders.find(item => item.id === orderId); if (!order || order.status !== 'ordered') return false; order.status = 'cancelled'; return true }
+  getOrders() { return this.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line })), rejectedLines: order.rejectedLines.map(line => ({ ...line })) })) }
+  exportState() { return { nextOrder: this.nextOrder, orders: this.getOrders() } }
+  importState(state: { nextOrder?: number; orders?: PurchaseOrder[] }) {
+    this.nextOrder = Math.max(1, state.nextOrder ?? 1)
+    this.orders = (state.orders ?? []).map(order => ({ ...order, lines: order.lines.map(line => ({ ...line })), rejectedLines: order.rejectedLines.map(line => ({ ...line })) }))
   }
 }
