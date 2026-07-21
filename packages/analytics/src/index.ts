@@ -1,6 +1,10 @@
-export { CustomerAnalyticsManager } from '../../../src/game/analytics/CustomerAnalyticsManager'
+export { CustomerAnalyticsManager } from './CustomerAnalyticsManager'
 export type {
+  AnalyticsProduct,
+  CustomerAnalyticsState,
   CustomerAnalyticsSummary,
   CustomerPurchaseObservation,
   ProductCustomerAnalytics,
-} from '../../../src/game/analytics/CustomerAnalyticsManager'
+  PurchaseDecision,
+  PurchaseDecisionResult,
+} from './CustomerAnalyticsManager'
