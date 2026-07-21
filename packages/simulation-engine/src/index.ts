@@ -1,16 +1,27 @@
-export { StoreSimulation } from '../../../src/game/StoreSimulation'
+export { StoreSimulation } from './StoreSimulation'
 export type {
   BasketLine,
   BasketSummary,
+  CustomerPurchaseContext,
   DaySnapshot,
   ShoppingPlanItem,
   StoreMetrics,
-} from '../../../src/game/StoreSimulation'
-export { GridManager } from '../../../src/game/GridManager'
+} from './StoreSimulation'
+export { GridManager } from './GridManager'
 export type {
   Direction,
+  EdgeAxis,
   GridCell,
   PlacedBuilding,
   PlacedEdge,
-} from '../../../src/game/GridManager'
-export { NavigationGrid } from '../../../src/game/NavigationGrid'
+} from './GridManager'
+export { NavigationGrid } from './NavigationGrid'
+export {
+  createEquipmentInventory,
+  getProductCapacity,
+  isProductCompatible,
+} from './equipment/EquipmentInventory'
+export type {
+  EquipmentCompartmentState,
+  EquipmentInventoryState,
+} from './equipment/EquipmentInventory'
