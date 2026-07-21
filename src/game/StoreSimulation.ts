@@ -150,29 +150,20 @@ export class StoreSimulation {
   getCompatibleProducts(buildingId: string) {
     const definition = this.shelfDefinitions.get(buildingId)
     if (!definition) return []
-    return getProductsForCategories(definition.allowedProductCategories)
-      .filter(product => isProductCompatible(definition, product))
+    return getProductsForCategories(definition.allowedProductCategories).filter(product => isProductCompatible(definition, product))
   }
 
-  assignProductToCompartment(
-    buildingId: string,
-    compartmentId: string,
-    productKey: string | null,
-    fill = false,
-    providedInventory?: EquipmentInventoryState,
-  ) {
+  assignProductToCompartment(buildingId: string, compartmentId: string, productKey: string | null, fill = false, providedInventory?: EquipmentInventoryState) {
     const inventory = providedInventory ?? this.inventories.get(buildingId)
     const definition = this.shelfDefinitions.get(buildingId)
     const compartment = inventory?.compartments.find(item => item.id === compartmentId)
     if (!inventory || !definition || !compartment) return false
-
     if (productKey === null) {
       compartment.productKey = null
       compartment.quantity = 0
       compartment.capacity = 0
       return true
     }
-
     const product = getProductDefinition(productKey)
     if (!product || !isProductCompatible(definition, product)) return false
     compartment.productKey = product.key
@@ -198,13 +189,10 @@ export class StoreSimulation {
 
   restockEquipment(buildingId: string) {
     const inventory = this.inventories.get(buildingId)
-    if (!inventory) return false
-    return this.restockCompartments(inventory.compartments)
+    return inventory ? this.restockCompartments(inventory.compartments) : false
   }
 
-  restockAll() {
-    return this.restockCompartments([...this.inventories.values()].flatMap(item => item.compartments))
-  }
+  restockAll() { return this.restockCompartments([...this.inventories.values()].flatMap(item => item.compartments)) }
 
   private restockCompartments(compartments: EquipmentCompartmentState[]) {
     const lines = compartments.flatMap(compartment => {
@@ -222,17 +210,14 @@ export class StoreSimulation {
   }
 
   getAvailableShelves(buildings: PlacedBuilding[]) {
-    return buildings.filter(building => isShelfDefinition(building.definition) &&
-      Boolean(this.inventories.get(building.id)?.compartments.some(slot => slot.productKey && slot.quantity > 0)))
+    return buildings.filter(building => isShelfDefinition(building.definition) && Boolean(this.inventories.get(building.id)?.compartments.some(slot => slot.productKey && slot.quantity > 0)))
   }
 
   createShoppingPlan(buildings: PlacedBuilding[]): ShoppingPlanItem[] {
     const available = buildings.flatMap(shelf => {
       if (!isShelfDefinition(shelf.definition)) return []
       const inventory = this.inventories.get(shelf.id)
-      return (inventory?.compartments ?? [])
-        .filter(slot => slot.productKey && slot.quantity > 0)
-        .map(slot => ({ shelf, compartmentId: slot.id }))
+      return (inventory?.compartments ?? []).filter(slot => slot.productKey && slot.quantity > 0).map(slot => ({ shelf, compartmentId: slot.id }))
     }).sort(() => Math.random() - .5)
     const count = Math.min(available.length, randomBetween(1, 3))
     return available.slice(0, count).map(item => ({ ...item, requestedQuantity: randomBetween(1, 3) }))
@@ -258,7 +243,7 @@ export class StoreSimulation {
   }
 
   choosePaymentMethod(accepted?: PaymentMethod[]): PaymentMethod {
-    const available = accepted?.length ? accepted : ['contactless', 'card', 'cash']
+    const available: PaymentMethod[] = accepted?.length ? accepted : ['contactless', 'card', 'cash']
     const roll = Math.random()
     const preferred: PaymentMethod = roll < .5 ? 'contactless' : roll < .85 ? 'card' : 'cash'
     return available.includes(preferred) ? preferred : available[Math.floor(Math.random() * available.length)]
@@ -282,7 +267,6 @@ export class StoreSimulation {
   }
 
   getPickupTimeMs(shelf: PlacedBuilding) { return isShelfDefinition(shelf.definition) ? shelf.definition.customerPickupTimeMs : 650 }
-
   enqueue(checkoutId: string, customerId: string) {
     const queue = this.checkoutQueues.get(checkoutId) ?? []
     if (!queue.includes(customerId)) queue.push(customerId)
