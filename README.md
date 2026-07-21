@@ -10,11 +10,95 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 - stocks, files, paiements, satisfaction et bilan journalier ;
 - rotation, déplacement et zoom de la caméra ;
 - interface Vue superposée à Phaser ;
-- équipements et produits entièrement pilotés par des catalogues typés.
+- équipements et produits chargés automatiquement depuis des définitions typées.
 
-## Catalogue des équipements
+## Architecture des catalogues
 
-Les équipements disponibles sont définis dans `src/game/catalog/buildings.ts` :
+Les grandes catégories sont volontairement figées dans `src/game/definitions.ts` :
+
+```text
+BuildingCategory = shelf | checkout | wall | door
+ProductCategory  = grocery | fruit | vegetable | fresh | drink | hygiene | frozen | bakery
+```
+
+Les clés précises des équipements et produits restent extensibles. Chaque objet est défini dans son propre fichier.
+
+```text
+src/game/catalog/
+├── buildings.ts
+├── buildings/
+│   ├── shelves/*.building.ts
+│   ├── checkouts/*.building.ts
+│   └── edges/*.building.ts
+├── products.ts
+└── products/
+    └── <categorie>/*.product.ts
+```
+
+`buildings.ts` et `products.ts` utilisent `import.meta.glob(..., { eager: true })` pour découvrir automatiquement les fichiers. Les registres vérifient au démarrage :
+
+- l’unicité des clés ;
+- les noms, dimensions, prix et capacités ;
+- les catégories autorisées d’un rayon ;
+- les moyens de paiement d’une caisse ;
+- la cohérence des contraintes de conservation d’un produit.
+
+## Ajouter un équipement
+
+Créer par exemple :
+
+```text
+src/game/catalog/buildings/shelves/organicShelf.building.ts
+```
+
+```ts
+import { defineBuilding } from '../../../definitions'
+
+export default defineBuilding({
+  key: 'organic-shelf',
+  category: 'shelf',
+  name: 'Rayon bio',
+  description: 'Rayon spécialisé dans les produits biologiques.',
+  width: 1,
+  height: 3,
+  price: 240,
+  color: 0x65a30d,
+  renderer: 'standard-shelf',
+  toolbar: { icon: '🌿', order: 55 },
+  capacity: 28,
+  allowedProductCategories: ['grocery', 'fruit', 'vegetable'],
+  customerPickupTimeMs: 750,
+})
+```
+
+Aucun import manuel n’est nécessaire. Le nouvel équipement est chargé par Vite et apparaît dans `BUILDINGS`, puis dans la barre Vue. Un changement dans `StoreScene` n’est requis que pour ajouter une apparence `renderer` réellement nouvelle.
+
+## Ajouter un produit
+
+Créer par exemple :
+
+```text
+src/game/catalog/products/fruits/pear.product.ts
+```
+
+```ts
+import { defineProduct } from '../../../definitions'
+
+export default defineProduct({
+  key: 'pear',
+  category: 'fruit',
+  name: 'Poires',
+  shortName: 'POIR',
+  salePrice: 3.4,
+  purchasePrice: 1.5,
+  color: 0x84cc16,
+  shelfLifeDays: 5,
+})
+```
+
+Le produit sera automatiquement disponible pour les rayons dont `allowedProductCategories` contient `fruit`.
+
+## Équipements disponibles
 
 ### Rayons
 
@@ -24,45 +108,13 @@ Les équipements disponibles sont définis dans `src/game/catalog/buildings.ts` 
 - congélateur ;
 - boulangerie.
 
-Chaque rayon définit sa capacité, ses catégories de produits compatibles, son temps de prise d’article et ses éventuels coûts électriques.
-
 ### Caisses
 
 - caisse classique ;
 - caisse automatique ;
 - caisse express.
 
-Chaque caisse définit sa vitesse, ses paiements acceptés, sa limite éventuelle de panier, son besoin en employé et son risque éventuel d’incident.
-
-### Structure
-
-```text
-BuildingDefinition
-├── ShelfDefinition
-├── CheckoutDefinition
-├── WallDefinition
-└── DoorDefinition
-```
-
-L’union discriminée utilise `category`. La propriété `key` identifie le modèle précis et `renderer` choisit sa représentation dans Phaser.
-
-## Catalogue des produits
-
-Les produits sont définis dans `src/game/catalog/products.ts`.
-
-Ils possèdent notamment :
-
-- une clé unique ;
-- une catégorie ;
-- un prix de vente ;
-- un prix d’achat ;
-- une couleur ;
-- éventuellement une durée de conservation ;
-- éventuellement une contrainte de réfrigération ou de congélation.
-
-Les catégories disponibles sont : épicerie, fruits, légumes, frais, boissons, hygiène, surgelés et boulangerie.
-
-Lorsqu’un rayon est construit, la simulation lui affecte uniquement un produit compatible avec `allowedProductCategories`.
+Chaque définition porte ses caractéristiques de gameplay : capacité, compatibilités, électricité, temps de prise, vitesse de scan, paiements, limite de panier et incidents.
 
 ## Économie
 
@@ -76,23 +128,6 @@ Lorsqu’un rayon est construit, la simulation lui affecte uniquement un produit
 ```text
 CA - construction - marchandises - fonctionnement
 ```
-
-## Interface Vue
-
-La barre de construction est générée automatiquement depuis `BUILDING_CATALOG`. Ajouter une définition au catalogue suffit donc à faire apparaître le nouvel équipement dans l’interface.
-
-Le panneau de gestion affiche :
-
-- pour un rayon : modèle, produit, catégorie, stock, prix, temps de prise et électricité ;
-- pour une caisse : modèle, file, état, paiements, limite de panier et besoin en employé.
-
-## Ajouter un équipement
-
-1. Ajouter sa clé dans `BuildingKey` dans `src/game/definitions.ts`.
-2. Ajouter sa définition dans `BUILDING_CATALOG`.
-3. Utiliser une catégorie existante (`shelf`, `checkout`, `wall`, `door`).
-4. Ajouter un renderer spécifique dans `StoreScene` uniquement si son apparence doit être différente.
-5. Ajouter les produits compatibles dans `PRODUCT_CATALOG` si nécessaire.
 
 ## Lancer le projet
 
@@ -127,11 +162,11 @@ npm run build
 | Bouton central + glisser | Déplacer à la souris |
 | Molette | Zoomer ou dézoomer |
 
-## Architecture
+## Composants principaux
 
-- `definitions.ts` : contrats TypeScript des produits et équipements ;
-- `catalog/buildings.ts` : source unique des équipements disponibles ;
-- `catalog/products.ts` : source unique des produits disponibles ;
+- `definitions.ts` : contrats et grandes catégories TypeScript ;
+- `catalog/buildings.ts` : autoload, validation et registre des équipements ;
+- `catalog/products.ts` : autoload, validation et registre des produits ;
 - `GridManager` : occupation, collisions et placement ;
 - `NavigationGrid` : pathfinding A* ;
 - `CustomerAgent` : représentation et déplacement ;
