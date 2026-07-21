@@ -26,24 +26,33 @@ Elle contient quatre sections :
 - **Réserve** : capacités ambiante, froide et surgelée, occupation et stock par produit ;
 - **Commandes** : caractéristiques du fournisseur, produits disponibles, estimation complète et historique.
 
-Le formulaire de commande affiche avant validation :
+Le panneau latéral de la scène reste réservé à la configuration de l’équipement sélectionné.
+
+## Validation des commandes
+
+Le formulaire affiche avant validation :
 
 - le délai de livraison ;
-- le minimum de commande du fournisseur ;
+- le minimum de marchandises imposé par le fournisseur ;
 - les frais de livraison ;
 - le coût des marchandises ;
-- le total de la commande ;
-- la capacité de réserve compatible encore libre ;
-- les raisons précises empêchant la commande.
+- le total réel débité ;
+- les produits effectivement vendus par le fournisseur ;
+- la capacité de réserve compatible encore libre.
 
-Exemples de blocage :
+Le bouton est désactivé tant qu’une règle n’est pas satisfaite. Chaque problème est affiché séparément.
+
+Exemples :
 
 ```text
 Minimum fournisseur non atteint : il manque 42 € de marchandises.
 Budget insuffisant : il manque 120 €.
 Aucune réserve froide n’est construite.
 Capacité insuffisante : seulement 18 unités peuvent être réceptionnées.
+Ce produit n’est pas proposé par le fournisseur sélectionné.
 ```
+
+La sélection des produits est filtrée selon le catalogue du fournisseur. Le joueur ne peut donc plus sélectionner volontairement une référence indisponible chez lui.
 
 ## Équipements
 
@@ -150,9 +159,10 @@ Scénario recommandé :
 1. construire une réserve ambiante, un rayon et une caisse ;
 2. ouvrir **Gestion → Commandes** ;
 3. observer le minimum, les frais et le total avant validation ;
-4. commander des pâtes ;
-5. passer au jour de livraison ;
-6. vérifier le stock dans **Gestion → Réserve** ;
-7. remplir le rayon ;
-8. accueillir des clients ;
-9. suivre les charges et le résultat dans **Gestion → Finances**.
+4. tester une quantité trop faible et vérifier le montant manquant ;
+5. commander des pâtes ;
+6. passer au jour de livraison ;
+7. vérifier le stock dans **Gestion → Réserve** ;
+8. remplir le rayon ;
+9. accueillir des clients ;
+10. suivre les charges et le résultat dans **Gestion → Finances**.
