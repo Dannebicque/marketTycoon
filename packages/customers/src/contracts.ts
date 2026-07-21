@@ -1,4 +1,5 @@
-import type { PaymentMethod, ProductDefinition } from '@market-tycoon/catalog'
+import type { PaymentMethod, ProductCategory, ProductDefinition } from '@market-tycoon/catalog'
+import type { CustomerProfileKey } from './CustomerProfileCatalog'
 
 export type CustomerJourneyState =
   | 'entering'
@@ -9,11 +10,25 @@ export type CustomerJourneyState =
   | 'abandoned'
   | 'completed'
 
+export type CustomerSatisfactionFactor = 'price' | 'queue' | 'availability' | 'checkout'
+
+export interface CustomerSatisfactionBreakdown {
+  price: number
+  queue: number
+  availability: number
+  checkout: number
+}
+
 export interface CustomerProfile {
   id: string
-  budget?: number
+  profileKey: CustomerProfileKey
+  budget: number
   priceSensitivity: number
+  availableTimeMs: number
+  requirement: number
+  loyalty: number
   preferredPaymentMethod?: PaymentMethod
+  preferredCategories: ProductCategory[]
 }
 
 export interface CustomerBasketLine {
@@ -34,7 +49,9 @@ export interface CustomerBasketSummary {
 
 export interface CustomerSnapshot {
   id: string
+  profile: CustomerProfile
   state: CustomerJourneyState
   satisfaction: number
+  satisfactionBreakdown: CustomerSatisfactionBreakdown
   basket: CustomerBasketSummary
 }
