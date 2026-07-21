@@ -1,6 +1,6 @@
 import { isCheckoutDefinition, isShelfDefinition } from '@market-tycoon/catalog'
-import type { GridCell, PlacedBuilding } from '../GridManager'
-import { NavigationGrid } from '../NavigationGrid'
+import type { GridCell, PlacedBuilding } from '@market-tycoon/simulation-engine'
+import { NavigationGrid } from '@market-tycoon/simulation-engine'
 import type { StoreScene } from '../StoreScene'
 import type { EmployeeManager } from './EmployeeManager'
 import { EmployeeAgent } from './EmployeeAgent'

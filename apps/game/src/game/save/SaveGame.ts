@@ -4,8 +4,8 @@ import type {
   StoreProductPricing,
 } from '@market-tycoon/economy'
 import type { EmployeeState } from '../employees/employeeTypes'
-import type { Direction } from '../GridManager'
-import type { StoreMetrics } from '../StoreSimulation'
+import type { Direction } from '@market-tycoon/simulation-engine'
+import type { StoreMetrics } from '@market-tycoon/simulation-engine'
 
 export const SAVE_GAME_VERSION = 1
 export const SAVE_GAME_STORAGE_KEY = 'market-tycoon.save.v1'

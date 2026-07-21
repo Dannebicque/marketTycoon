@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GridManager, type GridCell } from './GridManager'
+import { GridManager, type GridCell } from '@market-tycoon/simulation-engine'
 
 export class CustomerAgent {
   private sprite: Phaser.GameObjects.Container
