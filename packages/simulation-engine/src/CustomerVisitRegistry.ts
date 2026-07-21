@@ -45,7 +45,6 @@ export class CustomerVisitRegistry {
     if (!customer) return null
     const basket = customer.basket.summarize()
     const satisfaction = customer.satisfaction.getBreakdown()
-    customer.journey.transitionTo('completed')
     this.active.delete(customerId)
     return this.analytics.complete(customerId, {
       articleCount: basket.articleCount,
@@ -62,7 +61,6 @@ export class CustomerVisitRegistry {
     if (!customer) return null
     const basket = customer.basket.summarize()
     const satisfaction = customer.satisfaction.getBreakdown()
-    if (customer.journey.getState() !== 'abandoned') customer.journey.transitionTo('abandoned')
     this.active.delete(customerId)
     return this.analytics.abandon(customerId, {
       reason: options.reason,
