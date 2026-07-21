@@ -2,10 +2,7 @@ import { getProductDefinition } from '../catalog/products'
 import { getProductStorageType, isStorageDefinition, type StorageType } from '../definitions'
 import type { PlacedBuilding } from '../GridManager'
 
-export interface ReserveStockLine {
-  productKey: string
-  quantity: number
-}
+export interface ReserveStockLine { productKey: string; quantity: number }
 
 export class ReserveManager {
   private stock = new Map<string, number>()
@@ -26,19 +23,9 @@ export class ReserveManager {
     return used
   }
 
-  getFree(buildings: PlacedBuilding[], type: StorageType): number {
-    return Math.max(0, this.getCapacity(buildings, type) - this.getUsed(type))
-  }
-
-  getQuantity(productKey: string): number {
-    return this.stock.get(productKey) ?? 0
-  }
-
-  getLines(): ReserveStockLine[] {
-    return [...this.stock.entries()]
-      .filter(([, quantity]) => quantity > 0)
-      .map(([productKey, quantity]) => ({ productKey, quantity }))
-  }
+  getFree(buildings: PlacedBuilding[], type: StorageType): number { return Math.max(0, this.getCapacity(buildings, type) - this.getUsed(type)) }
+  getQuantity(productKey: string): number { return this.stock.get(productKey) ?? 0 }
+  getLines(): ReserveStockLine[] { return [...this.stock.entries()].filter(([, quantity]) => quantity > 0).map(([productKey, quantity]) => ({ productKey, quantity })) }
 
   add(productKey: string, quantity: number, buildings: PlacedBuilding[]): number {
     const product = getProductDefinition(productKey)
@@ -52,5 +39,11 @@ export class ReserveManager {
     const accepted = Math.min(Math.floor(Math.max(0, quantity)), this.getQuantity(productKey))
     this.stock.set(productKey, this.getQuantity(productKey) - accepted)
     return accepted
+  }
+
+  exportState() { return this.getLines() }
+  importState(lines: ReserveStockLine[]) {
+    this.stock.clear()
+    for (const line of lines) if (line.quantity > 0 && getProductDefinition(line.productKey)) this.stock.set(line.productKey, Math.floor(line.quantity))
   }
 }
