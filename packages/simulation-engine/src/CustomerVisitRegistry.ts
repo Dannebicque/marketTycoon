@@ -1,4 +1,4 @@
-import { CustomerVisitAnalyticsManager, type CustomerAbandonReason } from '@market-tycoon/analytics'
+import { customerVisitAnalytics, type CustomerAbandonReason } from '@market-tycoon/analytics'
 import { Customer, createCustomerProfile, type CustomerProfileKey } from '@market-tycoon/customers'
 import type { PaymentMethod } from '@market-tycoon/catalog'
 
@@ -23,7 +23,7 @@ export interface AbandonCustomerVisitOptions {
 export class CustomerVisitRegistry {
   private readonly active = new Map<string, Customer>()
 
-  constructor(readonly analytics = new CustomerVisitAnalyticsManager()) {}
+  constructor(readonly analytics = customerVisitAnalytics) {}
 
   start(customerId: string, options: StartCustomerVisitOptions) {
     const customer = new Customer(createCustomerProfile(customerId, { profileKey: options.profileKey }))
@@ -32,13 +32,8 @@ export class CustomerVisitRegistry {
     return customer
   }
 
-  get(customerId: string) {
-    return this.active.get(customerId)
-  }
-
-  getActiveCustomers() {
-    return [...this.active.values()]
-  }
+  get(customerId: string) { return this.active.get(customerId) }
+  getActiveCustomers() { return [...this.active.values()] }
 
   complete(customerId: string, options: CompleteCustomerVisitOptions) {
     const customer = this.active.get(customerId)
