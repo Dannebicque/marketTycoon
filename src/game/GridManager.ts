@@ -1,5 +1,5 @@
-import type { BuildingCategory, BuildingDefinition } from './definitions'
-import { isEdgeDefinition } from './definitions'
+import type { BuildingCategory, BuildingDefinition } from '@market-tycoon/catalog'
+import { isEdgeDefinition } from '@market-tycoon/catalog'
 
 export type Direction = 0 | 1 | 2 | 3
 export type EdgeAxis = 'x' | 'y'

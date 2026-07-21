@@ -1,4 +1,4 @@
-import type { ProductDefinition, ShelfDefinition } from '../definitions'
+import type { ProductDefinition, ShelfDefinition } from '@market-tycoon/catalog'
 
 export interface EquipmentCompartmentState {
   id: string

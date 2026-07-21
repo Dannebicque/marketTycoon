@@ -1,11 +1,11 @@
 import { CustomerAnalyticsManager } from '@market-tycoon/analytics'
 import { MarketDemandManager, PurchaseOrderManager, ReserveManager } from '@market-tycoon/economy'
 import { gameEvents } from '@market-tycoon/events'
-import { PRODUCTS, getProductDefinition, getProductsForCategories } from './catalog/products'
-import { productCatalogReader, supplierCatalogReader } from './catalog/readers'
-import { SUPPLIERS } from './catalog/suppliers'
-import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition, StorageType } from './definitions'
-import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './definitions'
+import { PRODUCTS, getProductDefinition, getProductsForCategories } from '@market-tycoon/catalog'
+import { productCatalogReader, supplierCatalogReader } from '@market-tycoon/catalog'
+import { SUPPLIERS } from '@market-tycoon/catalog'
+import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition, StorageType } from '@market-tycoon/catalog'
+import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
 import {
   createEquipmentInventory,
   getProductCapacity,
@@ -14,7 +14,7 @@ import {
 } from './equipment/EquipmentInventory'
 import type { PlacedBuilding } from './GridManager'
 
-export type { PaymentMethod, ProductDefinition } from './definitions'
+export type { PaymentMethod, ProductDefinition } from '@market-tycoon/catalog'
 
 export interface ShoppingPlanItem {
   shelf: PlacedBuilding

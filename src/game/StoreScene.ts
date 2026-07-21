@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
-import { BUILDING_CATALOG, getBuildingDefinition } from './catalog/buildings'
-import type { BuildingDefinition, BuildingKey, PaymentMethod } from './definitions'
-import { isCheckoutDefinition } from './definitions'
+import { BUILDING_CATALOG, getBuildingDefinition } from '@market-tycoon/catalog'
+import type { BuildingDefinition, BuildingKey, PaymentMethod } from '@market-tycoon/catalog'
+import { isCheckoutDefinition } from '@market-tycoon/catalog'
 import { CustomerAgent } from './CustomerAgent'
 import { GridManager, type Direction, type GridCell, type PlacedBuilding, type PlacedEdge } from './GridManager'
 import { NavigationGrid } from './NavigationGrid'
 import { StoreSimulation, type BasketLine, type ShoppingPlanItem } from './StoreSimulation'
-import { getProductDefinition } from './catalog/products'
+import { getProductDefinition } from '@market-tycoon/catalog'
 
 const MAX_QUEUE_WAIT_MS = 18_000
 const OPENING_MINUTES = 8 * 60

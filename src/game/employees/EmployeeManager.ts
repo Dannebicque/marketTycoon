@@ -1,4 +1,4 @@
-import { EMPLOYEE_ROLES, getEmployeeRole } from '../catalog/employees'
+import { EMPLOYEE_ROLES, getEmployeeRole } from '@market-tycoon/catalog'
 import type { EmployeeState, EmployeeTaskType } from './employeeTypes'
 
 const FIRST_NAMES = ['Léa', 'Hugo', 'Emma', 'Lucas', 'Chloé', 'Nathan', 'Inès', 'Tom', 'Sarah', 'Noah']

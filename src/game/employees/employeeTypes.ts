@@ -1,17 +1,8 @@
-export type EmployeeRoleKey = string
+import type { EmployeeRoleKey } from '@market-tycoon/catalog'
+
+export type { EmployeeRoleKey } from '@market-tycoon/catalog'
 export type EmployeeStatus = 'available' | 'assigned' | 'working'
 export type EmployeeTaskType = 'idle' | 'checkout' | 'restocking' | 'repairing'
-
-export interface EmployeeRoleDefinition {
-  key: EmployeeRoleKey
-  name: string
-  description: string
-  icon: string
-  baseDailySalary: number
-  qualityRange: [number, number]
-  skills: string[]
-  order: number
-}
 
 export interface EmployeeTaskState {
   type: EmployeeTaskType
@@ -33,5 +24,3 @@ export interface EmployeeState {
   completedTasks?: number
   hiredDay: number
 }
-
-export function defineEmployeeRole<T extends EmployeeRoleDefinition>(definition: T): T { return definition }

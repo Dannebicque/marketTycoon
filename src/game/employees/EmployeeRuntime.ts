@@ -1,4 +1,4 @@
-import { isCheckoutDefinition, isShelfDefinition } from '../definitions'
+import { isCheckoutDefinition, isShelfDefinition } from '@market-tycoon/catalog'
 import type { GridCell, PlacedBuilding } from '../GridManager'
 import { NavigationGrid } from '../NavigationGrid'
 import type { StoreScene } from '../StoreScene'
