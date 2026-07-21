@@ -67,15 +67,13 @@ import Phaser from 'phaser'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
-import { BUILDINGS, getBuildingDefinition } from '@market-tycoon/catalog'
-import { getProductDefinition } from '@market-tycoon/catalog'
-import type { BuildingKey, ProductDefinition, StorageType } from '@market-tycoon/catalog'
-import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
+import { BUILDINGS, getBuildingDefinition, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
+import type { BuildingKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
 import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
-import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
 import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
 import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'
+import { initializeDevelopmentScenario } from './dev/initializeDevelopmentScenario'
 import { StoreScene } from './phaser/StoreScene'
 
 const gameContainer = ref<HTMLElement | null>(null)
@@ -94,6 +92,7 @@ let payrollProcessedDay = 1
 let employeeRuntime: EmployeeRuntime | null = null
 let workforcePoliciesInstalled = false
 let pricingInitialized = false
+let developmentScenarioChecked = false
 
 const employeeManager = new EmployeeManager()
 const pricingManager = new StorePricingManager()
@@ -198,6 +197,10 @@ function loadGame() {
 function deleteCurrentSave() { deleteSaveGame(); saveAvailable.value = false; saveMessage.value = 'Sauvegarde supprimée.' }
 function refreshUi() {
   const scene = getScene(); if (!scene) return
+  if (!developmentScenarioChecked) {
+    developmentScenarioChecked = true
+    if (!saveAvailable.value && initializeDevelopmentScenario(scene, employeeManager)) saveMessage.value = 'Mode développement : magasin de démonstration initialisé.'
+  }
   ensureEmployeeRuntime(scene)
   const simulation = scene.simulation
   simulation.setCurrentDay(scene.day)
