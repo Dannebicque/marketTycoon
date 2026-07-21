@@ -2,15 +2,56 @@
 
 Cette feuille de route organise l’évolution du prototype vers un véritable jeu de gestion. Chaque version doit rester jouable, testable et compatible avec les sauvegardes existantes.
 
+## Vision
+
+Market Tycoon doit devenir à la fois :
+
+- un jeu de gestion complet et rejouable ;
+- un moteur de simulation indépendant du rendu ;
+- une application pilotée par des catalogues déclaratifs ;
+- un système dont chaque décision importante est mesurable ;
+- une base capable d’exécuter des simulations accélérées sans Vue ni Phaser.
+
 ## Principes directeurs
 
-- Les systèmes métier sont isolés dans des managers dédiés.
+- Les systèmes métier sont isolés dans des packages dédiés.
+- Le moteur ne dépend jamais de Vue ou Phaser.
+- Vue et Phaser sont des adaptateurs de présentation et d’interaction.
 - Les éléments extensibles sont déclarés dans des catalogues validés.
 - Les interactions importantes émettent des événements métier typés.
 - Les sauvegardes sont versionnées et migrables.
-- Les composants Vue affichent et orchestrent, mais ne portent pas les règles métier.
-- Phaser reste responsable de la scène, des agents et des animations.
-- Toute nouvelle mécanique doit produire des indicateurs exploitables par le joueur.
+- Toutes les chaînes visibles passent par l’i18n.
+- Toute nouvelle mécanique produit des indicateurs exploitables par le joueur.
+
+## Architecture cible
+
+```text
+apps/
+  game/                    # Vue, Phaser, HUD, panneaux, entrées, animations
+
+packages/
+  simulation-engine/       # boucle, temps, grille, navigation, état global
+  economy/                 # prix, demande, stock, fournisseurs, promotions
+  customers/               # profils, satisfaction, fidélité, comportements
+  employees/               # RH, compétences, tâches, hiérarchie
+  analytics/               # observations, KPI, diagnostics, historique
+  events/                  # bus d’événements métier
+  catalog/                 # produits, bâtiments, fournisseurs, scénarios
+  save/                    # format, migrations, persistance
+  i18n/                    # locales et outils de traduction
+  ui-shared/               # composants réutilisables
+```
+
+### Migration d’architecture
+
+- [x] Transformer le dépôt en workspace `apps/*` + `packages/*`
+- [x] Créer les premières API publiques de packages
+- [x] Configurer les alias TypeScript et Vite
+- [ ] Faire consommer tous les imports métier via `@market-tycoon/*`
+- [ ] Déplacer physiquement les implémentations hors de `src/game`
+- [ ] Déplacer l’application Vue/Phaser dans `apps/game`
+- [ ] Ajouter des règles de dépendances entre packages
+- [ ] Supprimer les façades temporaires une fois la migration terminée
 
 ## État actuel — v0.3
 
@@ -25,112 +66,194 @@ Cette feuille de route organise l’évolution du prototype vers un véritable j
 - [x] Salaires et charges journalières
 - [x] Prix de vente personnalisés et marges
 - [x] Sauvegarde locale versionnée
+- [x] Base multilingue avec Vue I18n et pont Phaser
 
 ## v0.4 — Intelligence commerciale
 
-### 1. Sensibilité des clients aux prix
+### Sensibilité des clients aux prix
 
-- [x] Ajouter un prix de marché et une sensibilité au prix par produit
-- [x] Introduire des décisions d’achat : accepter, réduire ou refuser
-- [x] Intégrer ces décisions dans le retrait réel du stock en rayon
-- [x] Comptabiliser les quantités et le chiffre d’affaires potentiel perdus
-- [x] Ajouter un écran de suivi commercial par produit et par période
-- [x] Produire des diagnostics pour ajuster les tarifs
-- [ ] Conserver une sensibilité stable pendant toute la visite d’un client
-- [ ] Faire varier la satisfaction finale selon l’écart au marché
-- [ ] Proposer un produit de substitution après un refus
-- [ ] Ajouter une élasticité configurable par profil client
+- [x] Prix de marché et sensibilité par produit
+- [x] Décisions accepter, réduire ou refuser
+- [x] Intégration dans le retrait réel du stock
+- [x] Quantités et chiffre d’affaires potentiel perdus
+- [x] Écran de suivi commercial par produit et période
+- [x] Diagnostics tarifaires
+- [ ] Sensibilité et budget stables pendant toute la visite
+- [ ] Satisfaction finale détaillée selon l’écart au marché
+- [ ] Produits de substitution
+- [ ] Élasticité configurable par profil client
 
-### 2. Coût réel du stock
+### Coût réel du stock
 
-- [ ] Gérer la valeur du stock et le coût moyen pondéré
-- [ ] Intégrer le prix fournisseur réellement payé
-- [ ] Répartir les frais de livraison entre les lignes
-- [ ] Calculer le coût des marchandises vendues
-- [ ] Calculer la marge brute réelle par vente
+- [ ] Valeur du stock et coût moyen pondéré
+- [ ] Prix fournisseur réellement payé
+- [ ] Répartition des frais de livraison
+- [ ] Coût des marchandises vendues
+- [ ] Marge brute réelle par vente et produit
 
-### 3. Statistiques par produit
-
-- [x] Quantités demandées, acceptées et refusées
-- [x] Conversion et chiffre d’affaires potentiel perdu
-- [ ] Quantités vendues, chiffre d’affaires et marge brute
-- [ ] Ruptures et demandes perdues
-- [ ] Rotation du stock et jours de couverture
-- [ ] Historique journalier consolidé
-- [ ] Tableau de performance produit complet
-
-### 4. Promotions
+### Promotions
 
 - [ ] Promotions temporaires
 - [ ] Prix barrés et durée
-- [ ] Impact sur la demande
-- [ ] Mesure de rentabilité de la promotion
+- [ ] Lots, deuxième produit remisé, produit d’appel
+- [ ] Impact sur demande, fréquentation et satisfaction
+- [ ] Mesure de rentabilité de chaque promotion
+
+### Fournisseurs évolutifs
+
+- [ ] Qualité, prix, délai, fiabilité et minimum de commande
+- [ ] Promotions fournisseurs
+- [ ] Retards, grèves, ruptures et hausses tarifaires
+- [ ] Négociation et niveaux de relation
+
+### Comptabilité simplifiée
+
+- [ ] Résultat journalier et mensuel
+- [ ] Trésorerie et besoins de financement
+- [ ] Immobilisations et amortissements
+- [ ] Charges fixes, variables et exceptionnelles
+- [ ] Inflation et évolution des coûts
 
 ## v0.5 — Clients et vie du magasin
 
 ### Profils clients
 
 - [ ] Catalogue extensible de profils
-- [ ] Budget, patience, sensibilité au prix et taille du panier
-- [ ] Préférences de catégories
-- [ ] Clients budget, réguliers, premium, familles et pressés
+- [ ] Âge, budget, temps disponible, exigence et fidélité
+- [ ] Préférences de catégories et habitudes
+- [ ] Profils budget, réguliers, premium, familles et pressés
 
-### Maintenance complète
+### Comportements
+
+- [ ] Comparer, hésiter et rechercher
+- [ ] Se perdre, changer de produit et faire demi-tour
+- [ ] Attendre ou quitter la file
+- [ ] Revenir plus tard selon l’expérience passée
+
+### Satisfaction détaillée
+
+- [ ] Prix
+- [ ] Temps d’attente
+- [ ] Disponibilité et choix
+- [ ] Fluidité du parcours
+- [ ] Propreté, ambiance et personnel
+
+### Fidélité
+
+- [ ] Occasionnels, habitués et premium
+- [ ] Historique individuel ou agrégé
+- [ ] Probabilité de retour
+- [ ] Réputation et bouche-à-oreille
+
+## v0.6 — Ressources humaines et magasin
+
+### Employés
+
+- [ ] Compétences, expérience et progression
+- [ ] Salaire, fatigue, motivation et formation
+- [ ] Horaires, congés et maladie
+- [ ] Priorités de tâches et affectation par zone
+- [ ] Hiérarchie : employé, chef de rayon, manager, directeur
+- [ ] Managers capables de distribuer automatiquement les tâches
+
+### Maintenance
 
 - [ ] État et usure des équipements
-- [ ] Risque de panne selon l’utilisation
 - [ ] Maintenance préventive et curative
+- [ ] Risque de panne selon l’utilisation
 - [ ] Priorisation des interventions
-- [ ] Pannes du froid avec risque de perte de stock
+- [ ] Pannes du froid et pertes de stock
 
-### Organisation du travail
+### Magasin et zones
 
-- [ ] Horaires et équipes
-- [ ] Affectation par zone ou catégorie
-- [ ] Priorités de tâches
-- [ ] Fatigue, moral et expérience
-- [ ] Formation et progression des salariés
+- [ ] Entrée, réserve, parking, quai, bureaux, sanitaires et salle de pause
+- [ ] Agrandissement de la surface
+- [ ] Arbitrage entre vente, stock, personnel et extension
+- [ ] Rentabilité par mètre carré
 
-## v0.6 — Progression du magasin
+### Ambiance et décoration
+
+- [ ] Signalétique, plantes, musique, couleurs et éclairage
+- [ ] Effets sur satisfaction, temps passé et image du magasin
+
+## v0.7 — Progression et monde vivant
+
+### Progression
 
 - [ ] Objectifs courts et indicateurs de réussite
 - [ ] Niveaux : épicerie, supérette, supermarché, hypermarché
 - [ ] Déblocage de produits, fournisseurs et équipements
-- [ ] Agrandissement de la surface
-- [ ] Réserve, bureaux, parking et quai de livraison
-- [ ] Arbitrage entre stock, personnel, équipement et extension
+- [ ] Scénarios et contraintes de départ
 
-## v0.7 — Monde vivant
+### Calendrier et saisonnalité
 
-- [ ] Catalogue d’événements
+- [ ] Week-ends, vacances, Noël, rentrée et soldes
 - [ ] Tendances produits et saisonnalité
-- [ ] Promotions fournisseurs
-- [ ] Hausses de coûts et pénuries
-- [ ] Affluence exceptionnelle
-- [ ] Incidents techniques et administratifs
-- [ ] Publicité et réputation
+- [ ] Affluence variable selon le calendrier
+
+### Météo et actualité
+
+- [ ] Pluie, canicule et neige
+- [ ] Grèves, pénuries et réglementation
+- [ ] Hausse de l’énergie et événements exceptionnels
+
+### Concurrence
+
+- [ ] Magasins concurrents simulés
+- [ ] Prix, promotions, assortiment et réputation concurrents
+- [ ] Parts de marché et réaction du joueur
+- [ ] Événements concurrentiels locaux
+
+## Analytics et tableau de bord décisionnel
+
+### KPI
+
+- [ ] Chiffre d’affaires
+- [ ] Marge brute et nette
+- [ ] Rotation des stocks
+- [ ] Taux de rupture
+- [ ] Temps moyen en caisse
+- [ ] Satisfaction globale et détaillée
+- [ ] Occupation des employés
+- [ ] Rentabilité par mètre carré
+
+### Graphiques
+
+- [ ] Évolution du CA et du nombre de clients
+- [ ] Évolution des prix et marges
+- [ ] Rotation et couverture des stocks
+- [ ] Répartition des ventes
+- [ ] Top produits et produits en difficulté
+
+### Alertes intelligentes
+
+- [ ] Détecter une rupture stratégique
+- [ ] Quantifier les ventes perdues pour prix trop élevé
+- [ ] Recommander une commande urgente
+- [ ] Signaler une marge anormalement faible
+- [ ] Expliquer les causes probables d’une baisse de performance
 
 ## Professionnalisation continue
 
 - [x] Bus d’événements métier typé
 - [x] Validation centralisée des catalogues
-- [ ] Tests unitaires des managers
-- [ ] Tests de sauvegarde et de migration
-- [ ] Tests des règles économiques
-- [ ] Tests des comportements clients
 - [x] CI de typecheck et build
-- [x] Conservation des diagnostics de CI sous forme d’artefacts
-- [ ] Journal métier pour le diagnostic
-- [ ] Réduction progressive du rôle d’orchestrateur de `App.vue`
 - [x] Documentation des décisions d’architecture
+- [ ] Tests unitaires des managers
+- [ ] Tests des règles économiques et comportements clients
+- [ ] Tests de sauvegarde et migration
+- [ ] Journal métier pour le diagnostic
+- [ ] Simulation accélérée sans rendu
+- [ ] Réduction progressive du rôle d’orchestrateur de `App.vue`
+- [ ] Contrôle automatique des dépendances entre packages
 
-## Prochain lot d’implémentation
+## Ordre d’implémentation recommandé
 
-Le prochain lot poursuit **v0.4 — Intelligence commerciale** dans cet ordre :
-
-1. stabiliser la sensibilité et le budget pendant toute une visite client ;
-2. relier les décisions de prix à la satisfaction finale ;
-3. persister l’historique analytique dans la sauvegarde ;
-4. calculer le coût moyen pondéré du stock ;
-5. ajouter les ventes et marges réelles au tableau produit ;
-6. introduire les substitutions et promotions.
+1. terminer la migration vers les packages publics ;
+2. stabiliser le profil client pendant toute une visite ;
+3. relier prix et satisfaction finale ;
+4. calculer le coût moyen pondéré ;
+5. ajouter ventes et marges réelles aux analytics ;
+6. persister l’historique analytique ;
+7. introduire promotions et substitutions ;
+8. extraire totalement Vue et Phaser dans `apps/game`.
