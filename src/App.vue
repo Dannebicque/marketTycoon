@@ -131,12 +131,14 @@ import type { BuildingKey, StorageType } from './game/definitions'
 import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './game/definitions'
 import { StoreScene } from './game/StoreScene'
 
+type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'orders'
+
 const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')
 const selectedId = ref<string | null>(null)
 const managementOpen = ref(false)
-const managementTab = ref<'dashboard' | 'finances' | 'reserve' | 'orders'>('dashboard')
-const managementTabs = [{ key: 'dashboard', label: 'Tableau de bord' }, { key: 'finances', label: 'Finances' }, { key: 'reserve', label: 'Réserve' }, { key: 'orders', label: 'Commandes' }] as const
+const managementTab = ref<ManagementTab>('dashboard')
+const managementTabs: Array<{ key: ManagementTab; label: string }> = [{ key: 'dashboard', label: 'Tableau de bord' }, { key: 'finances', label: 'Finances' }, { key: 'reserve', label: 'Réserve' }, { key: 'orders', label: 'Commandes' }]
 const orderSupplier = ref('metro-market')
 const orderProduct = ref('pasta')
 const orderQuantity = ref(50)
@@ -181,7 +183,7 @@ watch(orderSupplier, () => { if (!orderableProducts.value.some(product => produc
 watch([orderProduct, orderQuantity], () => { orderMessage.value = '' })
 
 function getScene() { return game ? game.scene.getScene('StoreScene') as StoreScene : null }
-function openManagement(tab: typeof managementTab.value) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
+function openManagement(tab: ManagementTab) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
 function selectTool(key: BuildingKey) { activeTool.value = key; getScene()?.select(key) }
 function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
 function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'spawnCustomer') void scene.spawnCustomer(); else scene[name]() }
