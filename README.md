@@ -5,52 +5,94 @@ Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScrip
 ## Fonctionnalités
 
 - grille logique 16 × 16 avec projection isométrique ;
-- rayons, caisses, murs et portes ;
-- construction continue des murs ;
 - pathfinding A* respectant murs et portes ;
-- choix automatique d’une cellule d’entrée accessible sur le bord du magasin ;
 - plusieurs clients simultanés avec paniers multi-articles ;
-- quatre catégories de produits ;
-- files physiques et temps de caisse variables ;
-- stock propre à chaque rayon ;
-- horloge accélérée de 8 h à 20 h ;
-- fermeture automatique et bilan de fin de journée ;
+- stocks, files, paiements, satisfaction et bilan journalier ;
 - rotation, déplacement et zoom de la caméra ;
-- interface de gestion en Vue superposée à la scène Phaser.
+- interface Vue superposée à Phaser ;
+- équipements et produits entièrement pilotés par des catalogues typés.
 
-## Économie minimale
+## Catalogue des équipements
 
-- budget initial : **2 000 €** ;
-- coûts de construction débités lors de la pose ;
-- coût d’achat des marchandises débité lors du réapprovisionnement ;
-- chiffre d’affaires ajouté lors de l’encaissement ;
-- suivi séparé des dépenses de construction et de marchandises ;
-- bénéfice journalier calculé ainsi :
+Les équipements disponibles sont définis dans `src/game/catalog/buildings.ts` :
+
+### Rayons
+
+- rayon standard ;
+- fruits et légumes ;
+- rayon réfrigéré ;
+- congélateur ;
+- boulangerie.
+
+Chaque rayon définit sa capacité, ses catégories de produits compatibles, son temps de prise d’article et ses éventuels coûts électriques.
+
+### Caisses
+
+- caisse classique ;
+- caisse automatique ;
+- caisse express.
+
+Chaque caisse définit sa vitesse, ses paiements acceptés, sa limite éventuelle de panier, son besoin en employé et son risque éventuel d’incident.
+
+### Structure
 
 ```text
-bénéfice du jour = chiffre d’affaires du jour
-                    - constructions du jour
-                    - achats de marchandises du jour
+BuildingDefinition
+├── ShelfDefinition
+├── CheckoutDefinition
+├── WallDefinition
+└── DoorDefinition
+```
+
+L’union discriminée utilise `category`. La propriété `key` identifie le modèle précis et `renderer` choisit sa représentation dans Phaser.
+
+## Catalogue des produits
+
+Les produits sont définis dans `src/game/catalog/products.ts`.
+
+Ils possèdent notamment :
+
+- une clé unique ;
+- une catégorie ;
+- un prix de vente ;
+- un prix d’achat ;
+- une couleur ;
+- éventuellement une durée de conservation ;
+- éventuellement une contrainte de réfrigération ou de congélation.
+
+Les catégories disponibles sont : épicerie, fruits, légumes, frais, boissons, hygiène, surgelés et boulangerie.
+
+Lorsqu’un rayon est construit, la simulation lui affecte uniquement un produit compatible avec `allowedProductCategories`.
+
+## Économie
+
+- budget initial : **2 000 €** ;
+- construction débitée lors de la pose ;
+- marchandises débitées lors du réapprovisionnement ;
+- chiffre d’affaires ajouté à l’encaissement ;
+- électricité des équipements froids débitée à la fermeture ;
+- bénéfice journalier :
+
+```text
+CA - construction - marchandises - fonctionnement
 ```
 
 ## Interface Vue
 
-L’interface Vue affiche en temps réel :
+La barre de construction est générée automatiquement depuis `BUILDING_CATALOG`. Ajouter une définition au catalogue suffit donc à faire apparaître le nouvel équipement dans l’interface.
 
-- budget disponible ;
-- heure et numéro du jour ;
-- clients présents ;
-- stock total ;
-- chiffre d’affaires du jour ;
-- coût des marchandises ;
-- bénéfice du jour.
+Le panneau de gestion affiche :
 
-La barre d’outils permet de sélectionner rayon, caisse, mur ou porte, de générer un client, d’activer les arrivées automatiques et de réapprovisionner.
+- pour un rayon : modèle, produit, catégorie, stock, prix, temps de prise et électricité ;
+- pour une caisse : modèle, file, état, paiements, limite de panier et besoin en employé.
 
-Le panneau latéral permet de sélectionner un rayon ou une caisse :
+## Ajouter un équipement
 
-- rayon : produit, stock, capacité, prix de vente et coût d’achat ;
-- caisse : taille de la file, état et coût de construction.
+1. Ajouter sa clé dans `BuildingKey` dans `src/game/definitions.ts`.
+2. Ajouter sa définition dans `BUILDING_CATALOG`.
+3. Utiliser une catégorie existante (`shelf`, `checkout`, `wall`, `door`).
+4. Ajouter un renderer spécifique dans `StoreScene` uniquement si son apparence doit être différente.
+5. Ajouter les produits compatibles dans `PRODUCT_CATALOG` si nécessaire.
 
 ## Lancer le projet
 
@@ -59,49 +101,40 @@ npm install
 npm run dev
 ```
 
-Puis ouvrir l’adresse indiquée par Vite, généralement `http://localhost:5173`.
+Validation complète :
+
+```bash
+npm run build
+```
 
 ## Commandes AZERTY
 
 | Commande | Action |
 |---|---|
-| `1` à `4` | Sélectionner un outil de construction |
-| Clic gauche | Placer l’élément ou tracer des murs |
-| Clic droit | Supprimer l’élément ou l’arête orientée |
-| `R` | Faire pivoter l’objet ou changer l’axe |
+| `1` | Rayon standard |
+| `2` | Caisse classique |
+| `3` | Mur |
+| `4` | Porte |
+| Clic gauche | Placer l’équipement |
+| Clic droit | Supprimer |
+| `R` | Faire pivoter l’équipement |
 | `C` | Faire entrer un client |
-| `Maj + S` | Activer ou couper les arrivées automatiques |
-| `Maj + A` | Réapprovisionner tous les rayons |
-| `N` | Démarrer le jour suivant après fermeture |
-| `A` / `E` | Tourner la scène de 90° |
+| `Maj + S` | Arrivées automatiques |
+| `Maj + A` | Réapprovisionner |
+| `N` | Jour suivant |
+| `A` / `E` | Tourner la scène |
 | `ZQSD` ou flèches | Déplacer la caméra |
-| Bouton central + glisser | Déplacer la caméra à la souris |
+| Bouton central + glisser | Déplacer à la souris |
 | Molette | Zoomer ou dézoomer |
-
-## Scénario de test
-
-1. Observer le budget initial de 2 000 € dans le HUD Vue.
-2. Construire un rayon et une caisse depuis la barre d’outils.
-3. Vérifier la baisse du budget et l’augmentation des dépenses de construction.
-4. Générer plusieurs clients et observer le chiffre d’affaires.
-5. Consommer du stock puis utiliser « Réappro. ».
-6. Vérifier le coût des marchandises et le bénéfice journalier.
-7. Sélectionner un rayon dans le panneau latéral et vérifier son stock.
-8. Sélectionner une caisse et vérifier la taille de sa file.
 
 ## Architecture
 
-- `GridManager` : occupation, collisions, transformation et rotation de la vue ;
-- `NavigationGrid` : calcul A* et règles de traversée ;
-- `CustomerAgent` : représentation, panier, humeur et déplacement ;
-- `StoreSimulation` : produits, stocks, paniers, files, paiements et économie ;
-- `StoreScene` : cycle journalier, caméra, orchestration et rendu Phaser ;
-- `App.vue` : HUD, barre d’outils et panneau de gestion.
-
-## Prochaines étapes techniques
-
-1. Remplacer le rafraîchissement périodique par un store Pinia et des événements typés.
-2. Ajouter sauvegarde et chargement du magasin.
-3. Ajouter des employés et l’ouverture individuelle des caisses.
-4. Ajouter les commandes fournisseurs et une réserve physique.
-5. Ajouter des objectifs, événements et progression du magasin.
+- `definitions.ts` : contrats TypeScript des produits et équipements ;
+- `catalog/buildings.ts` : source unique des équipements disponibles ;
+- `catalog/products.ts` : source unique des produits disponibles ;
+- `GridManager` : occupation, collisions et placement ;
+- `NavigationGrid` : pathfinding A* ;
+- `CustomerAgent` : représentation et déplacement ;
+- `StoreSimulation` : stocks, compatibilités, caisses et économie ;
+- `StoreScene` : orchestration et registre de rendu ;
+- `App.vue` : interface construite depuis les catalogues.
