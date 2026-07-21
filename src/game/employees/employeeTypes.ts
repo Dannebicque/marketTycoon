@@ -1,6 +1,6 @@
 import type { EmployeeRoleKey } from '@market-tycoon/catalog'
 
-export type { EmployeeRoleKey } from '@market-tycoon/catalog'
+export type { EmployeeRoleDefinition, EmployeeRoleKey } from '@market-tycoon/catalog'
 export type EmployeeStatus = 'available' | 'assigned' | 'working'
 export type EmployeeTaskType = 'idle' | 'checkout' | 'restocking' | 'repairing'
 
