@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "types": ["vite/client", "node"],
     "baseUrl": ".",
+    "noEmit": true,
     "paths": {
       "@market-tycoon/simulation-engine": ["packages/simulation-engine/src/index.ts"],
       "@market-tycoon/economy": ["packages/economy/src/index.ts"],

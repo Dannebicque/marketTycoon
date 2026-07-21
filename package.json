@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "vue-tsc --noEmit",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc --noEmit && vite build",
     "check": "npm run typecheck && npm run build",
     "preview": "vite preview"
   },
