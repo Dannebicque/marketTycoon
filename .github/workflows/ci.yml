@@ -81,13 +81,15 @@ jobs:
 
       - name: Enregistrer la migration
         run: |
-          git checkout HEAD^ -- .github/workflows/ci.yml
-          rm -f .github/workflows/finish-catalog-migration.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Finish catalog migration and remove compatibility facades"
-          git push origin HEAD:agent/phaser-isometric-store
+          git add src
+          if git diff --cached --quiet; then
+            echo "Migration déjà appliquée."
+          else
+            git commit -m "Finish catalog migration and remove compatibility facades"
+            git push origin HEAD:agent/phaser-isometric-store
+          fi
 
       - name: Publier les diagnostics
         if: always()
