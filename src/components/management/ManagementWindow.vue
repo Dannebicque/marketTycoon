@@ -25,11 +25,14 @@
   </div>
 </template>
 
+<script lang="ts">
+export type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'orders'
+</script>
+
 <script setup lang="ts">
 import type { ProductDefinition, StorageType } from '../../game/definitions'
 import PurchaseOrdersPanel from './PurchaseOrdersPanel.vue'
 
-type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'orders'
 const props = defineProps<{ tab: ManagementTab; ui: any; alerts: string[]; pendingOrders: any[]; suppliers: any[]; storageCapacities: any[]; reserveLines: any[]; orders: any[]; products: ProductDefinition[]; orderMessage: string; orderMessageType: 'success' | 'error' }>()
 defineEmits<{ close: []; 'update:tab': [tab: ManagementTab]; 'submit-order': [supplierKey: string, lines: Array<{ productKey: string; quantity: number }>] }>()
 const tabs: Array<{ key: ManagementTab; label: string }> = [{ key: 'dashboard', label: 'Tableau de bord' }, { key: 'finances', label: 'Finances' }, { key: 'reserve', label: 'Réserve' }, { key: 'orders', label: 'Commandes' }]
