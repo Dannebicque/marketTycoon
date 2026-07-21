@@ -1,20 +1,26 @@
-import { PRODUCTS, getProductsForCategories } from './catalog/products'
+import { PRODUCTS, getProductDefinition, getProductsForCategories } from './catalog/products'
 import type { CheckoutDefinition, PaymentMethod, ProductDefinition, ShelfDefinition } from './definitions'
 import { isCheckoutDefinition, isShelfDefinition } from './definitions'
+import {
+  createEquipmentInventory,
+  getProductCapacity,
+  isProductCompatible,
+  type EquipmentCompartmentState,
+  type EquipmentInventoryState,
+} from './equipment/EquipmentInventory'
 import type { PlacedBuilding } from './GridManager'
 
 export type { PaymentMethod, ProductDefinition } from './definitions'
 
-export interface ShelfState {
-  buildingId: string
-  definitionKey: string
-  product: ProductDefinition
-  stock: number
-  capacity: number
+export interface ShoppingPlanItem {
+  shelf: PlacedBuilding
+  compartmentId: string
+  requestedQuantity: number
 }
 
 export interface BasketLine {
   shelfId: string
+  compartmentId: string
   product: ProductDefinition
   quantity: number
 }
@@ -59,36 +65,22 @@ export interface DaySnapshot {
   averageQueueSeconds: number
 }
 
-export interface CheckoutTiming {
-  durationMs: number
-  incident: boolean
-}
-
+export interface CheckoutTiming { durationMs: number; incident: boolean }
 export const INITIAL_BUDGET = 2_000
 
 export class StoreSimulation {
-  private shelves = new Map<string, ShelfState>()
+  private inventories = new Map<string, EquipmentInventoryState>()
+  private shelfDefinitions = new Map<string, ShelfDefinition>()
   private checkoutQueues = new Map<string, string[]>()
   private checkoutBusy = new Set<string>()
   private dayStart?: StoreMetrics
 
   readonly metrics: StoreMetrics = {
-    cash: INITIAL_BUDGET,
-    revenue: 0,
-    profit: 0,
-    constructionExpenses: 0,
-    merchandiseExpenses: 0,
-    operatingExpenses: 0,
-    servedCustomers: 0,
-    lostCustomers: 0,
-    satisfactionTotal: 0,
-    satisfactionSamples: 0,
-    totalQueueTimeMs: 0,
-    articlesSold: 0,
-    contactlessPayments: 0,
-    cardPayments: 0,
-    cashPayments: 0,
-    checkoutIncidents: 0,
+    cash: INITIAL_BUDGET, revenue: 0, profit: 0, constructionExpenses: 0,
+    merchandiseExpenses: 0, operatingExpenses: 0, servedCustomers: 0,
+    lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0,
+    totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0,
+    cardPayments: 0, cashPayments: 0, checkoutIncidents: 0,
   }
 
   syncBuildings(buildings: PlacedBuilding[]) {
@@ -97,21 +89,21 @@ export class StoreSimulation {
     const shelfIds = new Set(shelves.map(item => item.id))
     const checkoutIds = new Set(checkouts.map(item => item.id))
 
-    for (const id of this.shelves.keys()) if (!shelfIds.has(id)) this.shelves.delete(id)
+    for (const id of this.inventories.keys()) if (!shelfIds.has(id)) this.inventories.delete(id)
+    for (const id of this.shelfDefinitions.keys()) if (!shelfIds.has(id)) this.shelfDefinitions.delete(id)
     for (const id of this.checkoutQueues.keys()) if (!checkoutIds.has(id)) this.checkoutQueues.delete(id)
 
     shelves.forEach((shelf, index) => {
-      if (this.shelves.has(shelf.id)) return
       const definition = shelf.definition as ShelfDefinition
-      const compatibleProducts = getProductsForCategories(definition.allowedProductCategories)
-      const product = compatibleProducts[index % Math.max(1, compatibleProducts.length)] ?? PRODUCTS[0]
-      this.shelves.set(shelf.id, {
-        buildingId: shelf.id,
-        definitionKey: definition.key,
-        product,
-        stock: definition.capacity,
-        capacity: definition.capacity,
+      this.shelfDefinitions.set(shelf.id, definition)
+      if (this.inventories.has(shelf.id)) return
+      const inventory = createEquipmentInventory(shelf.id, definition)
+      const compatible = this.getCompatibleProducts(shelf.id)
+      inventory.compartments.forEach((slot, slotIndex) => {
+        const product = compatible[(index + slotIndex) % Math.max(1, compatible.length)]
+        if (product) this.assignProductToCompartment(shelf.id, slot.id, product.key, true, inventory)
       })
+      this.inventories.set(shelf.id, inventory)
     })
 
     for (const checkout of checkouts) {
@@ -136,17 +128,12 @@ export class StoreSimulation {
       servedCustomers: served,
       lostCustomers: this.metrics.lostCustomers - start.lostCustomers,
       articlesSold: this.metrics.articlesSold - start.articlesSold,
-      averageSatisfaction: samples > 0
-        ? (this.metrics.satisfactionTotal - start.satisfactionTotal) / samples
-        : 100,
-      averageQueueSeconds: served > 0
-        ? (this.metrics.totalQueueTimeMs - start.totalQueueTimeMs) / served / 1000
-        : 0,
+      averageSatisfaction: samples > 0 ? (this.metrics.satisfactionTotal - start.satisfactionTotal) / samples : 100,
+      averageQueueSeconds: served > 0 ? (this.metrics.totalQueueTimeMs - start.totalQueueTimeMs) / served / 1000 : 0,
     }
   }
 
   canSpend(amount: number) { return this.metrics.cash >= amount }
-
   spend(amount: number) {
     if (!this.canSpend(amount)) return false
     this.metrics.cash -= amount
@@ -154,33 +141,111 @@ export class StoreSimulation {
     this.recalculateProfit()
     return true
   }
-
   refund(amount: number) {
     this.metrics.cash += amount
     this.metrics.constructionExpenses = Math.max(0, this.metrics.constructionExpenses - amount)
     this.recalculateProfit()
   }
 
-  getAvailableShelves(buildings: PlacedBuilding[]) {
-    return buildings.filter(building => {
-      const state = this.shelves.get(building.id)
-      return isShelfDefinition(building.definition) && state && state.stock > 0
+  getCompatibleProducts(buildingId: string) {
+    const definition = this.shelfDefinitions.get(buildingId)
+    if (!definition) return []
+    return getProductsForCategories(definition.allowedProductCategories)
+      .filter(product => isProductCompatible(definition, product))
+  }
+
+  assignProductToCompartment(
+    buildingId: string,
+    compartmentId: string,
+    productKey: string | null,
+    fill = false,
+    providedInventory?: EquipmentInventoryState,
+  ) {
+    const inventory = providedInventory ?? this.inventories.get(buildingId)
+    const definition = this.shelfDefinitions.get(buildingId)
+    const compartment = inventory?.compartments.find(item => item.id === compartmentId)
+    if (!inventory || !definition || !compartment) return false
+
+    if (productKey === null) {
+      compartment.productKey = null
+      compartment.quantity = 0
+      compartment.capacity = 0
+      return true
+    }
+
+    const product = getProductDefinition(productKey)
+    if (!product || !isProductCompatible(definition, product)) return false
+    compartment.productKey = product.key
+    compartment.capacity = getProductCapacity(definition, product)
+    compartment.quantity = fill ? compartment.capacity : 0
+    return true
+  }
+
+  restockCompartment(buildingId: string, compartmentId: string) {
+    const compartment = this.getCompartment(buildingId, compartmentId)
+    if (!compartment?.productKey) return false
+    const product = getProductDefinition(compartment.productKey)
+    if (!product) return false
+    const missing = compartment.capacity - compartment.quantity
+    const cost = missing * product.purchasePrice
+    if (!this.canSpend(cost)) return false
+    this.metrics.cash -= cost
+    this.metrics.merchandiseExpenses += cost
+    compartment.quantity = compartment.capacity
+    this.recalculateProfit()
+    return true
+  }
+
+  restockEquipment(buildingId: string) {
+    const inventory = this.inventories.get(buildingId)
+    if (!inventory) return false
+    return this.restockCompartments(inventory.compartments)
+  }
+
+  restockAll() {
+    return this.restockCompartments([...this.inventories.values()].flatMap(item => item.compartments))
+  }
+
+  private restockCompartments(compartments: EquipmentCompartmentState[]) {
+    const lines = compartments.flatMap(compartment => {
+      if (!compartment.productKey) return []
+      const product = getProductDefinition(compartment.productKey)
+      return product ? [{ compartment, product }] : []
     })
+    const cost = lines.reduce((total, line) => total + (line.compartment.capacity - line.compartment.quantity) * line.product.purchasePrice, 0)
+    if (!this.canSpend(cost)) return false
+    this.metrics.cash -= cost
+    this.metrics.merchandiseExpenses += cost
+    lines.forEach(line => { line.compartment.quantity = line.compartment.capacity })
+    this.recalculateProfit()
+    return true
   }
 
-  createShoppingPlan(buildings: PlacedBuilding[]) {
-    const available = this.getAvailableShelves(buildings)
-    const shuffled = [...available].sort(() => Math.random() - .5)
-    const shelfCount = Math.min(shuffled.length, randomBetween(1, 3))
-    return shuffled.slice(0, shelfCount).map(shelf => ({ shelf, requestedQuantity: randomBetween(1, 3) }))
+  getAvailableShelves(buildings: PlacedBuilding[]) {
+    return buildings.filter(building => isShelfDefinition(building.definition) &&
+      Boolean(this.inventories.get(building.id)?.compartments.some(slot => slot.productKey && slot.quantity > 0)))
   }
 
-  takeItems(shelfId: string, requestedQuantity: number): BasketLine | null {
-    const shelf = this.shelves.get(shelfId)
-    if (!shelf || shelf.stock <= 0) return null
-    const quantity = Math.min(requestedQuantity, shelf.stock)
-    shelf.stock -= quantity
-    return { shelfId, product: shelf.product, quantity }
+  createShoppingPlan(buildings: PlacedBuilding[]): ShoppingPlanItem[] {
+    const available = buildings.flatMap(shelf => {
+      if (!isShelfDefinition(shelf.definition)) return []
+      const inventory = this.inventories.get(shelf.id)
+      return (inventory?.compartments ?? [])
+        .filter(slot => slot.productKey && slot.quantity > 0)
+        .map(slot => ({ shelf, compartmentId: slot.id }))
+    }).sort(() => Math.random() - .5)
+    const count = Math.min(available.length, randomBetween(1, 3))
+    return available.slice(0, count).map(item => ({ ...item, requestedQuantity: randomBetween(1, 3) }))
+  }
+
+  takeItems(shelfId: string, compartmentId: string, requestedQuantity: number): BasketLine | null {
+    const compartment = this.getCompartment(shelfId, compartmentId)
+    if (!compartment?.productKey || compartment.quantity <= 0) return null
+    const product = getProductDefinition(compartment.productKey)
+    if (!product) return null
+    const quantity = Math.min(requestedQuantity, compartment.quantity)
+    compartment.quantity -= quantity
+    return { shelfId, compartmentId, product, quantity }
   }
 
   summarizeBasket(lines: BasketLine[]): BasketSummary {
@@ -200,14 +265,11 @@ export class StoreSimulation {
   }
 
   chooseCheckout(checkouts: PlacedBuilding[], basket?: BasketSummary, payment?: PaymentMethod) {
-    const compatible = checkouts.filter(checkout => {
+    return checkouts.filter(checkout => {
       if (!isCheckoutDefinition(checkout.definition)) return false
-      const definition = checkout.definition
-      if (basket && definition.maxBasketSize !== undefined && basket.articleCount > definition.maxBasketSize) return false
-      if (payment && !definition.acceptedPayments.includes(payment)) return false
-      return true
-    })
-    return compatible.sort((a, b) => this.queueLength(a.id) - this.queueLength(b.id))[0]
+      if (basket && checkout.definition.maxBasketSize !== undefined && basket.articleCount > checkout.definition.maxBasketSize) return false
+      return !payment || checkout.definition.acceptedPayments.includes(payment)
+    }).sort((a, b) => this.queueLength(a.id) - this.queueLength(b.id))[0]
   }
 
   getCheckoutTiming(checkout: PlacedBuilding, articleCount: number, payment: PaymentMethod): CheckoutTiming {
@@ -216,26 +278,10 @@ export class StoreSimulation {
     const paymentTime = payment === 'contactless' ? 900 : payment === 'card' ? 1_900 : 3_200
     const incident = Boolean(definition.breakdownChance && Math.random() < definition.breakdownChance)
     if (incident) this.metrics.checkoutIncidents += 1
-    return {
-      durationMs: definition.baseCheckoutTimeMs + articleCount * definition.scanTimePerArticleMs + paymentTime + (incident ? 4_000 : 0),
-      incident,
-    }
+    return { durationMs: definition.baseCheckoutTimeMs + articleCount * definition.scanTimePerArticleMs + paymentTime + (incident ? 4_000 : 0), incident }
   }
 
-  getPickupTimeMs(shelf: PlacedBuilding) {
-    return isShelfDefinition(shelf.definition) ? shelf.definition.customerPickupTimeMs : 650
-  }
-
-  restockAll() {
-    let cost = 0
-    for (const shelf of this.shelves.values()) cost += (shelf.capacity - shelf.stock) * shelf.product.purchasePrice
-    if (!this.canSpend(cost)) return false
-    this.metrics.cash -= cost
-    this.metrics.merchandiseExpenses += cost
-    for (const shelf of this.shelves.values()) shelf.stock = shelf.capacity
-    this.recalculateProfit()
-    return true
-  }
+  getPickupTimeMs(shelf: PlacedBuilding) { return isShelfDefinition(shelf.definition) ? shelf.definition.customerPickupTimeMs : 650 }
 
   enqueue(checkoutId: string, customerId: string) {
     const queue = this.checkoutQueues.get(checkoutId) ?? []
@@ -243,11 +289,7 @@ export class StoreSimulation {
     this.checkoutQueues.set(checkoutId, queue)
     return queue.indexOf(customerId)
   }
-
-  isFirst(checkoutId: string, customerId: string) {
-    return this.checkoutQueues.get(checkoutId)?.[0] === customerId && !this.checkoutBusy.has(checkoutId)
-  }
-
+  isFirst(checkoutId: string, customerId: string) { return this.checkoutQueues.get(checkoutId)?.[0] === customerId && !this.checkoutBusy.has(checkoutId) }
   startCheckout(checkoutId: string) { this.checkoutBusy.add(checkoutId) }
   isCheckoutBusy(checkoutId: string) { return this.checkoutBusy.has(checkoutId) }
 
@@ -284,70 +326,31 @@ export class StoreSimulation {
   queueLength(checkoutId: string) { return this.checkoutQueues.get(checkoutId)?.length ?? 0 }
   queuePosition(checkoutId: string, customerId: string) { return this.checkoutQueues.get(checkoutId)?.indexOf(customerId) ?? -1 }
   getQueue(checkoutId: string) { return [...(this.checkoutQueues.get(checkoutId) ?? [])] }
-  getTotalStock() { return [...this.shelves.values()].reduce((total, shelf) => total + shelf.stock, 0) }
-  getShelfState(buildingId: string) { return this.shelves.get(buildingId) }
-  getShelfStates() { return [...this.shelves.values()].map(shelf => ({ ...shelf, product: { ...shelf.product } })) }
+  getCompartment(buildingId: string, compartmentId: string) { return this.inventories.get(buildingId)?.compartments.find(item => item.id === compartmentId) }
+  getEquipmentInventory(buildingId: string) { return this.inventories.get(buildingId) }
+  getEquipmentInventories() { return [...this.inventories.values()] }
+  getTotalStock() { return [...this.inventories.values()].flatMap(item => item.compartments).reduce((total, slot) => total + slot.quantity, 0) }
   getProducts() { return PRODUCTS }
 
   getDayRevenue() { return this.metrics.revenue - (this.dayStart?.revenue ?? 0) }
   getDayConstructionExpenses() { return this.metrics.constructionExpenses - (this.dayStart?.constructionExpenses ?? 0) }
   getDayMerchandiseExpenses() { return this.metrics.merchandiseExpenses - (this.dayStart?.merchandiseExpenses ?? 0) }
   getDayOperatingExpenses() { return this.metrics.operatingExpenses - (this.dayStart?.operatingExpenses ?? 0) }
-  getDayProfit() {
-    return this.getDayRevenue()
-      - this.getDayConstructionExpenses()
-      - this.getDayMerchandiseExpenses()
-      - this.getDayOperatingExpenses()
-  }
-
-  getAverageSatisfaction() {
-    return this.metrics.satisfactionSamples ? this.metrics.satisfactionTotal / this.metrics.satisfactionSamples : 100
-  }
-
-  getAverageQueueSeconds() {
-    return this.metrics.servedCustomers ? this.metrics.totalQueueTimeMs / this.metrics.servedCustomers / 1000 : 0
-  }
+  getDayProfit() { return this.getDayRevenue() - this.getDayConstructionExpenses() - this.getDayMerchandiseExpenses() - this.getDayOperatingExpenses() }
+  getAverageSatisfaction() { return this.metrics.satisfactionSamples ? this.metrics.satisfactionTotal / this.metrics.satisfactionSamples : 100 }
+  getAverageQueueSeconds() { return this.metrics.servedCustomers ? this.metrics.totalQueueTimeMs / this.metrics.servedCustomers / 1000 : 0 }
 
   private applyDailyOperatingCosts(buildings: PlacedBuilding[]) {
-    const cost = buildings.reduce((total, building) => {
-      if (!isShelfDefinition(building.definition)) return total
-      return total + (building.definition.electricityCostPerDay ?? 0)
-    }, 0)
+    const cost = buildings.reduce((total, building) => isShelfDefinition(building.definition) ? total + (building.definition.electricityCostPerDay ?? 0) : total, 0)
     if (cost <= 0 || !this.canSpend(cost)) return
     this.metrics.cash -= cost
     this.metrics.operatingExpenses += cost
     this.recalculateProfit()
   }
-
-  private recalculateProfit() {
-    this.metrics.profit = this.metrics.revenue
-      - this.metrics.constructionExpenses
-      - this.metrics.merchandiseExpenses
-      - this.metrics.operatingExpenses
-  }
-
+  private recalculateProfit() { this.metrics.profit = this.metrics.revenue - this.metrics.constructionExpenses - this.metrics.merchandiseExpenses - this.metrics.operatingExpenses }
   private emptySnapshotStart(): StoreMetrics {
-    return {
-      cash: this.metrics.cash,
-      revenue: 0,
-      profit: 0,
-      constructionExpenses: 0,
-      merchandiseExpenses: 0,
-      operatingExpenses: 0,
-      servedCustomers: 0,
-      lostCustomers: 0,
-      satisfactionTotal: 0,
-      satisfactionSamples: 0,
-      totalQueueTimeMs: 0,
-      articlesSold: 0,
-      contactlessPayments: 0,
-      cardPayments: 0,
-      cashPayments: 0,
-      checkoutIncidents: 0,
-    }
+    return { cash: this.metrics.cash, revenue: 0, profit: 0, constructionExpenses: 0, merchandiseExpenses: 0, operatingExpenses: 0, servedCustomers: 0, lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0, totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0, cardPayments: 0, cashPayments: 0, checkoutIncidents: 0 }
   }
 }
 
-function randomBetween(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
-}
+function randomBetween(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
