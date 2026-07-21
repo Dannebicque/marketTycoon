@@ -1,135 +1,73 @@
 # Market Tycoon
 
-Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScript et Phaser 3.
+Market Tycoon est un prototype de jeu de gestion de magasin en vue isométrique, développé avec Vue 3, TypeScript et Phaser 3.
 
-## Boucle de jeu actuelle
+Le projet vise une simulation extensible dans laquelle le joueur construit son magasin, gère ses fournisseurs, ses stocks, ses prix et ses employés, puis arbitre entre satisfaction client et rentabilité.
+
+## État du projet
+
+La boucle de jeu actuelle couvre :
 
 ```text
-Construire une réserve compatible
-→ commander chez un fournisseur
-→ attendre la livraison
-→ stocker les marchandises
-→ configurer les rayons
-→ transférer le stock vers les rayons
-→ accueillir les clients
-→ suivre les résultats dans le menu Gestion
+Construire
+→ commander
+→ réceptionner
+→ stocker
+→ approvisionner
+→ vendre
+→ payer les charges et les salariés
+→ piloter les prix et les marges
+→ sauvegarder
 ```
+
+Fonctionnalités principales :
+
+- grille isométrique et équipements configurables ;
+- catalogues extensibles de produits, bâtiments et métiers ;
+- réserves ambiante, froide et surgelée ;
+- fournisseurs et commandes multi-produits ;
+- livraisons et réassort réel ;
+- clients, paniers et files de caisse ;
+- caissiers, employés de rayon et techniciens visibles ;
+- salaires et charges journalières ;
+- prix de vente personnalisés et indicateurs de marge ;
+- sauvegarde locale versionnée.
+
+## Démarrage
+
+Prérequis : Node.js 22 ou une version LTS récente.
+
+```bash
+npm install
+npm run dev
+```
+
+Vérification complète :
+
+```bash
+npm run check
+```
+
+Commandes disponibles :
+
+| Commande | Usage |
+|---|---|
+| `npm run dev` | Serveur de développement |
+| `npm run typecheck` | Vérification TypeScript et Vue |
+| `npm run build` | Typecheck puis build Vite |
+| `npm run check` | Contrôle complet du projet |
+| `npm run preview` | Prévisualisation du build |
 
 ## Menu Gestion
 
-Le bouton **Gestion** du HUD ouvre une fenêtre centrale indépendante de la scène Phaser.
+Le menu central contient :
 
-Elle contient quatre sections :
-
-- **Tableau de bord** : trésorerie, chiffre d’affaires, résultat, clients, stocks et alertes ;
-- **Finances** : construction, achats de marchandises, électricité, charges et résultat ;
-- **Réserve** : capacités ambiante, froide et surgelée, occupation et stock par produit ;
-- **Commandes** : caractéristiques du fournisseur, produits disponibles, estimation complète et historique.
-
-Le panneau latéral de la scène reste réservé à la configuration de l’équipement sélectionné.
-
-## Validation des commandes
-
-Le formulaire affiche avant validation :
-
-- le délai de livraison ;
-- le minimum de marchandises imposé par le fournisseur ;
-- les frais de livraison ;
-- le coût des marchandises ;
-- le total réel débité ;
-- les produits effectivement vendus par le fournisseur ;
-- la capacité de réserve compatible encore libre.
-
-Le bouton est désactivé tant qu’une règle n’est pas satisfaite. Chaque problème est affiché séparément.
-
-Exemples :
-
-```text
-Minimum fournisseur non atteint : il manque 42 € de marchandises.
-Budget insuffisant : il manque 120 €.
-Aucune réserve froide n’est construite.
-Capacité insuffisante : seulement 18 unités peuvent être réceptionnées.
-Ce produit n’est pas proposé par le fournisseur sélectionné.
-```
-
-La sélection des produits est filtrée selon le catalogue du fournisseur. Le joueur ne peut donc plus sélectionner volontairement une référence indisponible chez lui.
-
-## Équipements
-
-Les grandes catégories sont figées :
-
-```text
-BuildingCategory = shelf | checkout | storage | wall | door
-StorageType       = ambient | cold | frozen
-```
-
-Les rayons possèdent une grille d’emplacements configurables. Chaque emplacement contient au maximum une référence de produit.
-
-```ts
-layout: {
-  columns: 3,
-  levels: 4,
-  compartmentType: 'standard-shelf',
-}
-```
-
-## Capacité des produits
-
-Chaque produit définit une capacité fixe par type d’emplacement :
-
-```ts
-capacities: {
-  'standard-shelf': 30,
-}
-```
-
-La capacité de réserve est exprimée en unités et dépend des équipements de stockage construits.
-
-## Réserve
-
-Équipements disponibles :
-
-- étagère de réserve ambiante ;
-- réserve froide ;
-- réserve surgelée.
-
-Sans zone compatible, un produit ne peut pas être réceptionné ni conservé en réserve.
-
-Le réassort ne crée plus de marchandises et ne débite plus directement le budget : il transfère les unités de la réserve vers les rayons.
-
-## Fournisseurs
-
-Trois fournisseurs sont actuellement définis :
-
-- **Metro Market** : généraliste, livraison rapide ;
-- **Eco Wholesale** : moins cher, délai plus long, sans surgelés ;
-- **Fresh Logistics** : spécialisé dans le frais et le surgelé.
-
-Chaque fournisseur possède :
-
-- un catalogue de produits ;
-- un coefficient de prix ;
-- un minimum de commande ;
-- des frais de livraison ;
-- un délai de livraison.
-
-## Architecture principale
-
-```text
-src/game/
-├── definitions.ts
-├── equipment/
-│   └── EquipmentInventory.ts
-├── logistics/
-│   ├── ReserveManager.ts
-│   └── PurchaseOrderManager.ts
-├── catalog/
-│   ├── buildings/
-│   ├── products/
-│   └── suppliers.ts
-├── StoreSimulation.ts
-└── StoreScene.ts
-```
+- **Tableau de bord** : trésorerie, chiffre d’affaires, résultat et alertes ;
+- **Finances** : charges, achats, salaires et résultat ;
+- **Réserve** : capacités et stocks par produit ;
+- **Prix & marges** : tarifs, marge unitaire, taux de marge et taux de marque ;
+- **Employés** : recrutement, qualité, salaire, affectations et tâches ;
+- **Commandes** : panier fournisseur, validation et historique.
 
 ## Contrôles
 
@@ -141,28 +79,58 @@ src/game/
 | `R` | Faire pivoter l’équipement |
 | `C` | Faire entrer un client |
 | `Maj + S` | Activer les arrivées automatiques |
-| `Maj + A` | Réassort global depuis la réserve |
+| `Maj + A` | Demander un réassort |
 | `N` | Jour suivant |
 | `A` / `E` | Tourner la scène |
 | `ZQSD` ou flèches | Déplacer la caméra |
 | Molette | Zoomer ou dézoomer |
 
-## Validation locale
+## Architecture
 
-```bash
-npm install
-npm run build
+```text
+src/
+├── components/          # interface Vue
+├── composables/         # logique d’interface réutilisable
+└── game/
+    ├── catalog/         # définitions extensibles
+    ├── commerce/        # demande et décisions commerciales
+    ├── employees/       # gestion et agents employés
+    ├── equipment/       # inventaires des équipements
+    ├── events/          # événements métier typés
+    ├── logistics/       # réserve et commandes
+    ├── pricing/         # prix et marges
+    ├── save/            # sauvegarde versionnée
+    ├── StoreSimulation.ts
+    └── StoreScene.ts
 ```
 
-Scénario recommandé :
+Documentation complémentaire :
 
-1. construire une réserve ambiante, un rayon et une caisse ;
-2. ouvrir **Gestion → Commandes** ;
-3. observer le minimum, les frais et le total avant validation ;
-4. tester une quantité trop faible et vérifier le montant manquant ;
-5. commander des pâtes ;
-6. passer au jour de livraison ;
-7. vérifier le stock dans **Gestion → Réserve** ;
-8. remplir le rayon ;
-9. accueillir des clients ;
-10. suivre les charges et le résultat dans **Gestion → Finances**.
+- [Feuille de route](ROADMAP.md)
+- [Architecture détaillée](docs/ARCHITECTURE.md)
+- [Guide de contribution](CONTRIBUTING.md)
+
+## Principes techniques
+
+- Les règles métier sont placées dans des managers testables.
+- Les éléments extensibles proviennent de catalogues validés.
+- Vue orchestre l’interface et Phaser gère le rendu et les agents.
+- Les événements métier permettent de découpler statistiques, objectifs et simulation.
+- Les sauvegardes utilisent des données sérialisables et des clés de catalogue stables.
+- Le mode TypeScript strict reste activé.
+
+## Prochaine étape
+
+La version v0.4 introduit l’intelligence commerciale :
+
+1. sensibilité des clients aux prix ;
+2. coût moyen pondéré du stock ;
+3. statistiques par produit ;
+4. promotions ;
+5. écran d’analyse commerciale.
+
+Le premier socle est déjà présent avec un bus d’événements métier typé et un service de décision d’achat selon l’écart au prix du marché.
+
+## Statut
+
+Le projet est en développement actif. La pull request principale reste en brouillon tant que la boucle économique et les contrôles automatisés ne sont pas stabilisés.
