@@ -44,10 +44,14 @@ export function usePurchaseOrderCart(options: UsePurchaseOrderCartOptions) {
   const supplier = computed(() => options.suppliers.value.find(item => item.key === supplierKey.value))
   const availableProducts = computed(() => options.products.value.filter(product => supplier.value?.productKeys.includes(product.key)))
 
-  watch([supplierKey, availableProducts], () => {
+  watch(supplierKey, () => {
     lines.value = []
     selectedProductKey.value = availableProducts.value[0]?.key ?? ''
     selectedQuantity.value = 1
+  })
+
+  watch(availableProducts, products => {
+    if (!products.some(product => product.key === selectedProductKey.value)) selectedProductKey.value = products[0]?.key ?? ''
   }, { immediate: true })
 
   const detailedLines = computed(() => lines.value.flatMap(line => {
