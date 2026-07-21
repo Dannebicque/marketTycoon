@@ -11,7 +11,7 @@ export default defineBuilding({
   color: 0x84cc16,
   renderer: 'fruit-shelf',
   toolbar: { icon: '🍎', order: 20 },
-  capacity: 36,
+  layout: { columns: 4, levels: 2, compartmentType: 'fruit-bin' },
   allowedProductCategories: ['fruit', 'vegetable'],
   customerPickupTimeMs: 850,
 })
