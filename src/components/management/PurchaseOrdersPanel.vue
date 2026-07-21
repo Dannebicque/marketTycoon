@@ -57,8 +57,8 @@
 </template>
 
 <script setup lang="ts">
+import type { ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { toRef } from 'vue'
-import type { ProductDefinition, StorageType } from '../../game/definitions'
 import { usePurchaseOrderCart } from '../../composables/usePurchaseOrderCart'
 
 const props = defineProps<{ suppliers: any[]; products: ProductDefinition[]; storageCapacities: any[]; cash: number; orders: any[]; message: string; messageType: 'success' | 'error' }>()
