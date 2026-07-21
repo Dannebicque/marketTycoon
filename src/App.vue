@@ -12,9 +12,7 @@
     </header>
 
     <aside class="build-toolbar" aria-label="Outils de construction">
-      <button v-for="tool in tools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)">
-        <span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span><span>{{ tool.name }}</span><small>{{ tool.price }} €</small>
-      </button>
+      <button v-for="tool in tools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)"><span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span><span>{{ tool.name }}</span><small>{{ tool.price }} €</small></button>
       <div class="toolbar-separator" />
       <button @click="command('spawnCustomer')"><span class="tool-icon">🧍</span><span>Client</span></button>
       <button :class="{ active: ui.autoSpawn }" @click="command('toggleAutoSpawn')"><span class="tool-icon">▶</span><span>Auto</span></button>
@@ -22,7 +20,6 @@
     </aside>
 
     <section ref="gameContainer" class="game-container" />
-
     <EquipmentPanel :selected-item="selectedItem" :shelves="shelves" :storages="storages" :checkouts="checkouts" @select="selectBuilding" @assign-product="assignProduct" @restock-slot="restockSlot" @restock-equipment="restockEquipment" @open-management="openManagement" />
 
     <ManagementWindow
@@ -37,6 +34,7 @@
       :orders="orders"
       :products="products"
       :pricing-lines="pricingLines"
+      :customer-analytics="customerAnalytics"
       :order-message="orderMessage"
       :order-message-type="orderMessageType"
       :employees="employees"
@@ -67,6 +65,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import Phaser from 'phaser'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from './game/analytics/CustomerAnalyticsManager'
 import { BUILDINGS, getBuildingDefinition } from './game/catalog/buildings'
 import { getProductDefinition } from './game/catalog/products'
 import type { BuildingKey, ProductDefinition, StorageType } from './game/definitions'
@@ -105,13 +104,12 @@ const products = ref<ProductDefinition[]>([])
 const employees = ref<EmployeeState[]>([])
 const candidates = ref<EmployeeState[]>([])
 const employeeRoles = ref<EmployeeRoleDefinition[]>([])
+const emptySummary = (): CustomerAnalyticsSummary => ({ observations: 0, requestedQuantity: 0, acceptedQuantity: 0, rejectedQuantity: 0, conversionRate: 0, estimatedLostRevenue: 0, averageSatisfactionDelta: 0 })
+const customerAnalytics = reactive<{ day: number; daySummary: CustomerAnalyticsSummary; allSummary: CustomerAnalyticsSummary; dayProducts: ProductCustomerAnalytics[]; allProducts: ProductCustomerAnalytics[]; recent: CustomerPurchaseObservation[] }>({ day: 1, daySummary: emptySummary(), allSummary: emptySummary(), dayProducts: [], allProducts: [], recent: [] })
 const payroll = computed(() => employeeManager.getDailyPayroll())
 const selectedItem = computed(() => [...shelves.value, ...storages.value, ...checkouts.value].find(item => item.id === selectedId.value))
 const pendingOrders = computed(() => orders.value.filter(order => order.status === 'ordered'))
-const pricingLines = computed(() => products.value.map(product => {
-  const summary = pricingManager.getSummary(product)
-  return { ...summary, name: product.name, category: product.category, recommendedPrice: recommendedPrices.get(product.key) ?? product.salePrice }
-}))
+const pricingLines = computed(() => products.value.map(product => { const summary = pricingManager.getSummary(product); return { ...summary, name: product.name, category: product.category, recommendedPrice: recommendedPrices.get(product.key) ?? product.salePrice } }))
 const managementAlerts = computed(() => {
   const alerts: string[] = []
   for (const capacity of storageCapacities.value) {
@@ -126,6 +124,9 @@ const managementAlerts = computed(() => {
   const lowMarginCount = pricingLines.value.filter(line => !line.isLossLeader && line.markupRate < .1).length
   if (lossCount) alerts.push(`${lossCount} produit(s) sont vendus à perte.`)
   if (lowMarginCount) alerts.push(`${lowMarginCount} produit(s) ont une marge inférieure à 10 %.`)
+  const highLossProducts = customerAnalytics.dayProducts.filter(line => line.observations >= 3 && line.quantityConversionRate < .6)
+  if (highLossProducts.length) alerts.push(`${highLossProducts.length} produit(s) perdent plus de 40 % de la demande client. Consultez l’onglet Clients.`)
+  if (customerAnalytics.daySummary.estimatedLostRevenue >= 20) alerts.push(`${money(customerAnalytics.daySummary.estimatedLostRevenue)} de CA potentiel perdu aujourd’hui selon les décisions d’achat.`)
   return alerts
 })
 
@@ -133,38 +134,15 @@ function getScene() { return game ? game.scene.getScene('StoreScene') as StoreSc
 function openManagement(tab: ManagementTab) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
 function selectTool(key: BuildingKey) { activeTool.value = key; getScene()?.select(key) }
 function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
-function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') {
-  const scene = getScene(); if (!scene) return
-  if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return }
-  if (name === 'spawnCustomer') void scene.spawnCustomer()
-  else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'
-  else scene[name]()
-}
+function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return } if (name === 'spawnCustomer') void scene.spawnCustomer(); else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'; else scene[name]() }
 function assignProduct(buildingId: string, slotId: string, event: Event) { getScene()?.configureCompartment(buildingId, slotId, (event.target as HTMLSelectElement).value || null); refreshUi() }
 function restockSlot(buildingId: string, slotId: string) { getScene()?.restockCompartment(buildingId, slotId); refreshUi() }
 function restockEquipment(buildingId: string) { getScene()?.restockEquipment(buildingId); refreshUi() }
 function submitOrder(supplierKey: string, lines: Array<{ productKey: string; quantity: number }>) { const scene = getScene(); if (!scene) return; const order = scene.simulation.createPurchaseOrder(supplierKey, lines, scene.day); orderMessageType.value = order ? 'success' : 'error'; orderMessage.value = order ? `${order.id} enregistrée. Livraison prévue au jour ${order.expectedDay}.` : 'Le bon de commande n’a pas pu être enregistré.'; refreshUi() }
-
-function updateProductPrice(productKey: string, salePrice: number) {
-  if (!pricingManager.setSalePrice(productKey, salePrice)) { saveMessage.value = 'Le prix de vente doit être supérieur à 0.'; return }
-  applyPricingToProducts()
-  saveMessage.value = `Prix de ${getProductDefinition(productKey)?.name ?? productKey} mis à jour.`
-}
-function applyMarkup(markupRate: number) {
-  pricingManager.applyMarkup(products.value, markupRate)
-  applyPricingToProducts()
-  saveMessage.value = `Coefficient de marge de ${(markupRate * 100).toFixed(0)} % appliqué à tous les produits.`
-}
-function initializePricing(source: ProductDefinition[]) {
-  if (pricingInitialized) return
-  source.forEach(product => recommendedPrices.set(product.key, product.salePrice))
-  pricingManager.reset(source)
-  pricingInitialized = true
-}
-function applyPricingToProducts() {
-  for (const product of products.value) product.salePrice = pricingManager.getSalePrice(product)
-}
-
+function updateProductPrice(productKey: string, salePrice: number) { if (!pricingManager.setSalePrice(productKey, salePrice)) { saveMessage.value = 'Le prix de vente doit être supérieur à 0.'; return } applyPricingToProducts(); saveMessage.value = `Prix de ${getProductDefinition(productKey)?.name ?? productKey} mis à jour.` }
+function applyMarkup(markupRate: number) { pricingManager.applyMarkup(products.value, markupRate); applyPricingToProducts(); saveMessage.value = `Coefficient de marge de ${(markupRate * 100).toFixed(0)} % appliqué à tous les produits.` }
+function initializePricing(source: ProductDefinition[]) { if (pricingInitialized) return; source.forEach(product => recommendedPrices.set(product.key, product.salePrice)); pricingManager.reset(source); pricingInitialized = true }
+function applyPricingToProducts() { for (const product of products.value) product.salePrice = pricingManager.getSalePrice(product) }
 function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; syncWorkforce() }
 function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); syncWorkforce() }
 function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); syncWorkforce() }
@@ -180,23 +158,9 @@ function ensureEmployeeRuntime(scene: StoreScene) {
   const originalChooseCheckout = scene.simulation.chooseCheckout.bind(scene.simulation)
   scene.simulation.chooseCheckout = (available, basket, payment) => originalChooseCheckout(available.filter(checkout => employeeRuntime?.isCheckoutStaffed(checkout)), basket, payment)
   const originalCheckoutTiming = scene.simulation.getCheckoutTiming.bind(scene.simulation)
-  scene.simulation.getCheckoutTiming = (checkout, articleCount, payment) => {
-    const timing = originalCheckoutTiming(checkout, articleCount, payment)
-    if (!timing.incident) return timing
-    void employeeRuntime?.requestRepair(checkout)
-    const quality = employeeManager.getAverageQuality('technician')
-    const repairDelay = quality > 0 ? Math.max(900, Math.round(3_800 * (1.15 - quality / 130))) : 4_000
-    return { ...timing, durationMs: Math.max(0, timing.durationMs - 4_000 + repairDelay) }
-  }
+  scene.simulation.getCheckoutTiming = (checkout, articleCount, payment) => { const timing = originalCheckoutTiming(checkout, articleCount, payment); if (!timing.incident) return timing; void employeeRuntime?.requestRepair(checkout); const quality = employeeManager.getAverageQuality('technician'); const repairDelay = quality > 0 ? Math.max(900, Math.round(3_800 * (1.15 - quality / 130))) : 4_000; return { ...timing, durationMs: Math.max(0, timing.durationMs - 4_000 + repairDelay) } }
 }
-
-function applyPayroll(day: number) {
-  const scene = getScene(); if (!scene || payrollProcessedDay >= day) return
-  const cost = employeeManager.getDailyPayroll()
-  scene.simulation.metrics.cash -= cost
-  scene.simulation.metrics.operatingExpenses += cost
-  payrollProcessedDay = day
-}
+function applyPayroll(day: number) { const scene = getScene(); if (!scene || payrollProcessedDay >= day) return; const cost = employeeManager.getDailyPayroll(); scene.simulation.metrics.cash -= cost; scene.simulation.metrics.operatingExpenses += cost; payrollProcessedDay = day }
 
 function saveGame() {
   const scene = getScene(); if (!scene) return
@@ -208,9 +172,7 @@ function saveGame() {
     edges: scene.grid.getEdges().map(edge => ({ definitionKey: edge.definitionKey, gridX: edge.gridX, gridY: edge.gridY, direction: edge.direction })),
     reserve: simulation.reserve.exportState(), purchaseOrders: simulation.purchaseOrders.exportState(), employees: employeeManager.exportState(), pricing: pricingManager.exportState(),
   }
-  storeSaveGame(save)
-  saveAvailable.value = true
-  saveMessage.value = `Partie sauvegardée le ${new Date(save.savedAt).toLocaleString('fr-FR')}.`
+  storeSaveGame(save); saveAvailable.value = true; saveMessage.value = `Partie sauvegardée le ${new Date(save.savedAt).toLocaleString('fr-FR')}.`
 }
 
 function loadGame() {
@@ -225,24 +187,19 @@ function loadGame() {
   scene.simulation.syncBuildings(scene.grid.getBuildings())
   for (const saved of save.buildings) { const newId = idMap.get(saved.oldId); const inventory = newId ? scene.simulation.getEquipmentInventory(newId) : undefined; if (!inventory || !saved.compartments) continue; for (const savedSlot of saved.compartments) { const slot = inventory.compartments.find(item => item.id === savedSlot.id); if (slot) Object.assign(slot, savedSlot) } }
   Object.assign(scene.simulation.metrics, save.metrics)
-  scene.simulation.reserve.importState(save.reserve)
-  scene.simulation.purchaseOrders.importState(save.purchaseOrders)
+  scene.simulation.reserve.importState(save.reserve); scene.simulation.purchaseOrders.importState(save.purchaseOrders)
   employeeManager.importState({ ...save.employees, employees: save.employees.employees?.map(employee => ({ ...employee, assignedBuildingId: employee.assignedBuildingId ? idMap.get(employee.assignedBuildingId) : undefined })) })
-  pricingManager.importState(save.pricing, scene.simulation.getProducts())
-  products.value = scene.simulation.getProducts()
-  applyPricingToProducts()
+  pricingManager.importState(save.pricing, scene.simulation.getProducts()); products.value = scene.simulation.getProducts(); applyPricingToProducts()
   scene.day = save.day; scene.currentMinutes = save.currentMinutes; processedDay = save.day; payrollProcessedDay = save.day
-  scene.rotateScene(1); scene.rotateScene(-1)
-  ensureEmployeeRuntime(scene); refreshEmployees(); refreshUi()
-  saveMessage.value = `Partie du ${new Date(save.savedAt).toLocaleString('fr-FR')} chargée.`
+  scene.rotateScene(1); scene.rotateScene(-1); ensureEmployeeRuntime(scene); refreshEmployees(); refreshUi(); saveMessage.value = `Partie du ${new Date(save.savedAt).toLocaleString('fr-FR')} chargée.`
 }
 
 function deleteCurrentSave() { deleteSaveGame(); saveAvailable.value = false; saveMessage.value = 'Sauvegarde supprimée.' }
-
 function refreshUi() {
   const scene = getScene(); if (!scene) return
   ensureEmployeeRuntime(scene)
   const simulation = scene.simulation
+  simulation.setCurrentDay(scene.day)
   simulation.syncBuildings(scene.grid.getBuildings())
   if (processedDay !== scene.day) { simulation.processDeliveries(scene.day); applyPayroll(scene.day); employeeManager.refreshCandidates(scene.day); processedDay = scene.day }
   const minutes = scene.currentMinutes
@@ -252,7 +209,9 @@ function refreshUi() {
   shelves.value = buildings.filter(b => isShelfDefinition(b.definition)).map(building => { const definition = building.definition, inventory = simulation.getEquipmentInventory(building.id); const slots = (inventory?.compartments ?? []).map(slot => { const product = slot.productKey ? getProductDefinition(slot.productKey) : undefined; return { ...slot, productName: product?.name ?? 'Vide', reserveQuantity: product ? simulation.getReserveQuantity(product.key) : 0, color: product ? `#${product.color.toString(16).padStart(6, '0')}` : '#334155' } }); return { id: building.id, type: 'shelf', buildingName: definition.name, description: definition.description, columns: definition.layout.columns, levels: definition.layout.levels, slots, stock: slots.reduce((sum, slot) => sum + slot.quantity, 0), capacity: slots.reduce((sum, slot) => sum + slot.capacity, 0), configuredSlots: slots.filter(slot => slot.productKey).length, compatibleProducts: simulation.getCompatibleProducts(building.id).map(product => ({ key: product.key, name: product.name, capacity: product.capacities[definition.layout.compartmentType] ?? 0 })), columnGroups: Array.from({ length: definition.layout.columns }, (_, index) => ({ index, slots: slots.filter(slot => slot.column === index).sort((a, b) => b.level - a.level) })) } })
   storages.value = buildings.filter(b => isStorageDefinition(b.definition)).map(building => { const type = building.definition.storageType, capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { id: building.id, type: 'storage', buildingName: building.definition.name, description: building.definition.description, storageType: type, capacity, used, free: Math.max(0, capacity - used), ratio: capacity ? used / capacity : 0 } })
   checkouts.value = buildings.filter(b => isCheckoutDefinition(b.definition)).map(building => { const assigned = employeeManager.getAssignedTo(building.id); return { id: building.id, type: 'checkout', buildingName: building.definition.name, description: building.definition.description, queueLength: simulation.queueLength(building.id), busy: simulation.isCheckoutBusy(building.id), payments: building.definition.acceptedPayments.map(paymentLabel), employeeName: assigned ? `${assigned.firstName} ${assigned.lastName}` : null, open: !building.definition.requiresEmployee || Boolean(assigned) } })
-  suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); products.value = simulation.getProducts(); initializePricing(products.value); applyPricingToProducts(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } }); selectedId.value = scene.selectedBuildingId; refreshEmployees()
+  suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); products.value = simulation.getProducts(); initializePricing(products.value); applyPricingToProducts(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } })
+  Object.assign(customerAnalytics, { day: scene.day, daySummary: simulation.customerAnalytics.getSummary(scene.day), allSummary: simulation.customerAnalytics.getSummary(), dayProducts: simulation.customerAnalytics.getProductAnalytics(scene.day), allProducts: simulation.customerAnalytics.getProductAnalytics(), recent: simulation.customerAnalytics.getRecent(30) })
+  selectedId.value = scene.selectedBuildingId; refreshEmployees()
 }
 
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'ambiante' : type === 'cold' ? 'froide' : 'surgelée' }
