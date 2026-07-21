@@ -2,47 +2,118 @@
 
 Prototype de jeu de gestion de magasin en vue isométrique avec Vue 3, TypeScript et Phaser 3.
 
-## Fonctionnalités
+## Boucle logistique
 
-- grille logique 16 × 16 avec projection isométrique ;
-- pathfinding A* respectant murs et portes ;
-- plusieurs clients simultanés avec paniers multi-articles ;
-- stocks, files, paiements, satisfaction et bilan journalier ;
-- équipements composés d’emplacements configurables ;
-- capacité de rangement propre à chaque produit ;
-- interface Vue superposée à Phaser ;
-- équipements et produits chargés automatiquement depuis des définitions typées.
-
-## Architecture des catalogues
-
-Les grandes catégories sont volontairement figées dans `src/game/definitions.ts` :
+Le magasin utilise désormais une vraie chaîne d’approvisionnement :
 
 ```text
-BuildingCategory  = shelf | checkout | wall | door
-ProductCategory   = grocery | fruit | vegetable | fresh | drink | hygiene | frozen | bakery
-CompartmentType   = standard-shelf | fruit-bin | refrigerated-shelf | freezer-shelf | bakery-display
+Construire une réserve compatible
+→ passer une commande fournisseur
+→ attendre le jour de livraison
+→ réceptionner dans la réserve
+→ remplir les rayons depuis la réserve
+→ vendre
+→ recommander
 ```
 
-Les clés précises restent extensibles. Chaque équipement et chaque produit est défini dans son propre fichier, chargé avec `import.meta.glob(..., { eager: true })`.
+Un rayon ne peut plus être rempli directement avec de l’argent. Les produits doivent exister physiquement dans la réserve.
+
+## Types de réserve
+
+Trois types de stockage sont disponibles :
 
 ```text
-src/game/
-├── definitions.ts
-├── equipment/
-│   └── EquipmentInventory.ts
-└── catalog/
-    ├── buildings.ts
-    ├── buildings/
-    │   ├── shelves/*.building.ts
-    │   ├── checkouts/*.building.ts
-    │   └── edges/*.building.ts
-    ├── products.ts
-    └── products/<categorie>/*.product.ts
+ambient  → épicerie, boissons, hygiène, fruits, légumes, boulangerie
+cold     → produits réfrigérés
+frozen   → produits surgelés
 ```
 
-## Structure interne des équipements
+Équipements fournis :
 
-Un rayon ne possède plus une capacité globale. Il déclare une grille interne :
+- étagère de réserve ambiante : 180 unités ;
+- réserve froide : 240 unités ;
+- réserve surgelée : 200 unités.
+
+Les capacités de plusieurs équipements du même type s’additionnent.
+
+Sans zone compatible, la capacité vaut zéro et une livraison de ce type est refusée. Une livraison peut aussi être partielle si la place restante est insuffisante.
+
+## Fournisseurs
+
+Le catalogue `src/game/catalog/suppliers.ts` contient actuellement :
+
+- `Metro Market` : catalogue complet, livraison J+1 ;
+- `Eco Wholesale` : moins cher, sans surgelés, livraison J+2 ;
+- `Fresh Logistics` : spécialisé dans le froid, livraison J+1.
+
+Chaque fournisseur définit :
+
+```ts
+interface SupplierDefinition {
+  key: string
+  name: string
+  leadTimeDays: number
+  deliveryFee: number
+  minimumOrderAmount: number
+  priceMultiplier: number
+  productKeys: string[]
+}
+```
+
+## Commandes
+
+Une commande fournisseur contient :
+
+```ts
+interface PurchaseOrder {
+  id: string
+  supplierKey: string
+  orderedDay: number
+  expectedDay: number
+  status: 'ordered' | 'delivered' | 'partially-delivered' | 'cancelled'
+  lines: PurchaseOrderLine[]
+  deliveryFee: number
+  orderedTotal: number
+  deliveredTotal: number
+  rejectedLines: PurchaseOrderLine[]
+}
+```
+
+Le montant est débité lors de la commande. La livraison est traitée lorsque le jour attendu est atteint.
+
+## Réserve et réassort
+
+Le stock est séparé en deux parties :
+
+```text
+stock de réserve
+stock présent dans les rayons
+```
+
+Le réassort transfère les quantités disponibles :
+
+```text
+Réserve : 100 pâtes
+Étagère : 12 / 30
+
+Remplir
+→ Réserve : 82
+→ Étagère : 30 / 30
+```
+
+Trois opérations existent :
+
+```ts
+restockCompartment(buildingId, compartmentId)
+restockEquipment(buildingId)
+restockAll()
+```
+
+Lorsqu’un produit est retiré d’un emplacement, son stock restant retourne dans la réserve si une capacité compatible est disponible.
+
+## Équipements configurables
+
+Un rayon déclare une grille interne :
 
 ```ts
 layout: {
@@ -52,141 +123,57 @@ layout: {
 }
 ```
 
-Cet exemple génère automatiquement douze emplacements :
-
-```text
-3 colonnes × 4 étagères = 12 emplacements
-```
-
-Chaque emplacement peut contenir une seule référence de produit. Deux emplacements différents du même meuble peuvent recevoir des produits différents.
-
-L’état réel est stocké par équipement placé :
-
-```ts
-interface EquipmentCompartmentState {
-  id: string
-  column: number
-  level: number
-  productKey: string | null
-  quantity: number
-  capacity: number
-}
-```
-
-## Capacité propre aux produits
-
-La capacité est déclarée dans le fichier du produit pour chaque type d’emplacement compatible :
-
-```ts
-export default defineProduct({
-  key: 'pasta',
-  category: 'grocery',
-  name: 'Pâtes',
-  shortName: 'PÂTES',
-  salePrice: 3.5,
-  purchasePrice: 1.4,
-  color: 0xd6a75f,
-  capacities: {
-    'standard-shelf': 30,
-  },
-})
-```
-
-Un produit volumineux peut avoir une capacité plus faible :
+Chaque emplacement contient une seule référence. La capacité dépend du produit et du type d’emplacement :
 
 ```ts
 capacities: {
-  'standard-shelf': 6,
+  'standard-shelf': 30,
 }
 ```
 
-Une capacité absente ou égale à zéro rend le produit incompatible avec ce type d’emplacement.
-
-## Ajouter un équipement
-
-Créer par exemple :
+## Architecture
 
 ```text
-src/game/catalog/buildings/shelves/organicShelf.building.ts
+src/game/
+├── definitions.ts
+├── equipment/
+│   └── EquipmentInventory.ts
+├── logistics/
+│   ├── ReserveManager.ts
+│   └── PurchaseOrderManager.ts
+├── catalog/
+│   ├── buildings.ts
+│   ├── buildings/
+│   │   ├── shelves/
+│   │   ├── storage/
+│   │   ├── checkouts/
+│   │   └── edges/
+│   ├── products.ts
+│   ├── products/
+│   └── suppliers.ts
+├── StoreSimulation.ts
+├── StoreScene.ts
+└── GridManager.ts
 ```
 
-```ts
-import { defineBuilding } from '../../../definitions'
+## Interface
 
-export default defineBuilding({
-  key: 'organic-shelf',
-  category: 'shelf',
-  name: 'Rayon bio',
-  description: 'Rayon spécialisé dans les produits biologiques.',
-  width: 1,
-  height: 3,
-  price: 240,
-  color: 0x65a30d,
-  renderer: 'standard-shelf',
-  toolbar: { icon: '🌿', order: 55 },
-  layout: {
-    columns: 3,
-    levels: 4,
-    compartmentType: 'standard-shelf',
-  },
-  allowedProductCategories: ['grocery', 'fruit', 'vegetable'],
-  customerPickupTimeMs: 750,
-})
-```
+Le panneau latéral comporte trois onglets :
 
-Aucun import manuel n’est nécessaire. Un changement dans `StoreScene` n’est requis que pour une apparence réellement nouvelle.
-
-## Ajouter un produit
-
-Créer par exemple :
-
-```text
-src/game/catalog/products/fruits/pear.product.ts
-```
-
-```ts
-import { defineProduct } from '../../../definitions'
-
-export default defineProduct({
-  key: 'pear',
-  category: 'fruit',
-  name: 'Poires',
-  shortName: 'POIR',
-  salePrice: 3.4,
-  purchasePrice: 1.5,
-  color: 0x84cc16,
-  shelfLifeDays: 5,
-  capacities: {
-    'fruit-bin': 34,
-  },
-})
-```
-
-Le produit sera proposé uniquement dans les équipements compatibles avec sa catégorie, ses contraintes de froid et son type d’emplacement.
-
-## Configurer un équipement
-
-1. Placer un rayon dans la scène.
-2. Cliquer sur le rayon existant.
-3. Le panneau Vue affiche ses colonnes et ses étagères.
-4. Choisir un produit pour chaque emplacement.
-5. Réapprovisionner un emplacement ou le meuble entier.
-
-Le changement de produit vide volontairement l’emplacement. Il faut ensuite le réapprovisionner, ce qui débite le coût d’achat des marchandises.
-
-Les clients choisissent maintenant un emplacement précis et consomment son stock propre.
+- **Équipement** : configuration des rayons, caisses et réserves ;
+- **Réserve** : capacités ambiante, froide et surgelée, ainsi que les quantités stockées ;
+- **Commandes** : fournisseur, produit, quantité, date attendue et historique.
 
 ## Économie
 
 - budget initial : **2 000 €** ;
 - construction débitée lors de la pose ;
-- marchandises débitées lors du réapprovisionnement ;
+- commandes et frais de livraison débités à la validation ;
 - chiffre d’affaires ajouté à l’encaissement ;
-- électricité des équipements froids débitée à la fermeture ;
-- bénéfice journalier :
+- électricité des rayons froids et réserves froides débitée à la fermeture.
 
 ```text
-CA - construction - marchandises - fonctionnement
+Bénéfice = CA - construction - commandes - fonctionnement
 ```
 
 ## Lancer le projet
@@ -202,36 +189,15 @@ Validation complète :
 npm run build
 ```
 
-## Commandes AZERTY
+## Scénario de test
 
-| Commande | Action |
-|---|---|
-| `1` | Rayon standard |
-| `2` | Caisse classique |
-| `3` | Mur |
-| `4` | Porte |
-| Clic gauche sur une case vide | Placer l’équipement sélectionné |
-| Clic gauche sur un équipement | Sélectionner et configurer |
-| Clic droit | Supprimer |
-| `R` | Faire pivoter l’équipement |
-| `C` | Faire entrer un client |
-| `Maj + S` | Arrivées automatiques |
-| `Maj + A` | Réapprovisionner tous les emplacements |
-| `N` | Jour suivant |
-| `A` / `E` | Tourner la scène |
-| `ZQSD` ou flèches | Déplacer la caméra |
-| Bouton central + glisser | Déplacer à la souris |
-| Molette | Zoomer ou dézoomer |
-
-## Composants principaux
-
-- `definitions.ts` : contrats, catégories et types d’emplacements ;
-- `equipment/EquipmentInventory.ts` : génération des emplacements, capacités et compatibilité ;
-- `catalog/buildings.ts` : autoload et validation des équipements ;
-- `catalog/products.ts` : autoload et validation des produits ;
-- `GridManager` : occupation, collisions et placement ;
-- `NavigationGrid` : pathfinding A* ;
-- `CustomerAgent` : représentation et déplacement ;
-- `StoreSimulation` : inventaires, consommation, réapprovisionnement et économie ;
-- `StoreScene` : sélection, orchestration et rendu ;
-- `App.vue` : configurateur des équipements.
+1. Construire une étagère de réserve ambiante.
+2. Construire un rayon standard et une caisse.
+3. Affecter des pâtes à une étagère du rayon.
+4. Passer une commande de pâtes supérieure au minimum fournisseur.
+5. Passer au jour de livraison.
+6. Vérifier l’arrivée des produits dans la réserve.
+7. Remplir l’étagère depuis la réserve.
+8. Générer des clients et vérifier la diminution du stock en rayon.
+9. Tester une commande froide sans réserve froide : les unités doivent être refusées.
+10. Construire une réserve froide et recommencer.
