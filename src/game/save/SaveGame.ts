@@ -1,8 +1,10 @@
+import type {
+  PurchaseOrder,
+  ReserveStockLine,
+  StoreProductPricing,
+} from '@market-tycoon/economy'
 import type { EmployeeState } from '../employees/employeeTypes'
 import type { Direction } from '../GridManager'
-import type { PurchaseOrder } from '../logistics/PurchaseOrderManager'
-import type { ReserveStockLine } from '../logistics/ReserveManager'
-import type { StoreProductPricing } from '../pricing/StorePricingManager'
 import type { StoreMetrics } from '../StoreSimulation'
 
 export const SAVE_GAME_VERSION = 1
