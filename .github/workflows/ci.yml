@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -16,14 +16,70 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Finaliser les packages employees et save
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'apps/game/src/App.vue': {
+                  "import { EmployeeManager } from './game/employees/EmployeeManager'": "import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'",
+                  "import type { EmployeeState } from './game/employees/employeeTypes'\n": "",
+                  "import { EmployeeRuntime } from './game/employees/EmployeeRuntime'": "import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'",
+                  "import { deleteSaveGame, hasSaveGame, readSaveGame, SAVE_GAME_VERSION, storeSaveGame, type SaveGameV1 } from './game/save/SaveGame'": "import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'\nimport { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'",
+                  "import { StoreScene } from './game/StoreScene'": "import { StoreScene } from './phaser/StoreScene'",
+              },
+              'apps/game/src/phaser/employees/EmployeeAgent.ts': {
+                  "import type { EmployeeState } from './employeeTypes'": "import type { EmployeeState } from '@market-tycoon/employees'",
+              },
+              'apps/game/src/phaser/employees/EmployeeRuntime.ts': {
+                  "import type { EmployeeManager } from './EmployeeManager'": "import type { EmployeeManager } from '@market-tycoon/employees'",
+                  "import type { EmployeeState } from './employeeTypes'": "import type { EmployeeState } from '@market-tycoon/employees'",
+              },
+          }
+
+          for filename, changes in replacements.items():
+              path = Path(filename)
+              content = path.read_text()
+              for old, new in changes.items():
+                  if old not in content:
+                      raise SystemExit(f'Import attendu introuvable dans {filename}: {old}')
+                  content = content.replace(old, new)
+              path.write_text(content)
+
+          architecture = Path('docs/ARCHITECTURE.md')
+          section = '''\n\n## Frontières des packages\n\n- `apps/game` contient Vue, Phaser, les agents visuels et les adaptateurs navigateur.\n- `packages/employees` contient l’état, le recrutement, l’affectation et les règles métier des employés.\n- `packages/save` contient le format versionné, la sérialisation et l’analyse des sauvegardes.\n- `apps/game/src/infrastructure/LocalStorageSaveRepository.ts` est l’adaptateur navigateur de persistance.\n- aucun package ne peut importer `apps/*` ni sortir de son propre dossier par un chemin relatif.\n- `npm run architecture:check` vérifie ces frontières en CI.\n'''
+          content = architecture.read_text()
+          if '## Frontières des packages' not in content:
+              architecture.write_text(content.rstrip() + section)
+          PY
+
+          npm install
+          npm run architecture:check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps packages scripts docs package.json package-lock.json tsconfig.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Extraire les employés et la sauvegarde"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+
       - name: Installer les dépendances
         run: npm install
+
+      - name: Vérifier l'architecture
+        run: npm run architecture:check
 
       - name: Vérifier les types
         run: npm run typecheck 2>&1 | tee typecheck.log

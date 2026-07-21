@@ -3,15 +3,13 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "npm run dev --workspace @market-tycoon/game",
+    "architecture:check": "node scripts/check-architecture.mjs",
     "typecheck": "vue-tsc --noEmit",
     "build": "npm run build --workspace @market-tycoon/game",
-    "check": "npm run typecheck && npm run build",
+    "check": "npm run architecture:check && npm run typecheck && npm run build",
     "preview": "npm run preview --workspace @market-tycoon/game"
   },
   "devDependencies": {
