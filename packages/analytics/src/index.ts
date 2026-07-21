@@ -8,7 +8,7 @@ export type {
   PurchaseDecision,
   PurchaseDecisionResult,
 } from './CustomerAnalyticsManager'
-export { CustomerVisitAnalyticsManager } from './CustomerVisitAnalyticsManager'
+export { CustomerVisitAnalyticsManager, customerVisitAnalytics } from './CustomerVisitAnalyticsManager'
 export type {
   CustomerAbandonReason,
   CustomerProfileVisitAnalytics,
