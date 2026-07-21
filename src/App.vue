@@ -61,11 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
+import { StorePricingManager } from '@market-tycoon/economy'
 import Phaser from 'phaser'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
-import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from './game/analytics/CustomerAnalyticsManager'
 import { BUILDINGS, getBuildingDefinition } from './game/catalog/buildings'
 import { getProductDefinition } from './game/catalog/products'
 import type { BuildingKey, ProductDefinition, StorageType } from './game/definitions'
@@ -73,7 +74,6 @@ import { isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from './
 import { EmployeeManager } from './game/employees/EmployeeManager'
 import { EmployeeRuntime } from './game/employees/EmployeeRuntime'
 import type { EmployeeRoleDefinition, EmployeeState } from './game/employees/employeeTypes'
-import { StorePricingManager } from './game/pricing/StorePricingManager'
 import { deleteSaveGame, hasSaveGame, readSaveGame, SAVE_GAME_VERSION, storeSaveGame, type SaveGameV1 } from './game/save/SaveGame'
 import { StoreScene } from './game/StoreScene'
 
