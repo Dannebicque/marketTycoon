@@ -6,64 +6,16 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: agent/phaser-isometric-store
-
-      - name: Finaliser la migration du catalogue
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          replacements = {
-              "from './game/catalog/buildings'": "from '@market-tycoon/catalog'",
-              "from './game/catalog/products'": "from '@market-tycoon/catalog'",
-              "from './game/definitions'": "from '@market-tycoon/catalog'",
-              "from './catalog/buildings'": "from '@market-tycoon/catalog'",
-              "from './catalog/products'": "from '@market-tycoon/catalog'",
-              "from './catalog/readers'": "from '@market-tycoon/catalog'",
-              "from './catalog/suppliers'": "from '@market-tycoon/catalog'",
-              "from './definitions'": "from '@market-tycoon/catalog'",
-              "from '../definitions'": "from '@market-tycoon/catalog'",
-              "from '../catalog/employees'": "from '@market-tycoon/catalog'",
-          }
-
-          for path in Path('src').rglob('*'):
-              if path.suffix not in {'.ts', '.vue'}:
-                  continue
-              content = path.read_text()
-              updated = content
-              for old, new in replacements.items():
-                  updated = updated.replace(old, new)
-              if path.as_posix() == 'src/App.vue':
-                  updated = updated.replace(
-                      "import type { EmployeeRoleDefinition, EmployeeState } from './game/employees/employeeTypes'",
-                      "import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'\nimport type { EmployeeState } from './game/employees/employeeTypes'",
-                  )
-              if updated != content:
-                  path.write_text(updated)
-
-          Path('src/game/employees/employeeTypes.ts').write_text("""import type { EmployeeRoleKey } from '@market-tycoon/catalog'\n\nexport type { EmployeeRoleKey } from '@market-tycoon/catalog'\nexport type EmployeeStatus = 'available' | 'assigned' | 'working'\nexport type EmployeeTaskType = 'idle' | 'checkout' | 'restocking' | 'repairing'\n\nexport interface EmployeeTaskState {\n  type: EmployeeTaskType\n  label: string\n  targetBuildingId?: string\n  startedAt?: number\n}\n\nexport interface EmployeeState {\n  id: string\n  firstName: string\n  lastName: string\n  roleKey: EmployeeRoleKey\n  quality: number\n  dailySalary: number\n  status: EmployeeStatus\n  assignedBuildingId?: string\n  currentTask?: EmployeeTaskState\n  completedTasks?: number\n  hiredDay: number\n}\n""")
-          PY
-
-          rm -f \
-            src/game/catalog/buildings.ts \
-            src/game/catalog/products.ts \
-            src/game/catalog/suppliers.ts \
-            src/game/catalog/employees.ts \
-            src/game/catalog/readers.ts \
-            src/game/definitions.ts
-          rmdir src/game/catalog 2>/dev/null || true
 
       - name: Installer Node.js
         uses: actions/setup-node@v4
@@ -78,18 +30,6 @@ jobs:
 
       - name: Construire
         run: npm run build 2>&1 | tee build.log
-
-      - name: Enregistrer la migration
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src
-          if git diff --cached --quiet; then
-            echo "Migration déjà appliquée."
-          else
-            git commit -m "Finish catalog migration and remove compatibility facades"
-            git push origin HEAD:agent/phaser-isometric-store
-          fi
 
       - name: Publier les diagnostics
         if: always()
