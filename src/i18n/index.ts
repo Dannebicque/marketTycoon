@@ -1,7 +1,7 @@
+import { getBuildingDefinition } from '@market-tycoon/catalog'
 import { createI18n } from 'vue-i18n'
 import fr from './locales/fr.json'
 import en from './locales/en.json'
-import { getBuildingDefinition } from '../game/catalog/buildings'
 
 export const SUPPORTED_LOCALES = ['fr', 'en'] as const
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number]
