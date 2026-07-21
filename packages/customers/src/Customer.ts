@@ -1,31 +1,42 @@
 import { CustomerBasket } from './CustomerBasket'
 import { CustomerJourney } from './CustomerJourney'
-import type { CustomerProfile, CustomerSnapshot } from './contracts'
+import { CustomerSatisfaction } from './CustomerSatisfaction'
+import type { CustomerProfile, CustomerSatisfactionFactor, CustomerSnapshot } from './contracts'
 
 export class Customer {
   readonly basket = new CustomerBasket()
   readonly journey = new CustomerJourney()
-  private satisfaction = 100
+  readonly satisfaction = new CustomerSatisfaction()
 
   constructor(readonly profile: CustomerProfile) {}
 
   setSatisfaction(value: number) {
-    this.satisfaction = Math.max(0, Math.min(100, Math.round(value)))
+    for (const factor of ['price', 'queue', 'availability', 'checkout'] as CustomerSatisfactionFactor[]) {
+      this.satisfaction.set(factor, value)
+    }
   }
 
   adjustSatisfaction(delta: number) {
-    this.setSatisfaction(this.satisfaction + delta)
+    for (const factor of ['price', 'queue', 'availability', 'checkout'] as CustomerSatisfactionFactor[]) {
+      this.satisfaction.adjust(factor, delta)
+    }
   }
 
   getSatisfaction() {
-    return this.satisfaction
+    return this.satisfaction.getOverall()
+  }
+
+  getRemainingBudget() {
+    return Math.max(0, this.profile.budget - this.basket.summarize().saleTotal)
   }
 
   snapshot(): CustomerSnapshot {
     return {
       id: this.profile.id,
+      profile: { ...this.profile, preferredCategories: [...this.profile.preferredCategories] },
       state: this.journey.getState(),
-      satisfaction: this.satisfaction,
+      satisfaction: this.satisfaction.getOverall(),
+      satisfactionBreakdown: this.satisfaction.getBreakdown(),
       basket: this.basket.summarize(),
     }
   }
