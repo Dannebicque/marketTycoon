@@ -27,6 +27,15 @@
         <div class="employee-meta"><span>Qualité {{ candidate.quality }}/100</span><strong>{{ money(candidate.dailySalary) }}/jour</strong></div>
         <button class="panel-action" @click="$emit('hire', candidate.id)">Recruter</button>
       </article>
+
+      <div v-if="lockedRoles.length" class="locked-roles">
+        <div class="panel-heading locked-heading"><div><span class="eyebrow">À découvrir</span><h2>Métiers à débloquer</h2></div><span>🔒</span></div>
+        <article v-for="lockedRole in lockedRoles" :key="lockedRole.key" class="candidate-card locked-role-card">
+          <div class="employee-main"><span class="employee-icon">🔒</span><div><strong>{{ lockedRole.name }}</strong><small>{{ lockedRole.icon }} Métier indisponible</small></div></div>
+          <p>{{ lockedRole.description }}</p>
+          <div class="unlock-condition">{{ unlockLabel(lockedRole.requiredUnlockKey) }}</div>
+        </article>
+      </div>
     </section>
   </div>
 </template>
@@ -34,10 +43,25 @@
 <script setup lang="ts">
 import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
 import type { EmployeeState } from '../../game/employees/employeeTypes'
-const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number }>()
+const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; lockedRoleKeys: string[]; checkouts: any[]; payroll: number }>()
 defineEmits<{ hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': [] }>()
+const lockedRoles = computed(() => props.roles.filter(item => props.lockedRoleKeys.includes(item.key)))
 function role(key: string) { return props.roles.find(item => item.key === key) }
+function unlockLabel(key?: string) {
+  const labels: Record<string, string> = {
+    'core-store': 'Accessible dès l’ouverture du magasin',
+    'cold-chain': 'Débloqué avec la chaîne du froid',
+    'advanced-logistics': 'Débloqué avec la logistique avancée',
+    marketing: 'Débloqué avec le marketing',
+    automation: 'Débloqué avec l’automatisation',
+  }
+  return key ? labels[key] ?? `Déblocage requis : ${key}` : 'Disponible'
+}
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0) }
+</script>
+
+<script lang="ts">
+import { computed } from 'vue'
 </script>
 
 <style scoped>
@@ -56,5 +80,10 @@ function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: '
 .employee-meta { display:flex; justify-content:space-between; gap:12px; margin:8px 0; color:#cbd5e1; font-size:11px; }
 .employee-card select { width:100%; margin:8px 0; padding:8px; border:1px solid #334155; border-radius:8px; background:#020617; color:#e2e8f0; }
 .danger-action { padding:8px 10px; border:1px solid #7f1d1d; border-radius:8px; background:rgba(127,29,29,.22); color:#fecaca; cursor:pointer; }
+.locked-roles { margin-top:24px; }
+.locked-heading { padding-top:16px; border-top:1px solid #1e293b; }
+.locked-role-card { border-style:dashed; border-color:#475569; background:rgba(15,23,42,.58); }
+.locked-role-card .employee-icon { background:#111827; filter:grayscale(1); }
+.unlock-condition { margin-top:10px; padding:8px 10px; border:1px solid rgba(250,204,21,.22); border-radius:8px; background:rgba(113,63,18,.16); color:#fde68a; font-size:10px; font-weight:800; }
 @media (max-width:900px) { .employees-layout { grid-template-columns:1fr; } }
 </style>
