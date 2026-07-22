@@ -1,7 +1,7 @@
 import { getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
 import type { PlacedBuilding, StoreSimulation } from '@market-tycoon/simulation-engine'
 import type { ZoneSummary } from '@market-tycoon/store-zones'
-import { storeZoneManager } from '../zones/zoneRuntime'
+import { storeZoneManager, zoneRuntime } from '../zones/zoneRuntime'
 
 export interface StoreNeedCosts {
   electricity: number
@@ -34,6 +34,9 @@ export interface StoreNeedsReport {
   equipment: EquipmentCondition[]
   zones: ZoneSummary[]
   zonedArea: number
+  invalidZonedArea: number
+  zoneIssues: string[]
+  compliancePenalty: number
 }
 
 const EMPTY_COSTS: StoreNeedCosts = { electricity: 0, cleaning: 0, maintenance: 0, heating: 0, security: 0, waste: 0, losses: 0, total: 0 }
@@ -53,6 +56,9 @@ export class StoreNeedsManager {
     equipment: [],
     zones: [],
     zonedArea: 0,
+    invalidZonedArea: 0,
+    zoneIssues: [],
+    compliancePenalty: 0,
   }
 
   registerEmployee(employee: { id: string; roleKey: string; quality: number }) {
@@ -106,18 +112,22 @@ export class StoreNeedsManager {
 
     const zones = storeZoneManager.getSummaries()
     const zoneCosts = storeZoneManager.getDailyCosts()
+    const validation = zoneRuntime.validation
+    const invalidCellKeys = new Set(validation.invalidCellKeys)
+    const invalidZonedArea = invalidCellKeys.size
+    const compliancePenalty = round(invalidZonedArea * .35 + validation.issues.length * 2)
     const zonedArea = zones.reduce((sum, zone) => sum + zone.area, 0)
     const fallbackCleaning = zonedArea ? 0 : Math.max(2, buildings.length * .55)
     const activityCleaning = servedCustomers * .14
-    const cleaning = zoneCosts.cleaning + fallbackCleaning + activityCleaning
-    const cleanliness = Math.max(25, Math.round(100 - servedCustomers * .6 - Math.max(buildings.length * .25, zonedArea * .08)))
+    const cleaning = zoneCosts.cleaning + fallbackCleaning + activityCleaning + invalidZonedArea * .08
+    const cleanliness = Math.max(20, Math.round(100 - servedCustomers * .6 - Math.max(buildings.length * .25, zonedArea * .08) - invalidZonedArea * .45))
     const { wasteUnits, wasteCost } = this.applyProductLosses(simulation)
-    const losses = breakdowns * Math.max(2, servedCustomers * .3)
+    const losses = breakdowns * Math.max(2, servedCustomers * .3) + compliancePenalty
     const costs = {
-      electricity: round(equipmentElectricity + zoneCosts.electricity),
+      electricity: round(equipmentElectricity + zoneCosts.electricity + invalidZonedArea * .12),
       cleaning: round(cleaning),
       maintenance: round(equipmentMaintenance + zoneCosts.maintenance),
-      heating: round(zoneCosts.heating),
+      heating: round(zoneCosts.heating + invalidZonedArea * .18),
       security: round(zoneCosts.security),
       waste: round(wasteCost),
       losses: round(losses),
@@ -142,6 +152,9 @@ export class StoreNeedsManager {
       equipment: [...this.conditions.values()].map(item => ({ ...item })).sort((a, b) => b.wear - a.wear),
       zones,
       zonedArea,
+      invalidZonedArea,
+      zoneIssues: validation.issues.map(issue => issue.message),
+      compliancePenalty,
     }
     this.history.unshift(this.latest)
     this.history.splice(14)
@@ -149,7 +162,7 @@ export class StoreNeedsManager {
   }
 
   getLatestReport() { return this.latest }
-  getHistory() { return this.history.map(report => ({ ...report, costs: { ...report.costs }, equipment: report.equipment.map(item => ({ ...item })), zones: report.zones.map(zone => ({ ...zone, costs: { ...zone.costs } })) })) }
+  getHistory() { return this.history.map(report => ({ ...report, costs: { ...report.costs }, equipment: report.equipment.map(item => ({ ...item })), zones: report.zones.map(zone => ({ ...zone, costs: { ...zone.costs })), zoneIssues: [...report.zoneIssues] })) }
   getTechnicianQuality() {
     const values = [...this.technicianQualities.values()]
     return values.length ? Math.round(values.reduce((sum, quality) => sum + quality, 0) / values.length) : 0
