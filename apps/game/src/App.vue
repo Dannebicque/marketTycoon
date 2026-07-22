@@ -22,10 +22,10 @@
     <aside v-if="activeCategory" class="tool-palette" :class="{ compact: activeCategory === 'operations' }" aria-label="Choix disponibles">
       <header><div><span class="eyebrow">{{ currentCategory.label }}</span><strong>{{ currentCategory.description }}</strong></div><button class="palette-close" title="Fermer" @click="activeCategory = null">×</button></header>
       <div v-if="activeCategory !== 'operations'" class="tool-grid">
-        <button v-for="tool in visibleTools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)">
-          <span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span>
-          <span class="tool-copy"><strong>{{ tool.name }}</strong><small>{{ tool.description }}</small></span>
-          <span class="tool-price">{{ tool.price }} €</span>
+        <button v-for="tool in visibleTools" :key="tool.key" :disabled="!progressionAccess.isAccessible(tool)" :class="{ active: activeTool === tool.key, locked: !progressionAccess.isAccessible(tool) }" :title="toolTitle(tool)" @click="selectTool(tool.key)">
+          <span class="tool-icon">{{ progressionAccess.isAccessible(tool) ? (tool.toolbar?.icon ?? '•') : '🔒' }}</span>
+          <span class="tool-copy"><strong>{{ tool.name }}</strong><small>{{ progressionAccess.isAccessible(tool) ? tool.description : unlockLabel(tool.requiredUnlockKey) }}</small></span>
+          <span class="tool-price">{{ progressionAccess.isAccessible(tool) ? `${tool.price} €` : 'Verrouillé' }}</span>
         </button>
         <p v-if="!visibleTools.length" class="palette-empty">Aucun objet disponible dans cette catégorie.</p>
       </div>
@@ -91,12 +91,13 @@
 import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
 import { StorePricingManager } from '@market-tycoon/economy'
 import Phaser from 'phaser'
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
 import { BUILDINGS, getBuildingDefinition, getBuildingMenuCategories, getBuildingMenuCategoryKey, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
 import type { BuildingDefinition, BuildingKey, BuildingMenuCategoryDefinition, BuildingMenuCategoryKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
+import { ProgressionAccessPolicy, type ProgressionManager, type ProgressionUnlockable } from '@market-tycoon/progression'
 import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
 import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
 import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'
@@ -104,6 +105,9 @@ import { initializeDevelopmentScenario } from './dev/initializeDevelopmentScenar
 import { StoreScene } from './phaser/StoreScene'
 
 const OPERATIONS_CATEGORY: BuildingMenuCategoryDefinition = { key: 'operations', label: 'Exploitation', description: 'Clients et équipe', icon: '⚙️', order: 1_000 }
+const progression = inject<ProgressionManager>('progression')
+if (!progression) throw new Error('ProgressionManager non fourni à l’application.')
+const progressionAccess = new ProgressionAccessPolicy(progression)
 
 const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')
@@ -135,7 +139,7 @@ const toolCategories = [...getBuildingMenuCategories(tools), OPERATIONS_CATEGORY
 const currentCategory = computed(() => toolCategories.find(category => category.key === activeCategory.value) ?? toolCategories[0])
 const visibleTools = computed<BuildingDefinition[]>(() => activeCategory.value === 'operations'
   ? []
-  : tools.filter(tool => getBuildingMenuCategoryKey(tool) === activeCategory.value))
+  : tools.filter(tool => getBuildingMenuCategoryKey(tool) === activeCategory.value).filter(tool => progressionAccess.isVisible(tool)))
 const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, storeOpen: true, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
 const shelves = ref<any[]>([]), storages = ref<any[]>([]), checkouts = ref<any[]>([]), suppliers = ref<any[]>([]), orders = ref<any[]>([]), reserveLines = ref<any[]>([]), storageCapacities = ref<any[]>([])
 const products = ref<ProductDefinition[]>([])
@@ -155,9 +159,9 @@ const managementAlerts = computed(() => {
     else if (capacity.ratio >= .85) alerts.push(`La réserve ${storageLabel(capacity.type)} est presque pleine (${capacity.used}/${capacity.capacity}).`)
   }
   if (ui.shelfStock === 0) alerts.push('Aucun produit disponible dans les rayons.')
-  if (!employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques sont fermées.')
-  if (!employeeManager.hasRole('stocker')) alerts.push('Aucun employé de rayon : le réassort automatique est indisponible.')
-  if (!employeeManager.hasRole('technician')) alerts.push('Aucun technicien : les incidents de caisse dureront plus longtemps.')
+  if (progression.isUnlocked('core-store') && !employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques sont fermées.')
+  if (progression.isUnlocked('core-store') && !employeeManager.hasRole('stocker')) alerts.push('Aucun employé de rayon : le réassort automatique est indisponible.')
+  if (progression.isUnlocked('advanced-logistics') && !employeeManager.hasRole('technician')) alerts.push('Aucun technicien : les incidents de caisse dureront plus longtemps.')
   const lossCount = pricingLines.value.filter(line => line.isLossLeader).length
   const lowMarginCount = pricingLines.value.filter(line => !line.isLossLeader && line.markupRate < .1).length
   if (lossCount) alerts.push(`${lossCount} produit(s) sont vendus à perte.`)
@@ -168,9 +172,11 @@ const managementAlerts = computed(() => {
   return alerts
 })
 
+function unlockLabel(key?: string) { return key ? `Débloqué avec ${key}` : 'Disponible' }
+function toolTitle(tool: BuildingDefinition) { return progressionAccess.isAccessible(tool) ? tool.description : `${tool.description} — ${unlockLabel(tool.requiredUnlockKey)}` }
 function getScene() { return game ? game.scene.getScene('StoreScene') as StoreScene : null }
 function openManagement(tab: ManagementTab) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
-function selectTool(key: BuildingKey) { activeTool.value = key; getScene()?.select(key) }
+function selectTool(key: BuildingKey) { const tool = getBuildingDefinition(key); if (!tool || !progressionAccess.isAccessible(tool)) { saveMessage.value = tool ? unlockLabel(tool.requiredUnlockKey) : 'Équipement inconnu.'; return } activeTool.value = key; getScene()?.select(key) }
 function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
 function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return } if (name === 'spawnCustomer') void scene.spawnCustomer(); else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'; else scene[name]() }
 function toggleSimulationPause() { simulationPaused.value = !simulationPaused.value; applySimulationSpeed() }
@@ -185,11 +191,11 @@ function updateProductPrice(productKey: string, salePrice: number) { if (!pricin
 function applyMarkup(markupRate: number) { pricingManager.applyMarkup(products.value, markupRate); applyPricingToProducts(); saveMessage.value = `Coefficient de marge de ${(markupRate * 100).toFixed(0)} % appliqué à tous les produits.` }
 function initializePricing(source: ProductDefinition[]) { if (pricingInitialized) return; source.forEach(product => recommendedPrices.set(product.key, product.salePrice)); pricingManager.reset(source); pricingInitialized = true }
 function applyPricingToProducts() { for (const product of products.value) product.salePrice = pricingManager.getSalePrice(product) }
-function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; syncWorkforce() }
+function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const candidate = employeeManager.getCandidates().find(item => item.id === candidateId); const role = candidate ? employeeManager.getRoles().find(item => item.key === candidate.roleKey) : undefined; if (!candidate || !role || !progressionAccess.isAccessible(role)) { saveMessage.value = role ? unlockLabel(role.requiredUnlockKey) : 'Candidat introuvable.'; return } const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; syncWorkforce() }
 function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); syncWorkforce() }
 function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); syncWorkforce() }
 function refreshCandidates() { employeeManager.refreshCandidates(getScene()?.day ?? 1); refreshEmployees() }
-function refreshEmployees() { employees.value = employeeManager.getEmployees(); candidates.value = employeeManager.getCandidates(); employeeRoles.value = employeeManager.getRoles() }
+function refreshEmployees() { employees.value = employeeManager.getEmployees(); employeeRoles.value = employeeManager.getRoles().filter(role => progressionAccess.isVisible(role)); const accessibleRoleKeys = new Set(employeeRoles.value.filter(role => progressionAccess.isAccessible(role)).map(role => role.key)); candidates.value = employeeManager.getCandidates().filter(candidate => accessibleRoleKeys.has(candidate.roleKey)) }
 function syncWorkforce() { employeeRuntime?.sync(); refreshEmployees(); refreshUi() }
 
 function ensureEmployeeRuntime(scene: StoreScene) {
