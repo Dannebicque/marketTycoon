@@ -4,11 +4,13 @@ import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installStoreNeeds } from './simulation/installStoreNeeds'
 import './style.css'
 import './progression.css'
 import './store-identity.css'
 
 async function bootstrap() {
+  installStoreNeeds()
   const progression = await createProgressionManager()
 
   createApp(App)
