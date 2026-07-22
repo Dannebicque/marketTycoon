@@ -28,17 +28,14 @@ export function initializeDevelopmentScenario(scene: StoreScene, employeeManager
   if (!import.meta.env.DEV || initialized || scene.grid.getBuildings().length > 0) return false
   initialized = true
 
-  const storages = BUILDINGS.filter(isStorageDefinition)
-  for (const storageType of ['ambient', 'cold', 'frozen'] as StorageType[]) {
-    const definition = storages.find(item => item.storageType === storageType)
-    if (definition) place(scene, definition, STORAGE_POSITIONS[storageType].x, STORAGE_POSITIONS[storageType].y)
-  }
+  // Le scénario initial ne place que le contenu accessible au premier rang.
+  // Les réserves froides/surgelées restent visibles dans la palette mais verrouillées.
+  const ambientStorage = BUILDINGS.filter(isStorageDefinition).find(item => item.storageType === 'ambient')
+  if (ambientStorage) place(scene, ambientStorage, STORAGE_POSITIONS.ambient.x, STORAGE_POSITIONS.ambient.y)
 
-  const shelfDefinitions = BUILDINGS.filter(isShelfDefinition)
+  const shelfDefinitions = BUILDINGS.filter(isShelfDefinition).filter(item => !item.refrigerated && !item.frozen)
   const preferredShelves = uniqueDefinitions([
     shelfDefinitions.find(item => item.key === 'standard-shelf'),
-    shelfDefinitions.find(item => item.refrigerated && !item.frozen),
-    shelfDefinitions.find(item => item.frozen),
     ...shelfDefinitions,
   ]).slice(0, SHELF_POSITIONS.length)
 
@@ -50,7 +47,8 @@ export function initializeDevelopmentScenario(scene: StoreScene, employeeManager
 
   const checkoutDefinition = BUILDINGS
     .filter(isCheckoutDefinition)
-    .sort((a, b) => Number(b.requiresEmployee) - Number(a.requiresEmployee))[0]
+    .filter(item => item.requiresEmployee)
+    .sort((a, b) => a.price - b.price)[0]
   const checkout = checkoutDefinition ? place(scene, checkoutDefinition, 11, 11) : undefined
 
   scene.simulation.syncBuildings(scene.grid.getBuildings())
@@ -69,7 +67,7 @@ export function initializeDevelopmentScenario(scene: StoreScene, employeeManager
     scene.simulation.restockEquipment(shelf.id)
   }
 
-  recruitRequiredRoles(employeeManager, scene.day, checkout?.id)
+  recruitInitialRoles(employeeManager, scene.day, checkout?.id)
   scene.simulation.metrics.cash = Math.max(scene.simulation.metrics.cash, 5_000)
   scene.drawBuildings()
   return true
@@ -89,8 +87,10 @@ function uniqueDefinitions(definitions: Array<BuildingDefinition | undefined>) {
   })
 }
 
-function recruitRequiredRoles(employeeManager: EmployeeManager, day: number, checkoutId?: string) {
-  for (const roleKey of ['cashier', 'stocker', 'technician']) {
+function recruitInitialRoles(employeeManager: EmployeeManager, day: number, checkoutId?: string) {
+  // Le technicien est volontairement exclu : il doit être obtenu via
+  // advanced-logistics et apparaît désormais dans « Métiers à débloquer ».
+  for (const roleKey of ['cashier', 'stocker']) {
     if (employeeManager.hasRole(roleKey)) continue
     const candidate = employeeManager.getCandidates().find(item => item.roleKey === roleKey)
     if (!candidate) continue
