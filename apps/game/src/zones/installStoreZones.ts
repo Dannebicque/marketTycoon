@@ -42,8 +42,6 @@ export function installStoreZones() {
     installGridValidationHooks(scene)
     zoneRuntime.restore()
 
-    // The application used to start with the equipment palette open. Cursor mode
-    // is now the neutral initial state, so close that palette after Vue has mounted.
     window.setTimeout(() => (document.querySelector('.palette-close') as HTMLButtonElement | null)?.click(), 0)
 
     let painting = false
@@ -126,17 +124,21 @@ function drawZones(scene: StoreScene & Record<string, any>) {
   if (!layer) return
   layer.clear()
   const invalidCells = new Set(zoneRuntime.validation.invalidCellKeys)
+  const editing = zoneRuntime.isEditing()
+
   for (const cell of storeZoneManager.getCells()) {
     const definition = storeZoneManager.getDefinition(cell.zoneKey)
     if (!definition) continue
+
     const center = scene.grid.gridToScreen(cell.x, cell.y)
     const halfWidth = scene.grid.tileWidth / 2
     const halfHeight = scene.grid.tileHeight / 2
     const invalid = invalidCells.has(`${cell.x}:${cell.y}`)
-    const color = invalid ? 0xef4444 : definition.color
-    const editing = zoneRuntime.isEditing()
-    layer.fillStyle(color, editing ? .3 : .045)
-    layer.lineStyle(invalid && editing ? 2 : 1, color, editing ? .72 : .1)
+
+    // Always retain the semantic color of the zone. Invalidity is represented by
+    // a red outline and a small warning marker instead of replacing the fill.
+    layer.fillStyle(definition.color, editing ? .3 : .045)
+    layer.lineStyle(invalid && editing ? 3 : 1, invalid && editing ? 0xef4444 : definition.color, editing ? .78 : .1)
     layer.beginPath()
     layer.moveTo(center.x, center.y)
     layer.lineTo(center.x + halfWidth, center.y + halfHeight)
@@ -145,5 +147,10 @@ function drawZones(scene: StoreScene & Record<string, any>) {
     layer.closePath()
     layer.fillPath()
     layer.strokePath()
+
+    if (invalid && editing) {
+      layer.fillStyle(0xef4444, .95)
+      layer.fillCircle(center.x, center.y + halfHeight, 3)
+    }
   }
 }
