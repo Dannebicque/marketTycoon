@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { validateZones } from '@market-tycoon/store-zones'
 import { StoreScene } from '../phaser/StoreScene'
 import { storeZoneManager, zoneRuntime } from './zoneRuntime'
 
@@ -15,6 +16,8 @@ export function installStoreZones() {
     const scene = this as StoreScene & Record<string, any>
     scene.zoneLayer = scene.add.graphics().setDepth(12)
     zoneRuntime.setRedraw(() => drawZones(scene))
+    zoneRuntime.setValidator(() => validateZones(storeZoneManager.getCells(), zoneRuntime.definitions, scene.grid))
+    installGridValidationHooks(scene)
     zoneRuntime.restore()
 
     let painting = false
@@ -24,7 +27,7 @@ export function installStoreZones() {
       paintAtPointer(scene, pointer)
     })
     scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!painting || !pointer.leftButtonDown()) return
+      if (!painting || (!pointer.leftButtonDown() && !pointer.rightButtonDown())) return
       paintAtPointer(scene, pointer)
     })
     scene.input.on('pointerup', () => { painting = false })
@@ -60,6 +63,21 @@ export function installStoreZones() {
   }
 }
 
+function installGridValidationHooks(scene: StoreScene & Record<string, any>) {
+  const originalPlace = scene.grid.place.bind(scene.grid)
+  scene.grid.place = (...args: any[]) => {
+    const result = originalPlace(...args)
+    if (result) queueMicrotask(() => zoneRuntime.revalidate())
+    return result
+  }
+  const originalRemoveAt = scene.grid.removeAt.bind(scene.grid)
+  scene.grid.removeAt = (...args: any[]) => {
+    const result = originalRemoveAt(...args)
+    if (result) queueMicrotask(() => zoneRuntime.revalidate())
+    return result
+  }
+}
+
 function paintAtPointer(scene: StoreScene & Record<string, any>, pointer: Phaser.Input.Pointer) {
   const world = pointer.positionToCamera(scene.cameras.main) as Phaser.Math.Vector2
   const cell = scene.grid.screenToGrid(world.x, world.y)
@@ -73,14 +91,17 @@ function drawZones(scene: StoreScene & Record<string, any>) {
   const layer = scene.zoneLayer as Phaser.GameObjects.Graphics | undefined
   if (!layer) return
   layer.clear()
+  const invalidCells = new Set(zoneRuntime.validation.invalidCellKeys)
   for (const cell of storeZoneManager.getCells()) {
     const definition = storeZoneManager.getDefinition(cell.zoneKey)
     if (!definition) continue
     const center = scene.grid.gridToScreen(cell.x, cell.y)
     const halfWidth = scene.grid.tileWidth / 2
     const halfHeight = scene.grid.tileHeight / 2
-    layer.fillStyle(definition.color, zoneRuntime.isEditing() ? .38 : .13)
-    layer.lineStyle(1, definition.color, zoneRuntime.isEditing() ? .85 : .25)
+    const invalid = invalidCells.has(`${cell.x}:${cell.y}`)
+    const color = invalid ? 0xef4444 : definition.color
+    layer.fillStyle(color, zoneRuntime.isEditing() ? .4 : .14)
+    layer.lineStyle(invalid ? 2 : 1, color, zoneRuntime.isEditing() ? .9 : .3)
     layer.beginPath()
     layer.moveTo(center.x, center.y)
     layer.lineTo(center.x + halfWidth, center.y + halfHeight)
