@@ -3,7 +3,7 @@ import { GameEventBus } from './GameEventBus'
 export type PaymentMethod = 'contactless' | 'card' | 'cash'
 export type StorageType = 'ambient' | 'cold' | 'frozen'
 export type PurchaseDecision = 'accept' | 'reduce' | 'reject'
-export type CustomerAbandonReason = 'empty-basket' | 'queue-too-long' | 'checkout-unavailable' | 'store-closed' | 'other'
+export type CustomerAbandonReason = 'empty-basket' | 'no-compatible-checkout' | 'checkout-blocked' | 'impatient' | 'exit-blocked' | 'store-unavailable' | 'unknown'
 
 export interface CustomerEnteredStoreEvent { day: number; customerId: string; profileKey: string; budget: number; occurredAt: number }
 export interface CustomerPickedProductEvent { day: number; customerId: string; productKey: string; quantity: number; unitSalePrice: number; shelfId?: string }
