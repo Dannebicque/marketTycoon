@@ -18,6 +18,7 @@
     "@market-tycoon/progression": "0.1.0",
     "@market-tycoon/save": "0.1.0",
     "@market-tycoon/simulation-engine": "0.1.0",
+    "@market-tycoon/store-zones": "0.1.0",
     "phaser": "^3.90.0",
     "vue": "^3.5.17",
     "vue-i18n": "^11.0.0"
