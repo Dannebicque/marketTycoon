@@ -40,7 +40,7 @@
         <div><span class="eyebrow">Équipements</span><h2>Usure et maintenance</h2></div>
         <span>{{ report.equipment.length }} suivi(s)</span>
       </div>
-      <div v-if="!report.equipment.length" class="empty-state">Aucun équipement suivi pour le moment.</div>
+      <div v-if="!report.equipment.length" class="empty-state">Le premier bilan sera calculé à la fermeture du magasin.</div>
       <article v-for="equipment in report.equipment" :key="equipment.buildingId" class="equipment-health" :class="equipment.status">
         <div class="equipment-health-heading">
           <div><strong>{{ equipment.name }}</strong><small>{{ statusLabel(equipment.status) }} · {{ equipment.breakdowns }} panne(s)</small></div>
@@ -60,23 +60,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { StoreNeedsReport } from '../../simulation/StoreNeedsManager'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { storeNeedsManager, type StoreNeedsReport } from '../../simulation/StoreNeedsManager'
 
-const props = defineProps<{ report: StoreNeedsReport; history: StoreNeedsReport[] }>()
+const report = ref<StoreNeedsReport>(storeNeedsManager.getLatestReport())
+const history = ref<StoreNeedsReport[]>(storeNeedsManager.getHistory())
+let refreshTimer: number | undefined
+
+function refresh() {
+  report.value = storeNeedsManager.getLatestReport()
+  history.value = storeNeedsManager.getHistory()
+}
+
+onMounted(() => { refresh(); refreshTimer = window.setInterval(refresh, 500) })
+onBeforeUnmount(() => { if (refreshTimer) window.clearInterval(refreshTimer) })
+
 const healthScore = computed(() => {
-  if (!props.report.equipment.length) return 100
-  return Math.max(0, Math.round(100 - props.report.equipment.reduce((sum, item) => sum + item.wear, 0) / props.report.equipment.length))
+  if (!report.value.equipment.length) return 100
+  return Math.max(0, Math.round(100 - report.value.equipment.reduce((sum, item) => sum + item.wear, 0) / report.value.equipment.length))
 })
 const healthClass = computed(() => healthScore.value >= 70 ? 'healthy' : healthScore.value >= 40 ? 'warning' : 'critical')
 const costLines = computed(() => {
-  const total = Math.max(1, props.report.costs.total)
+  const total = Math.max(1, report.value.costs.total)
   return [
-    { key: 'electricity', label: 'Électricité', icon: '⚡', value: props.report.costs.electricity },
-    { key: 'cleaning', label: 'Nettoyage', icon: '🧹', value: props.report.costs.cleaning },
-    { key: 'maintenance', label: 'Maintenance', icon: '🛠️', value: props.report.costs.maintenance },
-    { key: 'waste', label: 'Déchets', icon: '🗑️', value: props.report.costs.waste },
-    { key: 'losses', label: 'Pertes d’exploitation', icon: '📉', value: props.report.costs.losses },
+    { key: 'electricity', label: 'Électricité', icon: '⚡', value: report.value.costs.electricity },
+    { key: 'cleaning', label: 'Nettoyage', icon: '🧹', value: report.value.costs.cleaning },
+    { key: 'maintenance', label: 'Maintenance', icon: '🛠️', value: report.value.costs.maintenance },
+    { key: 'waste', label: 'Déchets', icon: '🗑️', value: report.value.costs.waste },
+    { key: 'losses', label: 'Pertes d’exploitation', icon: '📉', value: report.value.costs.losses },
   ].map(line => ({ ...line, percent: Math.max(2, Math.round(line.value / total * 100)) }))
 })
 function statusLabel(status: string) { return status === 'broken' ? 'En panne' : status === 'critical' ? 'Usure critique' : status === 'warning' ? 'À surveiller' : 'Bon état' }
