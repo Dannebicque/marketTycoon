@@ -1,7 +1,7 @@
 import { customerVisitAnalytics, type CustomerAbandonReason } from '@market-tycoon/analytics'
 import { Customer, createCustomerProfile, type CustomerProfileKey } from '@market-tycoon/customers'
 import type { PaymentMethod } from '@market-tycoon/catalog'
-import { gameEvents } from '@market-tycoon/events'
+import { gameEvents, type CustomerAbandonReason as EventCustomerAbandonReason } from '@market-tycoon/events'
 
 export interface StartCustomerVisitOptions {
   day: number
@@ -40,7 +40,7 @@ export class CustomerVisitRegistry {
     gameEvents.emit('customer:entered-store', {
       day: options.day,
       customerId,
-      profileKey: customer.profile.key,
+      profileKey: customer.profile.profileKey,
       budget: customer.profile.budget,
       occurredAt: startedAt,
     })
@@ -99,7 +99,7 @@ export class CustomerVisitRegistry {
     gameEvents.emit('customer:abandoned-visit', {
       day,
       customerId,
-      reason: options.reason as Parameters<typeof gameEvents.emit<'customer:abandoned-visit'>>[1]['reason'],
+      reason: options.reason as EventCustomerAbandonReason,
       articleCount: basket.articleCount,
       potentialSaleTotal: basket.saleTotal,
       queueTimeMs,
