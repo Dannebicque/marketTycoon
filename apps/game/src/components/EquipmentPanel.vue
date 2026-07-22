@@ -1,11 +1,11 @@
 <template>
-  <aside class="selection-panel">
+  <aside v-if="selectedItem" class="selection-panel">
     <div class="panel-heading">
-      <div><span class="eyebrow">Équipement</span><h2>{{ selectedItem ? selectedItem.buildingName : 'Sélection' }}</h2></div>
-      <button v-if="selectedItem" class="close-button" @click="$emit('select', null)">×</button>
+      <div><span class="eyebrow">Équipement</span><h2>{{ selectedItem.buildingName }}</h2></div>
+      <button class="close-button" @click="$emit('select', null)">×</button>
     </div>
 
-    <template v-if="selectedItem?.type === 'shelf'">
+    <template v-if="selectedItem.type === 'shelf'">
       <div class="selection-type">{{ selectedItem.columns }} colonnes × {{ selectedItem.levels }} étagères</div>
       <p class="panel-help">{{ selectedItem.description }}</p>
       <div class="equipment-summary"><span>{{ selectedItem.configuredSlots }}/{{ selectedItem.slots.length }} configurés</span><strong>{{ selectedItem.stock }}/{{ selectedItem.capacity }}</strong></div>
@@ -27,7 +27,7 @@
       </div>
     </template>
 
-    <template v-else-if="selectedItem?.type === 'storage'">
+    <template v-else-if="selectedItem.type === 'storage'">
       <div class="selection-type">Réserve {{ storageLabel(selectedItem.storageType) }}</div>
       <p class="panel-help">{{ selectedItem.description }}</p>
       <div class="stock-meter"><span :style="{ width: `${selectedItem.ratio * 100}%` }" /></div>
@@ -35,7 +35,7 @@
       <button class="panel-action" @click="$emit('open-management', 'reserve')">Ouvrir la gestion de réserve</button>
     </template>
 
-    <template v-else-if="selectedItem?.type === 'checkout'">
+    <template v-else-if="selectedItem.type === 'checkout'">
       <div class="selection-type">Caisse</div><p class="panel-help">{{ selectedItem.description }}</p>
       <dl class="detail-list">
         <div><dt>Ouverture</dt><dd :class="selectedItem.open ? 'positive-text' : 'negative-text'">{{ selectedItem.open ? 'Ouverte' : 'Fermée' }}</dd></div>
@@ -45,13 +45,6 @@
         <div><dt>Paiements</dt><dd>{{ selectedItem.payments.join(', ') }}</dd></div>
       </dl>
       <button v-if="!selectedItem.open" class="panel-action" @click="$emit('open-management', 'employees')">Affecter un caissier</button>
-    </template>
-
-    <template v-else>
-      <p class="panel-help">Clique sur un équipement dans la scène pour le configurer.</p>
-      <h3>Rayons</h3><button v-for="item in shelves" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.stock }}/{{ item.capacity }}</strong></button>
-      <h3>Réserves</h3><button v-for="item in storages" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.used }}/{{ item.capacity }}</strong></button>
-      <h3>Caisses</h3><button v-for="item in checkouts" :key="item.id" class="selection-row" @click="$emit('select', item.id)"><span>{{ item.buildingName }}</span><strong>{{ item.open ? item.queueLength : 'Fermée' }}</strong></button>
     </template>
   </aside>
 </template>
