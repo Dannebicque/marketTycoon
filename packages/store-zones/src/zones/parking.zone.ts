@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'parking', name:'Parking', description:'Stationnement des clients et circulation automobile.', icon:'🅿️', color:0x64748b, order:80, costs:{ electricityPerCell:.08, cleaningPerCell:.07, maintenancePerCell:.12, securityPerCell:.08 }, constraints:{ indoor:false, minimumArea:8 }, allowedBuildingCategories:[], requiredUnlockKey:'marketing' })
