@@ -80,10 +80,16 @@ export function validateZones(cells: readonly ZoneCell[], definitions: readonly 
         const next = { x: cell.x + direction.x, y: cell.y + direction.y }
         const sameZone = byCell.get(key(next.x, next.y))?.zoneKey === seed.zoneKey
         if (sameZone) continue
+
         const outsideGrid = next.x < 0 || next.y < 0 || next.x >= grid.columns || next.y >= grid.rows
-        const edge = outsideGrid ? undefined : grid.getEdgeBetween(cell, next)
+        // The edge of the buildable map is the parcel boundary. It closes an indoor
+        // space but does not count as a door. This also allows stores built against
+        // the edge of the terrain to be validated correctly.
+        if (outsideGrid) continue
+
+        const edge = grid.getEdgeBetween(cell, next)
         if (edge?.type === 'door') doorCount += 1
-        if (definition.constraints?.requiresWalls && (!edge || (edge.type !== 'wall' && edge.type !== 'door'))) enclosed = false
+        if (definition.constraints?.requiresWalls && !edge) enclosed = false
       }
     }
 
