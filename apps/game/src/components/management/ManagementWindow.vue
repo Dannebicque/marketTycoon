@@ -14,7 +14,7 @@
 
       <div v-else-if="tab === 'finances'" class="management-content">
         <div class="finance-summary"><article><span>Revenus</span><strong>{{ money(ui.dayRevenue) }}</strong></article><article><span>Charges</span><strong>{{ money(ui.dayExpenses) }}</strong></article><article><span>Résultat</span><strong>{{ money(ui.dayProfit) }}</strong></article></div>
-        <dl class="finance-list"><div><dt>Construction</dt><dd>{{ money(ui.dayConstructionCost) }}</dd></div><div><dt>Achats de marchandises</dt><dd>{{ money(ui.dayMerchandiseCost) }}</dd></div><div><dt>Électricité et fonctionnement</dt><dd>{{ money(ui.dayOperatingCost) }}</dd></div><div><dt>Salaires prévus</dt><dd>{{ money(payroll) }}</dd></div><div class="total"><dt>Total des charges</dt><dd>{{ money(ui.dayExpenses) }}</dd></div></dl>
+        <dl class="finance-list"><div><dt>Construction</dt><dd>{{ money(ui.dayConstructionCost) }}</dd></div><div><dt>Achats de marchandises</dt><dd>{{ money(ui.dayMerchandiseCost) }}</dd></div><div><dt>Exploitation du magasin</dt><dd>{{ money(ui.dayOperatingCost) }}</dd></div><div><dt>Salaires prévus</dt><dd>{{ money(payroll) }}</dd></div><div class="total"><dt>Total des charges</dt><dd>{{ money(ui.dayExpenses) }}</dd></div></dl>
       </div>
 
       <div v-else-if="tab === 'reserve'" class="management-content">
@@ -22,27 +22,30 @@
         <h2>Produits stockés</h2><div v-if="!reserveLines.length" class="empty-state">La réserve est vide.</div><div v-for="line in reserveLines" :key="line.productKey" class="reserve-line"><span>{{ line.productName }}</span><strong>{{ line.quantity }}</strong></div>
       </div>
 
+      <StoreNeedsPanel v-else-if="tab === 'needs'" :report="storeNeedsReport" :history="storeNeedsHistory" />
       <CustomerAnalyticsPanel v-else-if="tab === 'customers'" v-bind="customerAnalytics" />
       <PricingPanel v-else-if="tab === 'pricing'" :lines="pricingLines" @update-price="(productKey, salePrice) => $emit('update-price', productKey, salePrice)" @apply-markup="$emit('apply-markup', $event)" />
-      <EmployeesPanel v-else-if="tab === 'employees'" :employees="employees" :candidates="candidates" :roles="employeeRoles" :checkouts="checkouts" :payroll="payroll" @hire="$emit('hire', $event)" @dismiss="$emit('dismiss', $event)" @assign="(employeeId, buildingId) => $emit('assign', employeeId, buildingId)" @refresh-candidates="$emit('refresh-candidates')" />
+      <EmployeesPanel v-else-if="tab === 'employees'" :employees="employees" :candidates="candidates" :roles="employeeRoles" :locked-role-keys="lockedRoleKeys" :checkouts="checkouts" :payroll="payroll" @hire="$emit('hire', $event)" @dismiss="$emit('dismiss', $event)" @assign="(employeeId, buildingId) => $emit('assign', employeeId, buildingId)" @refresh-candidates="$emit('refresh-candidates')" />
       <PurchaseOrdersPanel v-else-if="tab === 'orders'" :suppliers="suppliers" :products="products" :storage-capacities="storageCapacities" :cash="ui.cash" :orders="orders" :message="orderMessage" :message-type="orderMessageType" @submit="(supplierKey, lines) => $emit('submit-order', supplierKey, lines)" />
       <SettingsPanel v-else-if="tab === 'settings'" />
     </section>
   </div>
 </template>
 
-<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'reserve' | 'customers' | 'pricing' | 'employees' | 'orders' | 'settings'</script>
+<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'needs' | 'reserve' | 'customers' | 'pricing' | 'employees' | 'orders' | 'settings'</script>
 <script setup lang="ts">
 import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
 import type { EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EmployeeState } from '../../game/employees/employeeTypes'
+import type { StoreNeedsReport } from '../../simulation/StoreNeedsManager'
 import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
 import PricingPanel from './PricingPanel.vue'
 import PurchaseOrdersPanel from './PurchaseOrdersPanel.vue'
 import SettingsPanel from './SettingsPanel.vue'
+import StoreNeedsPanel from './StoreNeedsPanel.vue'
 
 interface CustomerAnalyticsViewModel {
   day: number
@@ -53,7 +56,7 @@ interface CustomerAnalyticsViewModel {
   recent: CustomerPurchaseObservation[]
 }
 
-const props = defineProps<{ tab: ManagementTab; ui: any; alerts: string[]; pendingOrders: any[]; suppliers: any[]; storageCapacities: any[]; reserveLines: any[]; orders: any[]; products: ProductDefinition[]; pricingLines: any[]; customerAnalytics: CustomerAnalyticsViewModel; orderMessage: string; orderMessageType: 'success' | 'error'; employees: EmployeeState[]; candidates: EmployeeState[]; employeeRoles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number; hasSave: boolean; saveMessage: string }>()
+const props = defineProps<{ tab: ManagementTab; ui: any; alerts: string[]; pendingOrders: any[]; suppliers: any[]; storageCapacities: any[]; reserveLines: any[]; orders: any[]; products: ProductDefinition[]; pricingLines: any[]; customerAnalytics: CustomerAnalyticsViewModel; orderMessage: string; orderMessageType: 'success' | 'error'; employees: EmployeeState[]; candidates: EmployeeState[]; employeeRoles: EmployeeRoleDefinition[]; lockedRoleKeys: string[]; checkouts: any[]; payroll: number; hasSave: boolean; saveMessage: string; storeNeedsReport: StoreNeedsReport; storeNeedsHistory: StoreNeedsReport[] }>()
 defineEmits<{ close: []; 'update:tab': [tab: ManagementTab]; 'submit-order': [supplierKey: string, lines: Array<{ productKey: string; quantity: number }>]; 'update-price': [productKey: string, salePrice: number]; 'apply-markup': [markupRate: number]; hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': []; 'save-game': []; 'load-game': []; 'delete-save': [] }>()
 const { t, locale } = useI18n({ useScope: 'global' })
 const tabs = computed<Array<{ key: ManagementTab; label: string }>>(() => {
@@ -61,6 +64,7 @@ const tabs = computed<Array<{ key: ManagementTab; label: string }>>(() => {
   return [
     { key: 'dashboard', label: t('management.tabs.dashboard') },
     { key: 'finances', label: t('management.tabs.finances') },
+    { key: 'needs', label: 'Besoins' },
     { key: 'reserve', label: t('management.tabs.reserve') },
     { key: 'customers', label: t('management.tabs.customers') },
     { key: 'pricing', label: t('management.tabs.pricing') },
