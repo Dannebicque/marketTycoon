@@ -13,7 +13,7 @@ import './progression.css'
 import './store-identity.css'
 import './zones.css'
 
-const DEV_SCENARIO_VERSION = '3'
+const DEV_SCENARIO_VERSION = '4'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
