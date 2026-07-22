@@ -35,6 +35,7 @@ const EMPTY_COSTS: StoreNeedCosts = { electricity: 0, cleaning: 0, maintenance: 
 export class StoreNeedsManager {
   private readonly conditions = new Map<string, EquipmentCondition>()
   private readonly history: StoreNeedsReport[] = []
+  private readonly technicianQualities = new Map<string, number>()
   private latest: StoreNeedsReport = {
     day: 0,
     costs: { ...EMPTY_COSTS },
@@ -46,9 +47,19 @@ export class StoreNeedsManager {
     equipment: [],
   }
 
-  processDay(day: number, simulation: StoreSimulation, buildings: PlacedBuilding[], technicianQuality: number, servedCustomers: number) {
-    if (this.latest.day === day) return this.latest
+  registerEmployee(employee: { id: string; roleKey: string; quality: number }) {
+    if (employee.roleKey === 'technician') this.technicianQualities.set(employee.id, employee.quality)
+  }
 
+  unregisterEmployee(employeeId: string) { this.technicianQualities.delete(employeeId) }
+  resetEmployees(employees: Array<{ id: string; roleKey: string; quality: number }>) {
+    this.technicianQualities.clear()
+    employees.forEach(employee => this.registerEmployee(employee))
+  }
+
+  processDay(day: number, simulation: StoreSimulation, buildings: PlacedBuilding[], servedCustomers: number) {
+    if (this.latest.day === day) return this.latest
+    const technicianQuality = this.getTechnicianQuality()
     const activeIds = new Set(buildings.map(building => building.id))
     for (const id of this.conditions.keys()) if (!activeIds.has(id)) this.conditions.delete(id)
 
@@ -105,8 +116,6 @@ export class StoreNeedsManager {
     }
     costs.total = round(costs.electricity + costs.cleaning + costs.maintenance + costs.waste + costs.losses)
 
-    // StoreSimulation facture déjà l’électricité des équipements froids à la fermeture.
-    // On ajoute ici les autres besoins afin d’éviter une double facturation.
     const additionalOperatingCosts = round(costs.cleaning + costs.maintenance + costs.waste + costs.losses)
     simulation.metrics.cash -= additionalOperatingCosts
     simulation.metrics.operatingExpenses += additionalOperatingCosts
@@ -129,6 +138,10 @@ export class StoreNeedsManager {
 
   getLatestReport() { return this.latest }
   getHistory() { return this.history.map(report => ({ ...report, costs: { ...report.costs }, equipment: report.equipment.map(item => ({ ...item })) })) }
+  getTechnicianQuality() {
+    const values = [...this.technicianQualities.values()]
+    return values.length ? Math.round(values.reduce((sum, quality) => sum + quality, 0) / values.length) : 0
+  }
 
   private applyProductLosses(simulation: StoreSimulation) {
     let wasteUnits = 0
@@ -149,5 +162,7 @@ export class StoreNeedsManager {
     return { wasteUnits, wasteCost }
   }
 }
+
+export const storeNeedsManager = new StoreNeedsManager()
 
 function round(value: number) { return Math.round(value * 100) / 100 }
