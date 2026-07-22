@@ -44,9 +44,12 @@
 import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
 import { computed } from 'vue'
 import type { EmployeeState } from '../../game/employees/employeeTypes'
-const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; lockedRoleKeys: string[]; checkouts: any[]; payroll: number }>()
+const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; checkouts: any[]; payroll: number }>()
 defineEmits<{ hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': [] }>()
-const lockedRoles = computed(() => props.roles.filter(item => props.lockedRoleKeys.includes(item.key)))
+const lockedRoles = computed(() => {
+  const candidateRoleKeys = new Set(props.candidates.map(candidate => candidate.roleKey))
+  return props.roles.filter(item => item.requiredUnlockKey && !candidateRoleKeys.has(item.key))
+})
 function role(key: string) { return props.roles.find(item => item.key === key) }
 function unlockLabel(key?: string) {
   const labels: Record<string, string> = {
