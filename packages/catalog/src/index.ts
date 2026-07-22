@@ -32,6 +32,7 @@ export type {
   StorageType,
   SupplierCatalogReader,
   SupplierDefinition,
+  UnlockableDefinition,
   WallDefinition,
 } from './contracts'
 export {
