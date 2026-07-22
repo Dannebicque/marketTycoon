@@ -105,8 +105,11 @@ export class StoreNeedsManager {
     }
     costs.total = round(costs.electricity + costs.cleaning + costs.maintenance + costs.waste + costs.losses)
 
-    simulation.metrics.cash -= costs.total
-    simulation.metrics.operatingExpenses += costs.total
+    // StoreSimulation facture déjà l’électricité des équipements froids à la fermeture.
+    // On ajoute ici les autres besoins afin d’éviter une double facturation.
+    const additionalOperatingCosts = round(costs.cleaning + costs.maintenance + costs.waste + costs.losses)
+    simulation.metrics.cash -= additionalOperatingCosts
+    simulation.metrics.operatingExpenses += additionalOperatingCosts
     simulation.metrics.profit = simulation.metrics.revenue - simulation.metrics.constructionExpenses - simulation.metrics.merchandiseExpenses - simulation.metrics.operatingExpenses
 
     this.latest = {
