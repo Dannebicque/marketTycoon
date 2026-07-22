@@ -18,15 +18,15 @@ export const zoneRuntime = {
   get eraseMode() { return eraseMode },
   get toolMode() { return toolMode },
   get validation() { return validation },
-  select(zoneKey: string) { activeZoneKey = zoneKey; eraseMode = false; toolMode = 'zone'; syncBodyClass(); emit(); redraw?.() },
-  selectEraser() { activeZoneKey = null; eraseMode = true; toolMode = 'zone'; syncBodyClass(); emit(); redraw?.() },
-  selectCursor() { activeZoneKey = null; eraseMode = false; toolMode = 'cursor'; syncBodyClass(); emit(); redraw?.() },
+  select(zoneKey: string) { activeZoneKey = zoneKey; eraseMode = false; toolMode = 'zone'; closeConstructionPalette(); syncBodyClass(); emit(); redraw?.() },
+  selectEraser() { activeZoneKey = null; eraseMode = true; toolMode = 'zone'; closeConstructionPalette(); syncBodyClass(); emit(); redraw?.() },
+  selectCursor() { activeZoneKey = null; eraseMode = false; toolMode = 'cursor'; closeConstructionPalette(); syncBodyClass(); emit(); redraw?.() },
   activateBuildingTool() { activeZoneKey = null; eraseMode = false; toolMode = 'building'; syncBodyClass(); emit(); redraw?.() },
-  close() { this.selectCursor() },
+  close() { activeZoneKey = null; eraseMode = false; toolMode = 'cursor'; closeConstructionPalette(); syncBodyClass(); emit(); redraw?.() },
   isEditing() { return toolMode === 'zone' },
   isBuildingMode() { return toolMode === 'building' },
   setRedraw(handler: () => void) { redraw = handler },
-  setValidator(handler: () => ZoneValidationReport) { validate = handler; this.revalidate() },
+  setValidator(handler: () => ZoneValidationReport) { validate = handler; validation = validate(); emit(); redraw?.() },
   revalidate() { validation = validate?.() ?? { valid: true, issues: [], components: [], invalidCellKeys: [] }; emit(); redraw?.(); return validation },
   notifyChanged() {
     validation = validate?.() ?? validation
@@ -47,6 +47,9 @@ export const zoneRuntime = {
 }
 
 function emit() { listeners.forEach(listener => listener()) }
+function closeConstructionPalette() {
+  window.setTimeout(() => (document.querySelector('.palette-close') as HTMLButtonElement | null)?.click(), 0)
+}
 function syncBodyClass() {
   document.body.classList.toggle('zone-mode-active', toolMode === 'zone')
   document.body.classList.toggle('building-mode-active', toolMode === 'building')
