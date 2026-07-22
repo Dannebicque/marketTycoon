@@ -1,9 +1,12 @@
 import { StoreZoneManager, ZONES, type ZoneDefinition, type ZoneValidationReport } from '@market-tycoon/store-zones'
 
+export type ToolMode = 'cursor' | 'building' | 'zone'
+
 export const storeZoneManager = new StoreZoneManager(ZONES)
 
 let activeZoneKey: string | null = null
 let eraseMode = false
+let toolMode: ToolMode = 'cursor'
 let redraw: (() => void) | undefined
 let validate: (() => ZoneValidationReport) | undefined
 let validation: ZoneValidationReport = { valid: true, issues: [], components: [], invalidCellKeys: [] }
@@ -13,11 +16,15 @@ export const zoneRuntime = {
   get definitions(): readonly ZoneDefinition[] { return ZONES },
   get activeZoneKey() { return activeZoneKey },
   get eraseMode() { return eraseMode },
+  get toolMode() { return toolMode },
   get validation() { return validation },
-  select(zoneKey: string) { activeZoneKey = zoneKey; eraseMode = false; emit(); redraw?.() },
-  selectEraser() { activeZoneKey = null; eraseMode = true; emit(); redraw?.() },
-  close() { activeZoneKey = null; eraseMode = false; emit(); redraw?.() },
-  isEditing() { return Boolean(activeZoneKey) || eraseMode },
+  select(zoneKey: string) { activeZoneKey = zoneKey; eraseMode = false; toolMode = 'zone'; syncBodyClass(); emit(); redraw?.() },
+  selectEraser() { activeZoneKey = null; eraseMode = true; toolMode = 'zone'; syncBodyClass(); emit(); redraw?.() },
+  selectCursor() { activeZoneKey = null; eraseMode = false; toolMode = 'cursor'; syncBodyClass(); emit(); redraw?.() },
+  activateBuildingTool() { activeZoneKey = null; eraseMode = false; toolMode = 'building'; syncBodyClass(); emit(); redraw?.() },
+  close() { this.selectCursor() },
+  isEditing() { return toolMode === 'zone' },
+  isBuildingMode() { return toolMode === 'building' },
   setRedraw(handler: () => void) { redraw = handler },
   setValidator(handler: () => ZoneValidationReport) { validate = handler; this.revalidate() },
   revalidate() { validation = validate?.() ?? { valid: true, issues: [], components: [], invalidCellKeys: [] }; emit(); redraw?.(); return validation },
@@ -29,10 +36,19 @@ export const zoneRuntime = {
   restore() {
     try { storeZoneManager.importState(JSON.parse(localStorage.getItem('market-tycoon.zones.v1') ?? '[]')) }
     catch { storeZoneManager.clear() }
+    toolMode = 'cursor'
+    activeZoneKey = null
+    eraseMode = false
     validation = validate?.() ?? validation
+    syncBodyClass()
     emit(); redraw?.()
   },
   subscribe(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener) },
 }
 
 function emit() { listeners.forEach(listener => listener()) }
+function syncBodyClass() {
+  document.body.classList.toggle('zone-mode-active', toolMode === 'zone')
+  document.body.classList.toggle('building-mode-active', toolMode === 'building')
+  document.body.classList.toggle('cursor-mode-active', toolMode === 'cursor')
+}
