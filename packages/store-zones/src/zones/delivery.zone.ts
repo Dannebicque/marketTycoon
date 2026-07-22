@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'delivery', name:'Zone de livraison', description:'Réception des marchandises et circulation logistique.', icon:'🚚', color:0xeab308, order:70, costs:{ electricityPerCell:.12, cleaningPerCell:.18, maintenancePerCell:.2, securityPerCell:.12 }, constraints:{ indoor:false, minimumArea:4 }, allowedBuildingCategories:['storage','wall','door'], requiredUnlockKey:'advanced-logistics' })
