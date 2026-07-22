@@ -1,6 +1,8 @@
 #zone-ui { position:fixed; z-index:45; left:220px; bottom:18px; }
-.zone-widget { position:relative; }
-.zone-trigger { min-width:190px; padding:10px 13px; display:flex; align-items:center; gap:10px; border:1px solid #334155; border-radius:13px; background:rgba(2,6,23,.94); box-shadow:0 14px 38px rgba(0,0,0,.35); cursor:pointer; text-align:left; }
+.zone-widget { position:relative; display:flex; gap:8px; align-items:stretch; }
+.cursor-trigger,.zone-trigger { padding:10px 13px; display:flex; align-items:center; gap:10px; border:1px solid #334155; border-radius:13px; background:rgba(2,6,23,.94); box-shadow:0 14px 38px rgba(0,0,0,.35); cursor:pointer; color:#e2e8f0; }
+.cursor-trigger { min-width:102px; justify-content:center; }.cursor-trigger span{font-size:20px}.cursor-trigger.active,.zone-trigger.active{border-color:#38bdf8;background:rgba(7,89,133,.3)}
+.zone-trigger { min-width:190px; text-align:left; }
 .zone-widget.invalid .zone-trigger { border-color:#a16207; background:rgba(69,39,8,.94); }
 .zone-trigger > span:first-child { font-size:24px; }.zone-trigger > span:last-child { display:flex; flex-direction:column; gap:2px; }.zone-trigger small { color:#94a3b8; font-size:9px; }
 .zone-panel { position:absolute; left:0; bottom:58px; width:min(570px,60vw); max-height:70vh; padding:15px; overflow:auto; border:1px solid #334155; border-radius:15px; background:rgba(2,6,23,.97); box-shadow:0 20px 60px rgba(0,0,0,.48); }
@@ -9,3 +11,4 @@
 .zone-validation { margin-top:12px; padding:10px 12px; border:1px solid #a16207; border-radius:10px; background:rgba(113,63,18,.18); color:#fde68a; font-size:10px; }
 .zone-validation ul { margin:7px 0 0; padding-left:17px; display:grid; gap:5px; line-height:1.4; }
 .zone-summary { margin-top:12px; display:grid; gap:6px; }.zone-summary > div { padding:8px 10px; display:grid; grid-template-columns:1fr auto auto; gap:10px; border-radius:8px; background:#0f172a; font-size:10px; }.zone-summary small { color:#86efac; }
+@media(max-width:800px){#zone-ui{left:12px}.zone-panel{width:min(570px,calc(100vw - 24px))}.cursor-trigger{min-width:48px}.cursor-trigger strong{display:none}}
