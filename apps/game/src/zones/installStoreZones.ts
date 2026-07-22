@@ -10,6 +10,28 @@ export function installStoreZones() {
   installed = true
 
   const prototype = StoreScene.prototype as StoreScene & Record<string, any>
+
+  const originalSelect = prototype.select
+  prototype.select = function (...args: any[]) {
+    zoneRuntime.activateBuildingTool()
+    return originalSelect.apply(this, args)
+  }
+
+  const originalDrawPreview = prototype.drawPreview
+  prototype.drawPreview = function () {
+    if (!zoneRuntime.isBuildingMode()) {
+      ;(this as StoreScene & Record<string, any>).previewLayer?.clear()
+      return
+    }
+    return originalDrawPreview.call(this)
+  }
+
+  const originalSelectBuilding = prototype.selectBuilding
+  prototype.selectBuilding = function (buildingId: string | null) {
+    if (zoneRuntime.isEditing() && buildingId) return
+    return originalSelectBuilding.call(this, buildingId)
+  }
+
   const originalCreate = prototype.create
   prototype.create = function () {
     originalCreate.call(this)
@@ -20,10 +42,16 @@ export function installStoreZones() {
     installGridValidationHooks(scene)
     zoneRuntime.restore()
 
+    // The application used to start with the equipment palette open. Cursor mode
+    // is now the neutral initial state, so close that palette after Vue has mounted.
+    window.setTimeout(() => (document.querySelector('.palette-close') as HTMLButtonElement | null)?.click(), 0)
+
     let painting = false
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!zoneRuntime.isEditing()) return
       painting = true
+      scene.selectedBuildingId = null
+      scene.selectionLayer?.clear()
       paintAtPointer(scene, pointer)
     })
     scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -44,7 +72,7 @@ export function installStoreZones() {
   const originalPlaceSelected = prototype.placeSelected
   prototype.placeSelected = function () {
     const scene = this as StoreScene & Record<string, any>
-    if (zoneRuntime.isEditing()) return
+    if (!zoneRuntime.isBuildingMode()) return
     const selected = scene.selected
     const hovered = scene.hovered
     if (selected && hovered && selected.category !== 'wall' && selected.category !== 'door') {
@@ -60,6 +88,12 @@ export function installStoreZones() {
       }
     }
     return originalPlaceSelected.call(this)
+  }
+
+  const originalPlaceDraggedWall = prototype.placeDraggedWall
+  prototype.placeDraggedWall = function () {
+    if (!zoneRuntime.isBuildingMode()) return
+    return originalPlaceDraggedWall.call(this)
   }
 }
 
@@ -100,8 +134,9 @@ function drawZones(scene: StoreScene & Record<string, any>) {
     const halfHeight = scene.grid.tileHeight / 2
     const invalid = invalidCells.has(`${cell.x}:${cell.y}`)
     const color = invalid ? 0xef4444 : definition.color
-    layer.fillStyle(color, zoneRuntime.isEditing() ? .4 : .14)
-    layer.lineStyle(invalid ? 2 : 1, color, zoneRuntime.isEditing() ? .9 : .3)
+    const editing = zoneRuntime.isEditing()
+    layer.fillStyle(color, editing ? .3 : .045)
+    layer.lineStyle(invalid && editing ? 2 : 1, color, editing ? .72 : .1)
     layer.beginPath()
     layer.moveTo(center.x, center.y)
     layer.lineTo(center.x + halfWidth, center.y + halfHeight)
