@@ -59,8 +59,21 @@ export interface EmployeeRoleDefinition {
 
 export type BuildingCategory = 'shelf' | 'checkout' | 'storage' | 'wall' | 'door'
 export type BuildingKey = string
+export type BuildingMenuCategoryKey = string
 
-export interface BuildingToolbarDefinition { icon: string; order: number }
+export interface BuildingMenuCategoryDefinition {
+  key: BuildingMenuCategoryKey
+  label: string
+  description: string
+  icon: string
+  order: number
+}
+
+export interface BuildingToolbarDefinition {
+  icon: string
+  order: number
+  category?: BuildingMenuCategoryKey
+}
 export interface EquipmentLayoutDefinition { columns: number; levels: number; compartmentType: CompartmentType }
 export interface BaseBuildingDefinition {
   key: BuildingKey
