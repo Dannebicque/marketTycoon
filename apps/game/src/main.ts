@@ -30,7 +30,7 @@ async function bootstrap() {
   const zoneRoot = document.createElement('div')
   zoneRoot.id = 'zone-ui'
   document.body.appendChild(zoneRoot)
-  createApp(ZoneToolbarWidget).mount(zoneRoot)
+  createApp(ZoneToolbarWidget, { progression }).mount(zoneRoot)
 
   const progressionRoot = document.createElement('div')
   progressionRoot.id = 'progression-ui'
