@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'gallery', name:'Galerie commerciale', description:'Circulation commerciale et futures boutiques partenaires.', icon:'🏬', color:0xec4899, order:60, costs:{ electricityPerCell:1.1, cleaningPerCell:.9, maintenancePerCell:.3, heatingPerCell:.28, securityPerCell:.25 }, constraints:{ indoor:true, requiresWalls:true, requiresDoor:true, minimumArea:12 }, allowedBuildingCategories:['wall','door'], requiredUnlockKey:'marketing' })
