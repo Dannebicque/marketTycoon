@@ -23,10 +23,7 @@
         </header>
 
         <div class="progression-overview">
-          <div class="progression-overview-copy">
-            <strong>{{ levelProgress }} %</strong>
-            <span>du niveau accompli</span>
-          </div>
+          <div class="progression-overview-copy"><strong>{{ levelProgress }} %</strong><span>du niveau accompli</span></div>
           <div class="progression-main-track" aria-hidden="true"><i :style="{ width: `${levelProgress}%` }" /></div>
           <span>{{ completedCurrent }} objectif{{ completedCurrent > 1 ? 's' : '' }} sur {{ currentObjectives.length }}</span>
         </div>
@@ -40,10 +37,7 @@
           <article v-for="objective in currentObjectives" :key="objective.key" class="progression-objective" :class="{ completed: objective.completed }">
             <div class="progression-objective-status">{{ objective.completed ? '✓' : objectiveIcon(objective.metric) }}</div>
             <div class="progression-objective-body">
-              <div class="progression-objective-title">
-                <strong>{{ objective.title }}</strong>
-                <span>{{ formatMetric(objective.value, objective.metric) }} / {{ formatMetric(objective.target, objective.metric) }}</span>
-              </div>
+              <div class="progression-objective-title"><strong>{{ objective.title }}</strong><span>{{ formatMetric(objective.value, objective.metric) }} / {{ formatMetric(objective.target, objective.metric) }}</span></div>
               <p>{{ objective.description }}</p>
               <div class="progression-objective-track"><i :style="{ width: `${objectivePercent(objective)}%` }" /></div>
             </div>
@@ -53,15 +47,8 @@
 
         <footer class="progression-next-level">
           <div class="progression-next-icon">{{ nextLevel ? '🔓' : '🏆' }}</div>
-          <div v-if="nextLevel">
-            <span>Prochaine étape</span>
-            <strong>Niveau {{ nextLevel.level }} · {{ nextLevel.title }}</strong>
-            <small v-if="nextLevel.unlockKeys?.length">Débloque : {{ nextLevel.unlockKeys.join(' · ') }}</small>
-          </div>
-          <div v-else>
-            <span>Progression maximale</span>
-            <strong>Votre enseigne a atteint le sommet !</strong>
-          </div>
+          <div v-if="nextLevel"><span>Prochaine étape</span><strong>Niveau {{ nextLevel.level }} · {{ nextLevel.title }}</strong><small v-if="nextLevel.unlockKeys?.length">Débloque : {{ nextLevel.unlockKeys.join(' · ') }}</small></div>
+          <div v-else><span>Progression maximale</span><strong>Votre enseigne a atteint le sommet !</strong></div>
         </footer>
       </div>
     </Transition>
@@ -69,23 +56,22 @@
 </template>
 
 <script setup lang="ts">
-import type { ProgressionMetric, ProgressionObjectiveState } from '@market-tycoon/progression'
+import type { ProgressionManager, ProgressionMetric, ProgressionObjectiveState } from '@market-tycoon/progression'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { progression } from '../../progression'
 
+const props = defineProps<{ progression: ProgressionManager }>()
 const open = ref(false)
 const revision = ref(0)
 let refreshTimer: number | undefined
 
-const level = computed(() => { revision.value; return progression.getLevel() })
-const currentLevel = computed(() => { revision.value; return progression.getLevelDefinition() })
-const nextLevel = computed(() => { revision.value; return progression.getNextLevelDefinition() })
-const currentObjectives = computed(() => { revision.value; return progression.getCurrentObjectives() })
+const level = computed(() => { revision.value; return props.progression.getLevel() })
+const currentLevel = computed(() => { revision.value; return props.progression.getLevelDefinition() })
+const nextLevel = computed(() => { revision.value; return props.progression.getNextLevelDefinition() })
+const currentObjectives = computed(() => { revision.value; return props.progression.getCurrentObjectives() })
 const completedCurrent = computed(() => currentObjectives.value.filter(objective => objective.completed).length)
 const levelProgress = computed(() => {
   if (!currentObjectives.value.length) return 100
-  const total = currentObjectives.value.reduce((sum, objective) => sum + objectivePercent(objective), 0)
-  return Math.round(total / currentObjectives.value.length)
+  return Math.round(currentObjectives.value.reduce((sum, objective) => sum + objectivePercent(objective), 0) / currentObjectives.value.length)
 })
 
 function objectivePercent(objective: ProgressionObjectiveState) {
@@ -96,13 +82,8 @@ function objectivePercent(objective: ProgressionObjectiveState) {
 
 function objectiveIcon(metric: ProgressionMetric) {
   const icons: Partial<Record<ProgressionMetric, string>> = {
-    'customers-entered': '🚶',
-    'customers-served': '🛒',
-    'customers-lost': '🚪',
-    revenue: '💶',
-    'buildings-placed': '🧱',
-    'employees-hired': '👷',
-    'days-completed': '📅',
+    'customers-entered': '🚶', 'customers-served': '🛒', 'customers-lost': '🚪', revenue: '💶',
+    'buildings-placed': '🧱', 'employees-hired': '👷', 'days-completed': '📅',
   }
   return icons[metric] ?? '🎯'
 }
