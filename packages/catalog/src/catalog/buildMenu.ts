@@ -11,9 +11,16 @@ export const BUILDING_MENU_CATEGORIES: readonly BuildingMenuCategoryDefinition[]
 ]
 
 const categoryMap = new Map(BUILDING_MENU_CATEGORIES.map(category => [category.key, category]))
+const legacyCategoryMap: Partial<Record<BuildingDefinition['category'], BuildingMenuCategoryKey>> = {
+  shelf: 'equipment',
+  storage: 'storage',
+  checkout: 'checkout',
+  wall: 'construction',
+  door: 'construction',
+}
 
 export function getBuildingMenuCategoryKey(definition: BuildingDefinition): BuildingMenuCategoryKey {
-  return definition.toolbar?.category ?? DEFAULT_BUILDING_MENU_CATEGORY
+  return definition.toolbar?.category ?? legacyCategoryMap[definition.category] ?? DEFAULT_BUILDING_MENU_CATEGORY
 }
 
 export function getBuildingMenuCategory(key: BuildingMenuCategoryKey): BuildingMenuCategoryDefinition {
