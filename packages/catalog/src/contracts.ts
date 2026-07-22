@@ -1,5 +1,10 @@
 export type PaymentMethod = 'contactless' | 'card' | 'cash'
 
+export interface UnlockableDefinition {
+  requiredUnlockKey?: string
+  unlockVisibility?: 'locked-visible' | 'hidden'
+}
+
 export type ProductCategory =
   | 'grocery'
   | 'fruit'
@@ -19,7 +24,7 @@ export type CompartmentType =
   | 'freezer-shelf'
   | 'bakery-display'
 
-export interface ProductDefinition {
+export interface ProductDefinition extends UnlockableDefinition {
   key: string
   category: ProductCategory
   name: string
@@ -35,7 +40,7 @@ export interface ProductDefinition {
   requiresFreezing?: boolean
 }
 
-export interface SupplierDefinition {
+export interface SupplierDefinition extends UnlockableDefinition {
   key: string
   name: string
   leadTimeDays: number
@@ -46,7 +51,7 @@ export interface SupplierDefinition {
 }
 
 export type EmployeeRoleKey = string
-export interface EmployeeRoleDefinition {
+export interface EmployeeRoleDefinition extends UnlockableDefinition {
   key: EmployeeRoleKey
   name: string
   description: string
@@ -75,7 +80,7 @@ export interface BuildingToolbarDefinition {
   category?: BuildingMenuCategoryKey
 }
 export interface EquipmentLayoutDefinition { columns: number; levels: number; compartmentType: CompartmentType }
-export interface BaseBuildingDefinition {
+export interface BaseBuildingDefinition extends UnlockableDefinition {
   key: BuildingKey
   category: BuildingCategory
   name: string
