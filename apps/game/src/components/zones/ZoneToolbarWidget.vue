@@ -1,9 +1,10 @@
 <template>
   <section class="zone-widget" :class="{ open, invalid: validation.issues.length }">
-    <button class="zone-trigger" @click="open = !open"><span>{{ validation.issues.length ? '⚠️' : '🗺️' }}</span><span><strong>Zones</strong><small>{{ paintedCells }} cellule(s) · {{ validationLabel }}</small></span></button>
+    <button class="cursor-trigger" :class="{ active: toolMode === 'cursor' }" title="Mode sélection" @click="selectCursor"><span>↖</span><strong>Curseur</strong></button>
+    <button class="zone-trigger" :class="{ active: toolMode === 'zone' }" @click="open = !open"><span>{{ validation.issues.length ? '⚠️' : '🗺️' }}</span><span><strong>Zones</strong><small>{{ paintedCells }} cellule(s) · {{ validationLabel }}</small></span></button>
     <div v-if="open" class="zone-panel">
-      <header><div><span class="eyebrow">Construction</span><strong>Définir les espaces</strong></div><button @click="close">×</button></header>
-      <p>Choisissez une zone puis peignez directement sur la grille. Clic droit ou gomme pour effacer.</p>
+      <header><div><span class="eyebrow">Construction</span><strong>Définir les espaces</strong></div><button @click="closePanel">×</button></header>
+      <p>Choisissez une zone puis peignez directement sur la grille. Clic droit ou gomme pour effacer. Revenez au curseur pour sélectionner un équipement.</p>
       <div class="zone-grid">
         <button v-for="zone in visibleZones" :key="zone.key" :disabled="!access.isAccessible(zone)" :class="{ active: activeZoneKey === zone.key, locked: !access.isAccessible(zone) }" @click="select(zone.key)">
           <i :style="{ backgroundColor: access.isAccessible(zone) ? color(zone.color) : '#334155' }" />
@@ -30,6 +31,7 @@ const unsubscribe = zoneRuntime.subscribe(() => revision.value++)
 onBeforeUnmount(unsubscribe)
 const activeZoneKey = computed(() => { void revision.value; return zoneRuntime.activeZoneKey })
 const eraseMode = computed(() => { void revision.value; return zoneRuntime.eraseMode })
+const toolMode = computed(() => { void revision.value; return zoneRuntime.toolMode })
 const validation = computed(() => { void revision.value; return zoneRuntime.validation })
 const validationLabel = computed(() => validation.value.issues.length ? `${validation.value.issues.length} alerte(s)` : 'configuration valide')
 const visibleZones = computed(() => { void revision.value; return zoneRuntime.definitions.filter(zone => access.isVisible(zone)) })
@@ -37,7 +39,8 @@ const summaries = computed(() => { void revision.value; return storeZoneManager.
 const paintedCells = computed(() => { void revision.value; return storeZoneManager.getCells().length })
 function select(key: string) { const zone = zoneRuntime.definitions.find(item => item.key === key); if (zone && access.isAccessible(zone)) zoneRuntime.select(key) }
 function selectEraser() { zoneRuntime.selectEraser() }
-function close() { open.value = false; zoneRuntime.close() }
+function selectCursor() { open.value = false; zoneRuntime.selectCursor() }
+function closePanel() { open.value = false; if (zoneRuntime.isEditing()) zoneRuntime.selectCursor() }
 function unlockLabel(key?: string) { return key ? `Débloqué avec ${key}` : 'Zone indisponible' }
 function color(value: number) { return `#${value.toString(16).padStart(6, '0')}` }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', maximumFractionDigits:0 }).format(value) }
