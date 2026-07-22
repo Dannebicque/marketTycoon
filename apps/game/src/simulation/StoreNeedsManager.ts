@@ -162,7 +162,7 @@ export class StoreNeedsManager {
   }
 
   getLatestReport() { return this.latest }
-  getHistory() { return this.history.map(report => ({ ...report, costs: { ...report.costs }, equipment: report.equipment.map(item => ({ ...item })), zones: report.zones.map(zone => ({ ...zone, costs: { ...zone.costs })), zoneIssues: [...report.zoneIssues] })) }
+  getHistory() { return this.history.map(report => ({ ...report, costs: { ...report.costs }, equipment: report.equipment.map(item => ({ ...item })), zones: report.zones.map(zone => ({ ...zone, costs: { ...zone.costs }})), zoneIssues: [...report.zoneIssues] })) }
   getTechnicianQuality() {
     const values = [...this.technicianQualities.values()]
     return values.length ? Math.round(values.reduce((sum, quality) => sum + quality, 0) / values.length) : 0
