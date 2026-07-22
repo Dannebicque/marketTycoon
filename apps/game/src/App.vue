@@ -19,7 +19,7 @@
       </button>
     </nav>
 
-    <aside class="tool-palette" :class="{ compact: activeCategory === 'operations' }" aria-label="Choix disponibles">
+    <aside v-if="activeCategory" class="tool-palette" :class="{ compact: activeCategory === 'operations' }" aria-label="Choix disponibles">
       <header><div><span class="eyebrow">{{ currentCategory.label }}</span><strong>{{ currentCategory.description }}</strong></div><button class="palette-close" title="Fermer" @click="activeCategory = null">×</button></header>
       <div v-if="activeCategory !== 'operations'" class="tool-grid">
         <button v-for="tool in visibleTools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)">
@@ -94,8 +94,8 @@ import Phaser from 'phaser'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
-import { BUILDINGS, getBuildingDefinition, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
-import type { BuildingDefinition, BuildingKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
+import { BUILDINGS, getBuildingDefinition, getBuildingMenuCategories, getBuildingMenuCategoryKey, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
+import type { BuildingDefinition, BuildingKey, BuildingMenuCategoryDefinition, BuildingMenuCategoryKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
 import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
 import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
@@ -103,11 +103,11 @@ import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infr
 import { initializeDevelopmentScenario } from './dev/initializeDevelopmentScenario'
 import { StoreScene } from './phaser/StoreScene'
 
-type ToolCategoryKey = 'equipment' | 'storage' | 'checkout' | 'construction' | 'operations'
+const OPERATIONS_CATEGORY: BuildingMenuCategoryDefinition = { key: 'operations', label: 'Exploitation', description: 'Clients et équipe', icon: '⚙️', order: 1_000 }
 
 const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')
-const activeCategory = ref<ToolCategoryKey | null>('equipment')
+const activeCategory = ref<BuildingMenuCategoryKey | null>('equipment')
 const selectedId = ref<string | null>(null)
 const managementOpen = ref(false)
 const managementTab = ref<ManagementTab>('dashboard')
@@ -131,21 +131,11 @@ const employeeManager = new EmployeeManager()
 const pricingManager = new StorePricingManager()
 const recommendedPrices = new Map<string, number>()
 const tools = BUILDINGS
-const toolCategories: Array<{ key: ToolCategoryKey; label: string; description: string; icon: string }> = [
-  { key: 'equipment', label: 'Équipements', description: 'Rayons et présentoirs', icon: '🛒' },
-  { key: 'storage', label: 'Réserves', description: 'Zones de stockage', icon: '📦' },
-  { key: 'checkout', label: 'Caisses', description: 'Encaissement client', icon: '💳' },
-  { key: 'construction', label: 'Construction', description: 'Murs et accès', icon: '🧱' },
-  { key: 'operations', label: 'Exploitation', description: 'Clients et équipe', icon: '⚙️' },
-]
+const toolCategories = [...getBuildingMenuCategories(tools), OPERATIONS_CATEGORY].sort((a, b) => a.order - b.order)
 const currentCategory = computed(() => toolCategories.find(category => category.key === activeCategory.value) ?? toolCategories[0])
-const visibleTools = computed<BuildingDefinition[]>(() => {
-  if (activeCategory.value === 'equipment') return tools.filter(tool => tool.category === 'shelf')
-  if (activeCategory.value === 'storage') return tools.filter(tool => tool.category === 'storage')
-  if (activeCategory.value === 'checkout') return tools.filter(tool => tool.category === 'checkout')
-  if (activeCategory.value === 'construction') return tools.filter(tool => tool.category === 'wall' || tool.category === 'door')
-  return []
-})
+const visibleTools = computed<BuildingDefinition[]>(() => activeCategory.value === 'operations'
+  ? []
+  : tools.filter(tool => getBuildingMenuCategoryKey(tool) === activeCategory.value))
 const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, storeOpen: true, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
 const shelves = ref<any[]>([]), storages = ref<any[]>([]), checkouts = ref<any[]>([]), suppliers = ref<any[]>([]), orders = ref<any[]>([]), reserveLines = ref<any[]>([]), storageCapacities = ref<any[]>([])
 const products = ref<ProductDefinition[]>([])
