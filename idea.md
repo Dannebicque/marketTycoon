@@ -18,6 +18,8 @@ Je la verrais dans cet ordre.
 
 ### 1. Construire un véritable moteur de progression ⭐⭐⭐⭐⭐
 
+**=> Fait**
+
 C'est, selon moi, la priorité.
 
 Aujourd'hui, le joueur peut tout construire dès le premier jour.
@@ -155,6 +157,8 @@ C'est là que le jeu deviendra vivant.
 ---
 
 ## 3. Introduire les besoins du magasin ⭐⭐⭐⭐☆
+
+**=> Fait**
 
 Aujourd'hui le magasin est "gratuit".
 

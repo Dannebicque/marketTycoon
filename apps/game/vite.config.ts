@@ -17,6 +17,7 @@ export default defineConfig({
       '@market-tycoon/catalog': packageSource('catalog'),
       '@market-tycoon/customers': packageSource('customers'),
       '@market-tycoon/progression': packageSource('progression'),
+      '@market-tycoon/store-zones': packageSource('store-zones'),
     },
   },
 })
