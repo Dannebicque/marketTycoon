@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import type { EmployeeRoleDefinition } from '@market-tycoon/catalog'
+import { computed } from 'vue'
 import type { EmployeeState } from '../../game/employees/employeeTypes'
 const props = defineProps<{ employees: EmployeeState[]; candidates: EmployeeState[]; roles: EmployeeRoleDefinition[]; lockedRoleKeys: string[]; checkouts: any[]; payroll: number }>()
 defineEmits<{ hire: [candidateId: string]; dismiss: [employeeId: string]; assign: [employeeId: string, buildingId?: string]; 'refresh-candidates': [] }>()
@@ -58,10 +59,6 @@ function unlockLabel(key?: string) {
   return key ? labels[key] ?? `Déblocage requis : ${key}` : 'Disponible'
 }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0) }
-</script>
-
-<script lang="ts">
-import { computed } from 'vue'
 </script>
 
 <style scoped>
