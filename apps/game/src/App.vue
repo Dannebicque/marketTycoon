@@ -11,13 +11,40 @@
       <button class="management-button" @click="openManagement('dashboard')">☰ Gestion</button>
     </header>
 
-    <aside class="build-toolbar" aria-label="Outils de construction">
-      <button v-for="tool in tools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)"><span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span><span>{{ tool.name }}</span><small>{{ tool.price }} €</small></button>
-      <div class="toolbar-separator" />
-      <button @click="command('spawnCustomer')"><span class="tool-icon">🧍</span><span>Client</span></button>
-      <button :class="{ active: ui.autoSpawn }" @click="command('toggleAutoSpawn')"><span class="tool-icon">▶</span><span>Auto</span></button>
-      <button @click="command('restock')"><span class="tool-icon">📦</span><span>Réassort</span></button>
+    <nav class="category-toolbar" aria-label="Catégories d'outils">
+      <button v-for="category in toolCategories" :key="category.key" :class="{ active: activeCategory === category.key }" @click="activeCategory = category.key">
+        <span class="category-icon">{{ category.icon }}</span>
+        <span><strong>{{ category.label }}</strong><small>{{ category.description }}</small></span>
+        <span class="category-chevron">›</span>
+      </button>
+    </nav>
+
+    <aside class="tool-palette" :class="{ compact: activeCategory === 'operations' }" aria-label="Choix disponibles">
+      <header><div><span class="eyebrow">{{ currentCategory.label }}</span><strong>{{ currentCategory.description }}</strong></div><button class="palette-close" title="Fermer" @click="activeCategory = null">×</button></header>
+      <div v-if="activeCategory !== 'operations'" class="tool-grid">
+        <button v-for="tool in visibleTools" :key="tool.key" :class="{ active: activeTool === tool.key }" :title="tool.description" @click="selectTool(tool.key)">
+          <span class="tool-icon">{{ tool.toolbar?.icon ?? '•' }}</span>
+          <span class="tool-copy"><strong>{{ tool.name }}</strong><small>{{ tool.description }}</small></span>
+          <span class="tool-price">{{ tool.price }} €</span>
+        </button>
+        <p v-if="!visibleTools.length" class="palette-empty">Aucun objet disponible dans cette catégorie.</p>
+      </div>
+      <div v-else class="operation-grid">
+        <button @click="command('spawnCustomer')"><span class="tool-icon">🧍</span><span><strong>Ajouter un client</strong><small>Lancer immédiatement une visite.</small></span></button>
+        <button :class="{ active: ui.autoSpawn }" @click="command('toggleAutoSpawn')"><span class="tool-icon">🚶</span><span><strong>Arrivées automatiques</strong><small>{{ ui.autoSpawn ? 'Actives' : 'Inactives' }}</small></span></button>
+        <button @click="command('restock')"><span class="tool-icon">📦</span><span><strong>Réassort</strong><small>Demander le remplissage des rayons.</small></span></button>
+        <button @click="openManagement('employees')"><span class="tool-icon">👷</span><span><strong>Employés</strong><small>Recruter et affecter l’équipe.</small></span></button>
+      </div>
     </aside>
+
+    <section class="time-controls" aria-label="Contrôle du temps">
+      <div class="day-control"><span>Jour {{ ui.day }}</span><strong>{{ ui.time }}</strong></div>
+      <button class="pause-control" :class="{ active: simulationPaused }" :title="simulationPaused ? 'Reprendre' : 'Mettre en pause'" @click="toggleSimulationPause">{{ simulationPaused ? '▶' : 'Ⅱ' }}</button>
+      <div class="speed-controls" role="group" aria-label="Vitesse de simulation">
+        <button v-for="speed in simulationSpeeds" :key="speed" :class="{ active: simulationSpeed === speed }" @click="setSimulationSpeed(speed)">×{{ speed }}</button>
+      </div>
+      <button class="next-day-control" :disabled="ui.customers > 0 && !ui.storeOpen" @click="advanceDay">{{ ui.storeOpen ? 'Terminer la journée' : ui.customers > 0 ? 'Départ des clients…' : 'Jour suivant' }}</button>
+    </section>
 
     <section ref="gameContainer" class="game-container" />
     <EquipmentPanel :selected-item="selectedItem" :shelves="shelves" :storages="storages" :checkouts="checkouts" @select="selectBuilding" @assign-product="assignProduct" @restock-slot="restockSlot" @restock-equipment="restockEquipment" @open-management="openManagement" />
@@ -68,7 +95,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
 import { BUILDINGS, getBuildingDefinition, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
-import type { BuildingKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
+import type { BuildingDefinition, BuildingKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
 import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
 import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
@@ -76,8 +103,11 @@ import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infr
 import { initializeDevelopmentScenario } from './dev/initializeDevelopmentScenario'
 import { StoreScene } from './phaser/StoreScene'
 
+type ToolCategoryKey = 'equipment' | 'storage' | 'checkout' | 'construction' | 'operations'
+
 const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')
+const activeCategory = ref<ToolCategoryKey | null>('equipment')
 const selectedId = ref<string | null>(null)
 const managementOpen = ref(false)
 const managementTab = ref<ManagementTab>('dashboard')
@@ -85,6 +115,9 @@ const orderMessage = ref('')
 const orderMessageType = ref<'success' | 'error'>('success')
 const saveMessage = ref('')
 const saveAvailable = ref(hasSaveGame())
+const simulationPaused = ref(false)
+const simulationSpeed = ref(1)
+const simulationSpeeds = [1, 2, 4]
 let game: Phaser.Game | null = null
 let refreshTimer: number | undefined
 let processedDay = 0
@@ -98,7 +131,22 @@ const employeeManager = new EmployeeManager()
 const pricingManager = new StorePricingManager()
 const recommendedPrices = new Map<string, number>()
 const tools = BUILDINGS
-const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
+const toolCategories: Array<{ key: ToolCategoryKey; label: string; description: string; icon: string }> = [
+  { key: 'equipment', label: 'Équipements', description: 'Rayons et présentoirs', icon: '🛒' },
+  { key: 'storage', label: 'Réserves', description: 'Zones de stockage', icon: '📦' },
+  { key: 'checkout', label: 'Caisses', description: 'Encaissement client', icon: '💳' },
+  { key: 'construction', label: 'Construction', description: 'Murs et accès', icon: '🧱' },
+  { key: 'operations', label: 'Exploitation', description: 'Clients et équipe', icon: '⚙️' },
+]
+const currentCategory = computed(() => toolCategories.find(category => category.key === activeCategory.value) ?? toolCategories[0])
+const visibleTools = computed<BuildingDefinition[]>(() => {
+  if (activeCategory.value === 'equipment') return tools.filter(tool => tool.category === 'shelf')
+  if (activeCategory.value === 'storage') return tools.filter(tool => tool.category === 'storage')
+  if (activeCategory.value === 'checkout') return tools.filter(tool => tool.category === 'checkout')
+  if (activeCategory.value === 'construction') return tools.filter(tool => tool.category === 'wall' || tool.category === 'door')
+  return []
+})
+const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, storeOpen: true, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
 const shelves = ref<any[]>([]), storages = ref<any[]>([]), checkouts = ref<any[]>([]), suppliers = ref<any[]>([]), orders = ref<any[]>([]), reserveLines = ref<any[]>([]), storageCapacities = ref<any[]>([])
 const products = ref<ProductDefinition[]>([])
 const employees = ref<EmployeeState[]>([])
@@ -135,6 +183,10 @@ function openManagement(tab: ManagementTab) { managementTab.value = tab; managem
 function selectTool(key: BuildingKey) { activeTool.value = key; getScene()?.select(key) }
 function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
 function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return } if (name === 'spawnCustomer') void scene.spawnCustomer(); else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'; else scene[name]() }
+function toggleSimulationPause() { simulationPaused.value = !simulationPaused.value; applySimulationSpeed() }
+function setSimulationSpeed(speed: number) { simulationSpeed.value = speed; simulationPaused.value = false; applySimulationSpeed() }
+function applySimulationSpeed() { const scene = getScene(); if (!scene) return; const scale = simulationPaused.value ? 0 : simulationSpeed.value; scene.time.timeScale = scale; scene.tweens.timeScale = scale }
+function advanceDay() { const scene = getScene(); if (!scene) return; if (ui.storeOpen) { simulationPaused.value = false; applySimulationSpeed(); scene.currentMinutes = 20 * 60; return } if (!scene.customers.size) scene.startNextDay() }
 function assignProduct(buildingId: string, slotId: string, event: Event) { getScene()?.configureCompartment(buildingId, slotId, (event.target as HTMLSelectElement).value || null); refreshUi() }
 function restockSlot(buildingId: string, slotId: string) { getScene()?.restockCompartment(buildingId, slotId); refreshUi() }
 function restockEquipment(buildingId: string) { getScene()?.restockEquipment(buildingId); refreshUi() }
@@ -207,7 +259,7 @@ function refreshUi() {
   simulation.syncBuildings(scene.grid.getBuildings())
   if (processedDay !== scene.day) { simulation.processDeliveries(scene.day); applyPayroll(scene.day); employeeManager.refreshCandidates(scene.day); processedDay = scene.day }
   const minutes = scene.currentMinutes
-  Object.assign(ui, { cash: simulation.metrics.cash, day: scene.day, time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`, customers: scene.customers.size, shelfStock: simulation.getTotalShelfStock(), reserveStock: simulation.getTotalReserveStock(), autoSpawn: scene.autoSpawn, dayRevenue: simulation.getDayRevenue(), dayProfit: simulation.getDayProfit(), dayConstructionCost: simulation.getDayConstructionExpenses(), dayMerchandiseCost: simulation.getDayMerchandiseExpenses(), dayOperatingCost: simulation.getDayOperatingExpenses() })
+  Object.assign(ui, { cash: simulation.metrics.cash, day: scene.day, time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`, customers: scene.customers.size, shelfStock: simulation.getTotalShelfStock(), reserveStock: simulation.getTotalReserveStock(), autoSpawn: scene.autoSpawn, storeOpen: minutes < 20 * 60, dayRevenue: simulation.getDayRevenue(), dayProfit: simulation.getDayProfit(), dayConstructionCost: simulation.getDayConstructionExpenses(), dayMerchandiseCost: simulation.getDayMerchandiseExpenses(), dayOperatingCost: simulation.getDayOperatingExpenses() })
   ui.dayExpenses = ui.dayConstructionCost + ui.dayMerchandiseCost + ui.dayOperatingCost
   const buildings = scene.grid.getBuildings()
   shelves.value = buildings.filter(b => isShelfDefinition(b.definition)).map(building => { const definition = building.definition, inventory = simulation.getEquipmentInventory(building.id); const slots = (inventory?.compartments ?? []).map(slot => { const product = slot.productKey ? getProductDefinition(slot.productKey) : undefined; return { ...slot, productName: product?.name ?? 'Vide', reserveQuantity: product ? simulation.getReserveQuantity(product.key) : 0, color: product ? `#${product.color.toString(16).padStart(6, '0')}` : '#334155' } }); return { id: building.id, type: 'shelf', buildingName: definition.name, description: definition.description, columns: definition.layout.columns, levels: definition.layout.levels, slots, stock: slots.reduce((sum, slot) => sum + slot.quantity, 0), capacity: slots.reduce((sum, slot) => sum + slot.capacity, 0), configuredSlots: slots.filter(slot => slot.productKey).length, compatibleProducts: simulation.getCompatibleProducts(building.id).map(product => ({ key: product.key, name: product.name, capacity: product.capacities[definition.layout.compartmentType] ?? 0 })), columnGroups: Array.from({ length: definition.layout.columns }, (_, index) => ({ index, slots: slots.filter(slot => slot.column === index).sort((a, b) => b.level - a.level) })) } })
@@ -221,7 +273,7 @@ function refreshUi() {
 function storageLabel(type: StorageType) { return type === 'ambient' ? 'ambiante' : type === 'cold' ? 'froide' : 'surgelée' }
 function paymentLabel(value: string) { return value === 'contactless' ? 'sans contact' : value === 'card' ? 'carte' : 'espèces' }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0) }
-function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || managementOpen.value) return; const target = event.target as HTMLElement | null; if (target?.matches('input, textarea, select, button, [contenteditable="true"]')) return; const key = event.key.toLocaleLowerCase('fr-FR'), scene = getScene(); if (!scene) return; if (!event.shiftKey && key === 'a') scene.rotateScene(-1); if (!event.shiftKey && key === 'e') scene.rotateScene(1); if (event.shiftKey && key === 'a') command('restock'); if (event.shiftKey && key === 's') scene.toggleAutoSpawn() }
+function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || managementOpen.value) return; const target = event.target as HTMLElement | null; if (target?.matches('input, textarea, select, button, [contenteditable="true"]')) return; const key = event.key.toLocaleLowerCase('fr-FR'), scene = getScene(); if (!scene) return; if (!event.shiftKey && key === 'a') scene.rotateScene(-1); if (!event.shiftKey && key === 'e') scene.rotateScene(1); if (event.code === 'Space') { event.preventDefault(); toggleSimulationPause() } if (event.shiftKey && key === 'a') command('restock'); if (event.shiftKey && key === 's') scene.toggleAutoSpawn() }
 
 onMounted(() => { if (!gameContainer.value) return; game = new Phaser.Game({ type: Phaser.AUTO, parent: gameContainer.value, width: gameContainer.value.clientWidth, height: gameContainer.value.clientHeight, backgroundColor: '#0f172a', scene: [StoreScene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }, render: { antialias: true } }); refreshEmployees(); window.addEventListener('keydown', handleAzertyShortcuts, { capture: true }); refreshTimer = window.setInterval(refreshUi, 250) })
 onBeforeUnmount(() => { employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
