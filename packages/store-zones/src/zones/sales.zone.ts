@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'sales', name:'Zone de vente', description:'Surface accessible aux clients et dédiée aux rayons et caisses.', icon:'🛒', color:0x22c55e, order:10, costs:{ electricityPerCell:.8, cleaningPerCell:.65, maintenancePerCell:.15, heatingPerCell:.18, securityPerCell:.08 }, constraints:{ indoor:true, requiresWalls:true, requiresDoor:true, minimumArea:8 }, allowedBuildingCategories:['shelf','checkout','wall','door'] })
