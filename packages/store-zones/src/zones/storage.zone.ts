@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'storage', name:'Réserve', description:'Stockage des marchandises et préparation du réassort.', icon:'📦', color:0x3b82f6, order:20, costs:{ electricityPerCell:.35, cleaningPerCell:.2, maintenancePerCell:.1, heatingPerCell:.08, securityPerCell:.05 }, constraints:{ indoor:true, requiresWalls:true, requiresDoor:true, minimumArea:4 }, allowedBuildingCategories:['storage','wall','door'] })
