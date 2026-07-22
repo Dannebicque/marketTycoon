@@ -14,6 +14,8 @@ export type {
   BuildingCategory,
   BuildingDefinition,
   BuildingKey,
+  BuildingMenuCategoryDefinition,
+  BuildingMenuCategoryKey,
   BuildingToolbarDefinition,
   CheckoutDefinition,
   CompartmentType,
@@ -42,6 +44,13 @@ export {
   getBuildingDefinition,
   requireBuildingDefinition,
 } from './catalog/buildings'
+export {
+  BUILDING_MENU_CATEGORIES,
+  DEFAULT_BUILDING_MENU_CATEGORY,
+  getBuildingMenuCategories,
+  getBuildingMenuCategory,
+  getBuildingMenuCategoryKey,
+} from './catalog/buildMenu'
 export {
   PRODUCTS,
   PRODUCT_CATALOG,
