@@ -22,7 +22,22 @@ export interface BuildingRemovedEvent { day: number; buildingId: string; definit
 export interface CheckoutBreakdownEvent { day: number; checkoutId: string; repairedByEmployeeId?: string; durationMs: number }
 export interface CheckoutCompletedEvent { day: number; checkoutId: string; customerId: string; articleCount: number; total: number; paymentMethod: PaymentMethod; satisfaction: number }
 export interface StoreDayStartedEvent { day: number; cash: number }
-export interface StoreDayClosedEvent { day: number; revenue: number; profit: number; servedCustomers: number; lostCustomers: number; averageSatisfaction: number }
+export interface StoreDayClosedEvent {
+  day: number
+  revenue: number
+  constructionExpenses: number
+  merchandiseExpenses: number
+  operatingExpenses: number
+  costOfGoodsSold: number
+  grossMargin: number
+  stockValue: number
+  profit: number
+  servedCustomers: number
+  lostCustomers: number
+  articlesSold: number
+  averageSatisfaction: number
+  averageQueueSeconds: number
+}
 
 export interface MarketTycoonEvents {
   'customer:entered-store': CustomerEnteredStoreEvent
