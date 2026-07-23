@@ -67,7 +67,10 @@
       :employees="employees"
       :candidates="candidates"
       :employee-roles="employeeRoles"
+      :employee-tasks="employeeTasks"
+      :selected-employee-id="selectedEmployeeId"
       :checkouts="checkouts"
+      :buildings="buildingViewModels"
       :payroll="payroll"
       :has-save="saveAvailable"
       :save-message="saveMessage"
@@ -79,6 +82,7 @@
       @hire="hireEmployee"
       @dismiss="dismissEmployee"
       @assign="assignEmployee"
+      @select-employee="selectEmployee"
       @refresh-candidates="refreshCandidates"
       @save-game="saveGame"
       @load-game="loadGame"
@@ -96,8 +100,8 @@ import EquipmentPanel from './components/EquipmentPanel.vue'
 import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
 import { BUILDINGS, getBuildingDefinition, getBuildingMenuCategories, getBuildingMenuCategoryKey, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
 import type { BuildingDefinition, BuildingKey, BuildingMenuCategoryDefinition, BuildingMenuCategoryKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
-import { EmployeeManager, type EmployeeState } from '@market-tycoon/employees'
-import { ProgressionAccessPolicy, type ProgressionManager, type ProgressionUnlockable } from '@market-tycoon/progression'
+import { EmployeeManager, type EmployeeState, type EmployeeWorkTask } from '@market-tycoon/employees'
+import { ProgressionAccessPolicy, type ProgressionManager } from '@market-tycoon/progression'
 import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
 import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
 import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'
@@ -113,6 +117,7 @@ const gameContainer = ref<HTMLElement | null>(null)
 const activeTool = ref<BuildingKey>('standard-shelf')
 const activeCategory = ref<BuildingMenuCategoryKey | null>('equipment')
 const selectedId = ref<string | null>(null)
+const selectedEmployeeId = ref<string | undefined>()
 const managementOpen = ref(false)
 const managementTab = ref<ManagementTab>('dashboard')
 const orderMessage = ref('')
@@ -128,6 +133,7 @@ let processedDay = 0
 let payrollProcessedDay = 1
 let employeeRuntime: EmployeeRuntime | null = null
 let workforcePoliciesInstalled = false
+let employeeSelectionInstalled = false
 let pricingInitialized = false
 let developmentScenarioChecked = false
 
@@ -146,10 +152,12 @@ const products = ref<ProductDefinition[]>([])
 const employees = ref<EmployeeState[]>([])
 const candidates = ref<EmployeeState[]>([])
 const employeeRoles = ref<EmployeeRoleDefinition[]>([])
+const employeeTasks = ref<EmployeeWorkTask[]>([])
 const emptySummary = (): CustomerAnalyticsSummary => ({ observations: 0, requestedQuantity: 0, acceptedQuantity: 0, rejectedQuantity: 0, conversionRate: 0, estimatedLostRevenue: 0, averageSatisfactionDelta: 0 })
 const customerAnalytics = reactive<{ day: number; daySummary: CustomerAnalyticsSummary; allSummary: CustomerAnalyticsSummary; dayProducts: ProductCustomerAnalytics[]; allProducts: ProductCustomerAnalytics[]; recent: CustomerPurchaseObservation[] }>({ day: 1, daySummary: emptySummary(), allSummary: emptySummary(), dayProducts: [], allProducts: [], recent: [] })
 const payroll = computed(() => employeeManager.getDailyPayroll())
 const selectedItem = computed(() => [...shelves.value, ...storages.value, ...checkouts.value].find(item => item.id === selectedId.value))
+const buildingViewModels = computed(() => [...shelves.value, ...storages.value, ...checkouts.value])
 const pendingOrders = computed(() => orders.value.filter(order => order.status === 'ordered'))
 const pricingLines = computed(() => products.value.map(product => { const summary = pricingManager.getSummary(product); return { ...summary, name: product.name, category: product.category, recommendedPrice: recommendedPrices.get(product.key) ?? product.salePrice } }))
 const managementAlerts = computed(() => {
@@ -162,6 +170,8 @@ const managementAlerts = computed(() => {
   if (progression.isUnlocked('core-store') && !employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques sont fermées.')
   if (progression.isUnlocked('core-store') && !employeeManager.hasRole('stocker')) alerts.push('Aucun employé de rayon : le réassort automatique est indisponible.')
   if (progression.isUnlocked('advanced-logistics') && !employeeManager.hasRole('technician')) alerts.push('Aucun technicien : les incidents de caisse dureront plus longtemps.')
+  const urgentTasks = employeeTasks.value.filter(task => task.status === 'pending' && task.priority >= 80)
+  if (urgentTasks.length) alerts.push(`${urgentTasks.length} tâche(s) urgente(s) attendent une prise en charge.`)
   const lossCount = pricingLines.value.filter(line => line.isLossLeader).length
   const lowMarginCount = pricingLines.value.filter(line => !line.isLossLeader && line.markupRate < .1).length
   if (lossCount) alerts.push(`${lossCount} produit(s) sont vendus à perte.`)
@@ -176,6 +186,7 @@ function unlockLabel(key?: string) { return key ? `Débloqué avec ${key}` : 'Di
 function toolTitle(tool: BuildingDefinition) { return progressionAccess.isAccessible(tool) ? tool.description : `${tool.description} — ${unlockLabel(tool.requiredUnlockKey)}` }
 function getScene() { return game ? game.scene.getScene('StoreScene') as StoreScene : null }
 function openManagement(tab: ManagementTab) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
+function selectEmployee(employeeId?: string) { selectedEmployeeId.value = employeeId; if (employeeId) openManagement('employees') }
 function selectTool(key: BuildingKey) { const tool = getBuildingDefinition(key); if (!tool || !progressionAccess.isAccessible(tool)) { saveMessage.value = tool ? unlockLabel(tool.requiredUnlockKey) : 'Équipement inconnu.'; return } activeTool.value = key; getScene()?.select(key) }
 function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
 function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return } if (name === 'spawnCustomer') void scene.spawnCustomer(); else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'; else scene[name]() }
@@ -191,16 +202,20 @@ function updateProductPrice(productKey: string, salePrice: number) { if (!pricin
 function applyMarkup(markupRate: number) { pricingManager.applyMarkup(products.value, markupRate); applyPricingToProducts(); saveMessage.value = `Coefficient de marge de ${(markupRate * 100).toFixed(0)} % appliqué à tous les produits.` }
 function initializePricing(source: ProductDefinition[]) { if (pricingInitialized) return; source.forEach(product => recommendedPrices.set(product.key, product.salePrice)); pricingManager.reset(source); pricingInitialized = true }
 function applyPricingToProducts() { for (const product of products.value) product.salePrice = pricingManager.getSalePrice(product) }
-function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const candidate = employeeManager.getCandidates().find(item => item.id === candidateId); const role = candidate ? employeeManager.getRoles().find(item => item.key === candidate.roleKey) : undefined; if (!candidate || !role || !progressionAccess.isAccessible(role)) { saveMessage.value = role ? unlockLabel(role.requiredUnlockKey) : 'Candidat introuvable.'; return } const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; syncWorkforce() }
-function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); syncWorkforce() }
+function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const candidate = employeeManager.getCandidates().find(item => item.id === candidateId); const role = candidate ? employeeManager.getRoles().find(item => item.key === candidate.roleKey) : undefined; if (!candidate || !role || !progressionAccess.isAccessible(role)) { saveMessage.value = role ? unlockLabel(role.requiredUnlockKey) : 'Candidat introuvable.'; return } const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; if (employee) selectedEmployeeId.value = employee.id; syncWorkforce() }
+function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); if (selectedEmployeeId.value === employeeId) selectedEmployeeId.value = undefined; syncWorkforce() }
 function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); syncWorkforce() }
 function refreshCandidates() { employeeManager.refreshCandidates(getScene()?.day ?? 1); refreshEmployees() }
-function refreshEmployees() { employees.value = employeeManager.getEmployees(); employeeRoles.value = employeeManager.getRoles().filter(role => progressionAccess.isVisible(role)); const accessibleRoleKeys = new Set(employeeRoles.value.filter(role => progressionAccess.isAccessible(role)).map(role => role.key)); candidates.value = employeeManager.getCandidates().filter(candidate => accessibleRoleKeys.has(candidate.roleKey)) }
+function refreshEmployees() { employees.value = employeeManager.getEmployees(); employeeRoles.value = employeeManager.getRoles().filter(role => progressionAccess.isVisible(role)); const accessibleRoleKeys = new Set(employeeRoles.value.filter(role => progressionAccess.isAccessible(role)).map(role => role.key)); candidates.value = employeeManager.getCandidates().filter(candidate => accessibleRoleKeys.has(candidate.roleKey)); employeeTasks.value = employeeManager.tasks.getTasks() }
 function syncWorkforce() { employeeRuntime?.sync(); refreshEmployees(); refreshUi() }
 
 function ensureEmployeeRuntime(scene: StoreScene) {
   if (!employeeRuntime) employeeRuntime = new EmployeeRuntime(scene, employeeManager)
   employeeRuntime.sync()
+  if (!employeeSelectionInstalled) {
+    employeeSelectionInstalled = true
+    scene.events.on('employee:selected', selectEmployee)
+  }
   if (workforcePoliciesInstalled) return
   workforcePoliciesInstalled = true
   const originalChooseCheckout = scene.simulation.chooseCheckout.bind(scene.simulation)
@@ -216,7 +231,7 @@ function saveGame() {
   const save: SaveGameV1 = {
     version: SAVE_GAME_VERSION, savedAt: new Date().toISOString(), day: scene.day, currentMinutes: scene.currentMinutes,
     metrics: { ...simulation.metrics },
-    buildings: scene.grid.getBuildings().map(building => ({ oldId: building.id, definitionKey: building.definition.key, gridX: building.gridX, gridY: building.gridY, direction: building.direction, compartments: simulation.getEquipmentInventory(building.id)?.compartments.map(slot => ({ id: slot.id, productKey: slot.productKey, quantity: slot.quantity, capacity: slot.capacity })) })),
+    buildings: scene.grid.getBuildings().map(building => ({ oldId: building.id, definitionKey: building.definition.key, gridX: building.gridX, gridY: building.gridY, direction: building.direction, compartments: simulation.getEquipmentInventory(building.id)?.compartments.map(slot => ({ id: slot.id, productKey: slot.productKey, quantity: slot.quantity, capacity: slot.capacity, averageUnitCost: slot.averageUnitCost })) })),
     edges: scene.grid.getEdges().map(edge => ({ definitionKey: edge.definitionKey, gridX: edge.gridX, gridY: edge.gridY, direction: edge.direction })),
     reserve: simulation.reserve.exportState(), purchaseOrders: simulation.purchaseOrders.exportState(), employees: employeeManager.exportState(), pricing: pricingManager.exportState(),
   }
@@ -226,7 +241,7 @@ function saveGame() {
 function loadGame() {
   const save = readSaveGame(), scene = getScene()
   if (!save || !scene || scene.customers.size) { saveMessage.value = 'Chargement impossible pendant la présence de clients.'; return }
-  employeeRuntime?.destroy(); employeeRuntime = null
+  employeeRuntime?.destroy(); employeeRuntime = null; employeeSelectionInstalled = false
   for (const edge of scene.grid.getEdges()) scene.grid.removeAt(edge.gridX, edge.gridY, edge.direction)
   for (const building of scene.grid.getBuildings()) scene.grid.removeAt(building.gridX, building.gridY)
   const idMap = new Map<string, string>()
@@ -272,5 +287,5 @@ function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: '
 function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || managementOpen.value) return; const target = event.target as HTMLElement | null; if (target?.matches('input, textarea, select, button, [contenteditable="true"]')) return; const key = event.key.toLocaleLowerCase('fr-FR'), scene = getScene(); if (!scene) return; if (!event.shiftKey && key === 'a') scene.rotateScene(-1); if (!event.shiftKey && key === 'e') scene.rotateScene(1); if (event.code === 'Space') { event.preventDefault(); toggleSimulationPause() } if (event.shiftKey && key === 'a') command('restock'); if (event.shiftKey && key === 's') scene.toggleAutoSpawn() }
 
 onMounted(() => { if (!gameContainer.value) return; game = new Phaser.Game({ type: Phaser.AUTO, parent: gameContainer.value, width: gameContainer.value.clientWidth, height: gameContainer.value.clientHeight, backgroundColor: '#0f172a', scene: [StoreScene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }, render: { antialias: true } }); refreshEmployees(); window.addEventListener('keydown', handleAzertyShortcuts, { capture: true }); refreshTimer = window.setInterval(refreshUi, 250) })
-onBeforeUnmount(() => { employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
+onBeforeUnmount(() => { const scene = getScene(); scene?.events.off('employee:selected', selectEmployee); employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
 </script>
