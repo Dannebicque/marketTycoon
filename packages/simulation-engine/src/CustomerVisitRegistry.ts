@@ -55,7 +55,7 @@ export class CustomerVisitRegistry {
     if (!visit) return null
     const { customer, day, startedAt } = visit
     const basket = customer.basket.summarize()
-    const satisfaction = customer.satisfaction.getBreakdown()
+    const report = customer.getSatisfactionReport()
     const completedAt = options.completedAt ?? Date.now()
     this.active.delete(customerId)
     const observation = this.analytics.complete(customerId, {
@@ -63,7 +63,7 @@ export class CustomerVisitRegistry {
       saleTotal: basket.saleTotal,
       paymentMethod: options.paymentMethod,
       queueTimeMs: options.queueTimeMs,
-      satisfaction: { ...satisfaction, overall: customer.satisfaction.getOverall() },
+      satisfaction: { ...report.breakdown, overall: report.overall, report },
       completedAt,
     })
     gameEvents.emit('customer:visit-completed', {
@@ -73,7 +73,7 @@ export class CustomerVisitRegistry {
       saleTotal: basket.saleTotal,
       paymentMethod: options.paymentMethod,
       queueTimeMs: options.queueTimeMs,
-      satisfaction: customer.satisfaction.getOverall(),
+      satisfaction: report.overall,
       visitDurationMs: Math.max(0, completedAt - startedAt),
     })
     return observation
@@ -84,7 +84,7 @@ export class CustomerVisitRegistry {
     if (!visit) return null
     const { customer, day, startedAt } = visit
     const basket = customer.basket.summarize()
-    const satisfaction = customer.satisfaction.getBreakdown()
+    const report = customer.getSatisfactionReport()
     const completedAt = options.completedAt ?? Date.now()
     const queueTimeMs = options.queueTimeMs ?? 0
     this.active.delete(customerId)
@@ -93,7 +93,7 @@ export class CustomerVisitRegistry {
       articleCount: basket.articleCount,
       potentialSaleTotal: basket.saleTotal,
       queueTimeMs,
-      satisfaction: { ...satisfaction, overall: customer.satisfaction.getOverall() },
+      satisfaction: { ...report.breakdown, overall: report.overall, report },
       completedAt,
     })
     gameEvents.emit('customer:abandoned-visit', {
@@ -103,7 +103,7 @@ export class CustomerVisitRegistry {
       articleCount: basket.articleCount,
       potentialSaleTotal: basket.saleTotal,
       queueTimeMs,
-      satisfaction: customer.satisfaction.getOverall(),
+      satisfaction: report.overall,
       visitDurationMs: Math.max(0, completedAt - startedAt),
     })
     return observation
