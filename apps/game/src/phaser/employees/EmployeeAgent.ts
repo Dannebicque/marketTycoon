@@ -32,7 +32,14 @@ export class EmployeeAgent {
     this.taskLabel = scene.add.text(0, 18, 'Disponible', {
       fontSize: '8px', color: '#dbeafe', backgroundColor: '#172554dd', padding: { x: 3, y: 1 },
     }).setOrigin(.5, 0)
-    this.container = scene.add.container(point.x, point.y + 10, [shadow, body, head, name, this.taskLabel]).setDepth(110)
+    this.container = scene.add.container(point.x, point.y + 10, [shadow, body, head, name, this.taskLabel])
+      .setDepth(110)
+      .setSize(38, 68)
+      .setInteractive({ useHandCursor: true })
+    this.container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event.stopPropagation()
+      this.scene.events.emit('employee:selected', this.employeeId)
+    })
   }
 
   get position() { return this.current }
