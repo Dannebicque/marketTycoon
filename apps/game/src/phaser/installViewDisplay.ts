@@ -4,12 +4,20 @@ import { StoreScene } from './StoreScene'
 import { viewDisplayRuntime } from './viewDisplayRuntime'
 
 let installed = false
+const activeScenes = new Set<StoreScene>()
 
 export function installViewDisplay() {
   if (installed) return
   installed = true
 
   const prototype = StoreScene.prototype as StoreScene & Record<string, any>
+  const originalCreate = prototype.create
+  prototype.create = function () {
+    originalCreate.call(this)
+    const scene = this as StoreScene
+    activeScenes.add(scene)
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => activeScenes.delete(scene))
+  }
 
   prototype.drawEdge = function (edge: PlacedEdge) {
     const scene = this as StoreScene & Record<string, any>
@@ -65,9 +73,7 @@ export function installViewDisplay() {
     scene.shelfLabels.forEach((label: Phaser.GameObjects.Text) => label.destroy())
     scene.shelfLabels = []
 
-    const buildings = [...scene.grid.getBuildings()].sort((left: PlacedBuilding, right: PlacedBuilding) => {
-      return visualDepth(scene, left) - visualDepth(scene, right)
-    })
+    const buildings = [...scene.grid.getBuildings()].sort((left: PlacedBuilding, right: PlacedBuilding) => visualDepth(scene, left) - visualDepth(scene, right))
     buildings.forEach((building: PlacedBuilding) => scene.drawBuilding(building))
 
     const edges = [...scene.grid.getEdges()].sort((left: PlacedEdge, right: PlacedEdge) => {
@@ -81,11 +87,7 @@ export function installViewDisplay() {
     scene.drawQueues()
   }
 
-  window.addEventListener('market-tycoon:view-display-changed', () => {
-    const game = (window as Window & { marketTycoonGame?: Phaser.Game }).marketTycoonGame
-    const scene = game?.scene.getScene('StoreScene') as StoreScene | undefined
-    scene?.drawBuildings()
-  })
+  viewDisplayRuntime.subscribe(() => activeScenes.forEach(scene => scene.drawBuildings()))
 }
 
 function visualDepth(scene: StoreScene & Record<string, any>, building: PlacedBuilding) {
