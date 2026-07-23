@@ -21,6 +21,6 @@ export function summarizeCustomerBasket(lines: CustomerBasketLine[]): CustomerBa
     lines: [...lines],
     articleCount: lines.reduce((total, line) => total + line.quantity, 0),
     saleTotal: lines.reduce((total, line) => total + line.quantity * line.product.salePrice, 0),
-    purchaseTotal: lines.reduce((total, line) => total + line.quantity * line.product.purchasePrice, 0),
+    purchaseTotal: lines.reduce((total, line) => total + line.quantity * (line.unitCost ?? line.product.purchasePrice), 0),
   }
 }
