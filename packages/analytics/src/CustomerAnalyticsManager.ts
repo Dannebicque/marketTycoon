@@ -66,10 +66,9 @@ export interface CustomerAnalyticsState {
 }
 
 const MAX_OBSERVATIONS = 2_000
+let sharedObservations: CustomerPurchaseObservation[] = []
 
 export class CustomerAnalyticsManager {
-  private observations: CustomerPurchaseObservation[] = []
-
   record(day: number, customerId: string, product: AnalyticsProduct, requestedQuantity: number, result: PurchaseDecisionResult) {
     const acceptedQuantity = Math.min(requestedQuantity, result.acceptedQuantity)
     const marketPrice = Math.max(.01, product.marketPrice ?? product.salePrice)
@@ -79,8 +78,8 @@ export class CustomerAnalyticsManager {
       marketPrice, priceRatio: result.priceRatio, acceptanceProbability: result.acceptanceProbability,
       satisfactionDelta: result.satisfactionDelta, createdAt: Date.now(),
     }
-    this.observations.push(observation)
-    if (this.observations.length > MAX_OBSERVATIONS) this.observations.splice(0, this.observations.length - MAX_OBSERVATIONS)
+    sharedObservations.push(observation)
+    if (sharedObservations.length > MAX_OBSERVATIONS) sharedObservations.splice(0, sharedObservations.length - MAX_OBSERVATIONS)
     return { ...observation }
   }
 
@@ -126,12 +125,14 @@ export class CustomerAnalyticsManager {
     }).sort((a, b) => b.estimatedLostRevenue - a.estimatedLostRevenue)
   }
 
-  getRecent(limit = 30) { return this.observations.slice(-Math.max(0, limit)).reverse().map(item => ({ ...item })) }
-  exportState(): CustomerAnalyticsState { return { observations: this.observations.map(item => ({ ...item })) } }
-  importState(state?: CustomerAnalyticsState) { this.observations = (state?.observations ?? []).slice(-MAX_OBSERVATIONS).map(item => ({ ...item })) }
-  clear() { this.observations = [] }
-  private filter(day?: number) { return day === undefined ? this.observations : this.observations.filter(item => item.day === day) }
+  getRecent(limit = 30) { return sharedObservations.slice(-Math.max(0, limit)).reverse().map(item => ({ ...item })) }
+  exportState(): CustomerAnalyticsState { return { observations: sharedObservations.map(item => ({ ...item })) } }
+  importState(state?: CustomerAnalyticsState) { sharedObservations = (state?.observations ?? []).slice(-MAX_OBSERVATIONS).map(item => ({ ...item })) }
+  clear() { sharedObservations = [] }
+  private filter(day?: number) { return day === undefined ? sharedObservations : sharedObservations.filter(item => item.day === day) }
 }
+
+export const customerAnalytics = new CustomerAnalyticsManager()
 
 function sum<T>(items: T[], selector: (item: T) => number) { return items.reduce((total, item) => total + selector(item), 0) }
 function average<T>(items: T[], selector: (item: T) => number) { return items.length ? sum(items, selector) / items.length : 0 }
