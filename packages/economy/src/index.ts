@@ -12,6 +12,7 @@ export type { DemandProduct, PricingProduct } from './product'
 export { ReserveManager, getProductStorageType } from './ReserveManager'
 export type {
   ReserveStockLine,
+  StockWithdrawal,
   StorageBuilding,
 } from './ReserveManager'
 
