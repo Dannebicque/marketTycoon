@@ -3,12 +3,13 @@ import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
+import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
-import { installPromotions, PROMOTIONS_STORAGE_KEY } from './promotions/installPromotions'
+import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
 import './style.css'
@@ -52,6 +53,11 @@ async function bootstrap() {
   helpRoot.id = 'help-ui'
   document.body.appendChild(helpRoot)
   createApp(HelpWidget).mount(helpRoot)
+
+  const promotionReactionRoot = document.createElement('div')
+  promotionReactionRoot.id = 'promotion-reaction-ui'
+  document.body.appendChild(promotionReactionRoot)
+  createApp(PromotionReactionOverlay).mount(promotionReactionRoot)
 }
 
 function migrateDevelopmentScenario() {
@@ -62,6 +68,7 @@ function migrateDevelopmentScenario() {
   localStorage.removeItem('market-tycoon.zones.v1')
   localStorage.removeItem('market-tycoon.analytics.v1')
   localStorage.removeItem(PROMOTIONS_STORAGE_KEY)
+  localStorage.removeItem(PROMOTION_ANALYTICS_STORAGE_KEY)
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
 
