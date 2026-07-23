@@ -3,6 +3,7 @@
     <div class="help-actions">
       <button title="Tourner la carte vers la gauche" @click="rotate(-1)">↶</button>
       <button title="Tourner la carte vers la droite" @click="rotate(1)">↷</button>
+      <button class="wall-mode-trigger" :title="wallModeTitle" @click="cycleWallMode">{{ wallModeIcon }} {{ wallModeLabel }}</button>
       <button class="help-trigger" @click="open = true">? Aide</button>
     </div>
 
@@ -26,6 +27,7 @@
               <div><dt><kbd>Molette</kbd></dt><dd>Zoomer ou dézoomer</dd></div>
               <div><dt><kbd>Clic milieu</kbd></dt><dd>Déplacer librement la caméra</dd></div>
               <div><dt><kbd>A</kbd> / <kbd>E</kbd></dt><dd>Tourner la carte à gauche ou à droite</dd></div>
+              <div><dt><kbd>Bouton Murs</kbd></dt><dd>Passer entre affichage automatique, complet et abaissé</dd></div>
             </dl>
           </section>
 
@@ -66,6 +68,10 @@
             <p>Le jeu remplit automatiquement les segments intermédiaires. Une légère dérive du pointeur ne change plus l’axe du mur.</p>
           </section>
           <section>
+            <h3>Visibilité des murs</h3>
+            <p><strong>Auto</strong> conserve les murs éloignés en hauteur et abaisse ceux situés au premier plan. <strong>Complets</strong> montre toute la hauteur. <strong>Bas</strong> réduit tous les murs pour faciliter la construction et la sélection des équipements.</p>
+          </section>
+          <section>
             <h3>Modes d’interaction</h3>
             <p><strong>Curseur</strong> sélectionne les équipements sans construire. <strong>Construction</strong> place l’objet choisi. <strong>Zones</strong> peint les surfaces fonctionnelles et désactive les équipements.</p>
           </section>
@@ -76,12 +82,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { viewDisplayRuntime, type WallDisplayMode } from '../../phaser/viewDisplayRuntime'
 
 const open = ref(false)
 const page = ref<'commands' | 'construction'>('commands')
+const revision = ref(0)
+const unsubscribe = viewDisplayRuntime.subscribe(() => revision.value++)
+onBeforeUnmount(unsubscribe)
+
+const wallMode = computed(() => { void revision.value; return viewDisplayRuntime.wallMode })
+const wallModeLabel = computed(() => wallMode.value === 'auto' ? 'Auto' : wallMode.value === 'full' ? 'Complets' : 'Bas')
+const wallModeIcon = computed(() => wallMode.value === 'auto' ? '◩' : wallMode.value === 'full' ? '▥' : '▁')
+const wallModeTitle = computed(() => `Affichage des murs : ${wallModeLabel.value}`)
 
 function rotate(step: -1 | 1) {
   window.dispatchEvent(new CustomEvent('market-tycoon:rotate', { detail: { step } }))
+}
+
+function cycleWallMode() {
+  const next: Record<WallDisplayMode, WallDisplayMode> = { auto: 'full', full: 'low', low: 'auto' }
+  viewDisplayRuntime.setWallMode(next[wallMode.value])
 }
 </script>
