@@ -38,6 +38,7 @@ export interface PromotionCampaignReport {
   before: PromotionPeriodMetrics
   during: PromotionPeriodMetrics
   after: PromotionPeriodMetrics
+  campaignCost: number
   incrementalQuantity: number
   incrementalRevenue: number
   sacrificedMargin: number
@@ -61,7 +62,7 @@ export class PromotionAnalyticsManager {
     this.prune()
   }
 
-  getCampaignReport(promotion: { id: string; productKey: string; startDay: number; endDay: number }): PromotionCampaignReport {
+  getCampaignReport(promotion: { id: string; productKey: string; startDay: number; endDay: number; campaignCost?: number }): PromotionCampaignReport {
     const duration = Math.max(1, promotion.endDay - promotion.startDay + 1)
     const before = this.metrics(promotion.productKey, promotion.startDay - duration, promotion.startDay - 1)
     const during = this.metrics(promotion.productKey, promotion.startDay, promotion.endDay, promotion.id)
@@ -75,17 +76,20 @@ export class PromotionAnalyticsManager {
     const baselineMarginPerUnit = before.quantitySold ? before.grossMargin / before.quantitySold : 0
     const expectedMarginAtBaseline = during.quantitySold * baselineMarginPerUnit
     const sacrificedMargin = Math.max(0, expectedMarginAtBaseline - during.grossMargin)
-    const estimatedNetImpact = incrementalRevenue - sacrificedMargin
+    const campaignCost = Math.max(0, promotion.campaignCost ?? 0)
+    const investment = sacrificedMargin + campaignCost
+    const estimatedNetImpact = incrementalRevenue - investment
     return {
       promotionId: promotion.id,
       before,
       during,
       after,
+      campaignCost,
       incrementalQuantity,
       incrementalRevenue,
       sacrificedMargin,
       estimatedNetImpact,
-      roi: sacrificedMargin > 0 ? estimatedNetImpact / sacrificedMargin : estimatedNetImpact > 0 ? 1 : 0,
+      roi: investment > 0 ? estimatedNetImpact / investment : estimatedNetImpact > 0 ? 1 : 0,
     }
   }
 
