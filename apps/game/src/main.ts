@@ -7,6 +7,7 @@ import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installViewDisplay } from './phaser/installViewDisplay'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
 import './style.css'
@@ -20,6 +21,7 @@ const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
+  installViewDisplay()
   installStoreZones()
   installStoreNeeds()
   const progression = await createProgressionManager()
