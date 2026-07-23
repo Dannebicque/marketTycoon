@@ -10,7 +10,7 @@ import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
-import { installPersistentAnalytics } from './analytics/installPersistentAnalytics'
+import { ANALYTICS_STORAGE_KEY, installPersistentAnalytics } from './analytics/installPersistentAnalytics'
 import './style.css'
 import './progression.css'
 import './store-identity.css'
@@ -61,6 +61,7 @@ function migrateDevelopmentScenario() {
   // Le scénario de démonstration a changé de géométrie. Une ancienne sauvegarde
   // empêcherait son initialisation et conserverait des zones devenues incohérentes.
   localStorage.removeItem(SAVE_GAME_STORAGE_KEY)
+  localStorage.removeItem(ANALYTICS_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.zones.v1')
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
