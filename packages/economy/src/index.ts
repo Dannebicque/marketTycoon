@@ -9,6 +9,24 @@ export type {
 } from './MarketDemandManager'
 export type { DemandProduct, PricingProduct } from './product'
 
+export { AdvertisingManager, advertisingManager, ADVERTISING_MEDIA } from './AdvertisingManager'
+export type {
+  AdvertisingCampaign,
+  AdvertisingMedium,
+  AdvertisingMediumDefinition,
+  AdvertisingState,
+  AdvertisingStatus,
+} from './AdvertisingManager'
+
+export { LoanManager, loanManager, LOAN_OFFERS } from './LoanManager'
+export type {
+  LoanContract,
+  LoanOffer,
+  LoanPayment,
+  LoanState,
+  LoanStatus,
+} from './LoanManager'
+
 export { PromotionManager, promotionManager } from './promotionManagerInstance'
 export type {
   ProductPromotion,
