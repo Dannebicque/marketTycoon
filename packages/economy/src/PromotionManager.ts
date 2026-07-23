@@ -1,6 +1,7 @@
 import type { PricingProduct } from './product'
 
 export type PromotionType = 'percentage' | 'fixed-price' | 'x-for-y' | 'second-item-discount'
+export type PromotionChannel = 'shelf' | 'flyer' | 'coupon' | 'endcap'
 export type PromotionStatus = 'scheduled' | 'active' | 'finished' | 'cancelled'
 
 export interface ProductPromotion {
@@ -10,6 +11,8 @@ export interface ProductPromotion {
   value: number
   startDay: number
   endDay: number
+  channel: PromotionChannel
+  campaignCost: number
   createdAt: number
   buyQuantity?: number
   payQuantity?: number
@@ -22,6 +25,8 @@ export interface ProductPromotionInput {
   value: number
   startDay: number
   endDay: number
+  channel?: PromotionChannel
+  campaignCost?: number
   buyQuantity?: number
   payQuantity?: number
 }
@@ -55,6 +60,8 @@ export class PromotionManager {
 
     const mechanics = normalizeMechanics(input)
     if (!mechanics) return null
+    const channel = input.channel ?? 'shelf'
+    const duration = endDay - startDay + 1
     const promotion: ProductPromotion = {
       id: `PROMO-${this.nextPromotion++}`,
       productKey: input.productKey,
@@ -62,6 +69,8 @@ export class PromotionManager {
       value,
       startDay,
       endDay,
+      channel,
+      campaignCost: roundPrice(Math.max(0, input.campaignCost ?? defaultChannelCost(channel, duration))),
       buyQuantity: mechanics.buyQuantity,
       payQuantity: mechanics.payQuantity,
       createdAt: Date.now(),
@@ -77,7 +86,7 @@ export class PromotionManager {
     return true
   }
 
-  getPromotions() { return this.promotions.map(item => ({ ...item })) }
+  getPromotions() { return this.promotions.map(item => ({ ...item, channel: item.channel ?? 'shelf', campaignCost: item.campaignCost ?? 0 })) }
 
   getStatus(promotion: ProductPromotion, day: number): PromotionStatus {
     if (promotion.cancelledAt) return 'cancelled'
@@ -122,11 +131,15 @@ export class PromotionManager {
     return `2e à -${formatNumber(promotion.value)} %`
   }
 
+  getChannelLabel(channel: PromotionChannel) {
+    return channel === 'flyer' ? 'Prospectus' : channel === 'coupon' ? 'Coupon' : channel === 'endcap' ? 'Tête de gondole' : 'Étiquette rayon'
+  }
+
   exportState(): PromotionState { return { nextPromotion: this.nextPromotion, promotions: this.getPromotions() } }
 
   importState(state?: PromotionState) {
     this.nextPromotion = Math.max(1, state?.nextPromotion ?? 1)
-    this.promotions = (state?.promotions ?? []).map(item => ({ ...item }))
+    this.promotions = (state?.promotions ?? []).map(item => ({ ...item, channel: item.channel ?? 'shelf', campaignCost: item.campaignCost ?? 0 }))
   }
 }
 
@@ -152,6 +165,11 @@ function normalizeMechanics(input: ProductPromotionInput) {
   const payQuantity = Math.max(1, Math.floor(input.payQuantity ?? buyQuantity - 1))
   if (payQuantity >= buyQuantity) return null
   return { buyQuantity, payQuantity }
+}
+
+function defaultChannelCost(channel: PromotionChannel, duration: number) {
+  const base = channel === 'flyer' ? 35 : channel === 'coupon' ? 18 : channel === 'endcap' ? 24 : 4
+  return base + Math.max(0, duration - 1) * Math.max(1, Math.round(base * .2))
 }
 
 function normalizeValue(type: PromotionType, value: number) {
