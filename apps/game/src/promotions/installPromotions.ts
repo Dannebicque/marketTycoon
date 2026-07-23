@@ -11,6 +11,7 @@ export const PROMOTION_ANALYTICS_STORAGE_KEY = 'market-tycoon.promotion-analytic
 
 let installed = false
 let analyticsPersistTimer: number | undefined
+let activeSimulation: StoreSimulation | undefined
 const simulationDays = new WeakMap<StoreSimulation, number>()
 const promotionLabels = new WeakMap<StoreScene, Phaser.GameObjects.Text[]>()
 
@@ -22,6 +23,7 @@ export function installPromotions() {
 
   const originalSetCurrentDay = StoreSimulation.prototype.setCurrentDay
   StoreSimulation.prototype.setCurrentDay = function setCurrentDayWithPromotions(day: number) {
+    activeSimulation = this
     simulationDays.set(this, Math.max(1, Math.floor(day)))
     return originalSetCurrentDay.call(this, day)
   }
@@ -42,9 +44,7 @@ export function installPromotions() {
     product.salePrice = quotedPrice.effectivePrice
     try {
       const line = originalTakeItems.call(this, shelfId, compartmentId, promotedRequestedQuantity, context)
-      const actualPrice = line
-        ? promotionManager.getPrice({ ...product, salePrice: regularPrice }, day, line.quantity)
-        : quotedPrice
+      const actualPrice = line ? promotionManager.getPrice({ ...product, salePrice: regularPrice }, day, line.quantity) : quotedPrice
       window.dispatchEvent(new CustomEvent('market-tycoon:promotion-reaction', {
         detail: {
           customerId: context.customerId ?? 'Client',
@@ -70,8 +70,9 @@ export function installPromotions() {
 
   const originalDrawBuildings = StoreScene.prototype.drawBuildings
   StoreScene.prototype.drawBuildings = function drawBuildingsWithPromotions() {
-    originalDrawBuildings.call(this)
     promotionLabels.get(this)?.forEach(label => label.destroy())
+    promotionLabels.set(this, [])
+    originalDrawBuildings.call(this)
     const labels: Phaser.GameObjects.Text[] = []
     const day = this.day
     for (const shelf of this.grid.getBuildings('shelf')) {
@@ -91,14 +92,6 @@ export function installPromotions() {
       }).setOrigin(.5).setDepth(90))
     }
     promotionLabels.set(this, labels)
-  }
-
-  const originalStartNextDay = StoreScene.prototype.startNextDay
-  StoreScene.prototype.startNextDay = function startNextDayWithPromotionRefresh() {
-    const previousDay = this.day
-    const result = originalStartNextDay.call(this)
-    if (this.day !== previousDay) this.drawBuildings()
-    return result
   }
 
   gameEvents.on('product:purchase-decision', event => {
@@ -128,6 +121,29 @@ export function installPromotions() {
 
   window.addEventListener('beforeunload', persistPromotions)
   window.addEventListener('beforeunload', persistPromotionAnalytics)
+}
+
+/**
+ * Débite immédiatement le coût d'une campagne sur la trésorerie et l'impute
+ * aux charges d'exploitation de la journée courante.
+ */
+export function chargePromotionCampaign(cost: number) {
+  const simulation = activeSimulation
+  const amount = roundMoney(cost)
+  if (!simulation || amount < 0 || simulation.metrics.cash < amount) return false
+  simulation.metrics.cash = roundMoney(simulation.metrics.cash - amount)
+  simulation.metrics.operatingExpenses = roundMoney(simulation.metrics.operatingExpenses + amount)
+  simulation.metrics.profit = roundMoney(
+    simulation.metrics.revenue
+      - simulation.metrics.constructionExpenses
+      - simulation.metrics.merchandiseExpenses
+      - simulation.metrics.operatingExpenses,
+  )
+  return true
+}
+
+export function getPromotionBudget() {
+  return activeSimulation?.metrics.cash ?? 0
 }
 
 export function persistPromotions() {
@@ -181,4 +197,8 @@ function positiveReaction(label?: string) {
 function hesitantReaction(label?: string) {
   const choices = [`Même avec ${label ?? 'la promo'}, je réfléchis…`, 'Pas aujourd’hui.', 'Le prix reste trop élevé pour moi.']
   return choices[Math.floor(Math.random() * choices.length)]
+}
+
+function roundMoney(value: number) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
