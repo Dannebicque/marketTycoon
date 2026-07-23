@@ -52,6 +52,7 @@ export interface CustomerBasketLine {
   compartmentId: string
   product: ProductDefinition
   quantity: number
+  unitCost?: number
   requestedQuantity?: number
   satisfactionDelta?: number
 }
