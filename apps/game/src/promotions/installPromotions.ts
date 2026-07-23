@@ -1,6 +1,6 @@
 import { promotionAnalytics, type PromotionAnalyticsState } from '@market-tycoon/analytics'
 import { getProductDefinition, isShelfDefinition } from '@market-tycoon/catalog'
-import { promotionManager, type PromotionState } from '@market-tycoon/economy'
+import { promotionManager, type ProductPromotion, type PromotionState } from '@market-tycoon/economy'
 import { gameEvents } from '@market-tycoon/events'
 import { StoreSimulation } from '@market-tycoon/simulation-engine'
 import type Phaser from 'phaser'
@@ -33,29 +33,33 @@ export function installPromotions() {
     if (!product) return originalTakeItems.call(this, shelfId, compartmentId, requestedQuantity, context)
 
     const day = context.day ?? simulationDays.get(this) ?? 1
-    const price = promotionManager.getPrice(product, day, requestedQuantity)
-    if (!price.promotion) return originalTakeItems.call(this, shelfId, compartmentId, requestedQuantity, context)
+    const activePromotion = promotionManager.getActivePromotion(product.key, day)
+    if (!activePromotion) return originalTakeItems.call(this, shelfId, compartmentId, requestedQuantity, context)
 
+    const promotedRequestedQuantity = applyVisibilityBoost(activePromotion, requestedQuantity)
+    const quotedPrice = promotionManager.getPrice(product, day, promotedRequestedQuantity)
     const regularPrice = product.salePrice
-    product.salePrice = price.effectivePrice
+    product.salePrice = quotedPrice.effectivePrice
     try {
-      const line = originalTakeItems.call(this, shelfId, compartmentId, requestedQuantity, context)
+      const line = originalTakeItems.call(this, shelfId, compartmentId, promotedRequestedQuantity, context)
+      const actualPrice = line ? promotionManager.getPrice(product, day, line.quantity) : quotedPrice
       window.dispatchEvent(new CustomEvent('market-tycoon:promotion-reaction', {
         detail: {
           customerId: context.customerId ?? 'Client',
           productName: product.name,
-          promotionLabel: price.label,
+          promotionLabel: `${actualPrice.label} · ${promotionManager.getChannelLabel(activePromotion.channel)}`,
           accepted: Boolean(line),
-          message: line ? positiveReaction(price.label) : hesitantReaction(price.label),
+          message: line ? positiveReaction(actualPrice.label) : hesitantReaction(actualPrice.label),
         },
       }))
       if (!line) return null
       return {
         ...line,
-        product: { ...line.product, salePrice: price.effectivePrice },
-        promotionId: price.promotion.id,
-        regularUnitPrice: price.regularPrice,
-        promotionLabel: price.label,
+        product: { ...line.product, salePrice: actualPrice.effectivePrice },
+        promotionId: activePromotion.id,
+        regularUnitPrice: actualPrice.regularPrice,
+        promotionLabel: actualPrice.label,
+        promotionChannel: activePromotion.channel,
       }
     } finally {
       product.salePrice = regularPrice
@@ -71,15 +75,15 @@ export function installPromotions() {
     for (const shelf of this.grid.getBuildings('shelf')) {
       if (!isShelfDefinition(shelf.definition)) continue
       const inventory = this.simulation.getEquipmentInventory(shelf.id)
-      const active = [...new Set((inventory?.compartments ?? [])
+      const active = uniquePromotions((inventory?.compartments ?? [])
         .map(slot => slot.productKey ? promotionManager.getActivePromotion(slot.productKey, day) : undefined)
-        .filter(Boolean)
-        .map(promotion => promotion!.id))]
-        .map(id => promotionManager.getPromotions().find(item => item.id === id))
-        .filter(Boolean)
+        .filter((promotion): promotion is ProductPromotion => Boolean(promotion)))
       if (!active.length) continue
       const point = this.grid.gridToScreen(shelf.gridX, shelf.gridY)
-      const text = active.slice(0, 2).map(promotion => promotionManager.getLabel(promotion!)).join(' · ')
+      const text = active.slice(0, 2).map(promotion => {
+        const prefix = promotion.channel === 'endcap' ? '⭐' : promotion.channel === 'flyer' ? '📰' : promotion.channel === 'coupon' ? '🎟' : '🏷'
+        return `${prefix} ${promotionManager.getLabel(promotion)}`
+      }).join(' · ')
       labels.push(this.add.text(point.x, point.y - 72, `PROMO ${text}`, {
         fontSize: '10px', fontStyle: 'bold', color: '#fff7ed', backgroundColor: '#dc2626ee', padding: { x: 5, y: 3 },
       }).setOrigin(.5).setDepth(90))
@@ -145,6 +149,18 @@ export function restorePromotionAnalytics() {
 function scheduleAnalyticsPersistence() {
   if (analyticsPersistTimer) window.clearTimeout(analyticsPersistTimer)
   analyticsPersistTimer = window.setTimeout(persistPromotionAnalytics, 150)
+}
+
+function applyVisibilityBoost(promotion: ProductPromotion, requestedQuantity: number) {
+  const quantity = Math.max(1, Math.floor(requestedQuantity))
+  if (promotion.channel === 'endcap') return quantity + 1
+  if (promotion.channel === 'flyer' && Math.random() < .35) return quantity + 1
+  if (promotion.channel === 'coupon' && Math.random() < .18) return quantity + 1
+  return quantity
+}
+
+function uniquePromotions(promotions: ProductPromotion[]) {
+  return promotions.filter((promotion, index, items) => items.findIndex(item => item.id === promotion.id) === index)
 }
 
 function positiveReaction(label?: string) {
