@@ -27,3 +27,11 @@ export type {
   StorePerformanceRecord,
   StorePerformanceSummary,
 } from './StorePerformanceAnalyticsManager'
+export { PromotionAnalyticsManager, promotionAnalytics } from './PromotionAnalyticsManager'
+export type {
+  PromotionAnalyticsState,
+  PromotionCampaignReport,
+  PromotionDecisionObservation,
+  PromotionPeriodMetrics,
+  PromotionSaleObservation,
+} from './PromotionAnalyticsManager'
