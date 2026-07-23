@@ -13,6 +13,7 @@ export { PromotionManager, promotionManager } from './promotionManagerInstance'
 export type {
   ProductPromotion,
   ProductPromotionInput,
+  PromotionChannel,
   PromotionPriceSummary,
   PromotionState,
   PromotionStatus,
