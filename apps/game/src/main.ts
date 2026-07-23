@@ -10,6 +10,7 @@ import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
+import { installPersistentAnalytics } from './analytics/installPersistentAnalytics'
 import './style.css'
 import './progression.css'
 import './store-identity.css'
@@ -21,6 +22,7 @@ const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
+  installPersistentAnalytics()
   installViewDisplay()
   installStoreZones()
   installStoreNeeds()
