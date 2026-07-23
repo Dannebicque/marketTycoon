@@ -42,7 +42,9 @@ export function installPromotions() {
     product.salePrice = quotedPrice.effectivePrice
     try {
       const line = originalTakeItems.call(this, shelfId, compartmentId, promotedRequestedQuantity, context)
-      const actualPrice = line ? promotionManager.getPrice(product, day, line.quantity) : quotedPrice
+      const actualPrice = line
+        ? promotionManager.getPrice({ ...product, salePrice: regularPrice }, day, line.quantity)
+        : quotedPrice
       window.dispatchEvent(new CustomEvent('market-tycoon:promotion-reaction', {
         detail: {
           customerId: context.customerId ?? 'Client',
@@ -89,6 +91,14 @@ export function installPromotions() {
       }).setOrigin(.5).setDepth(90))
     }
     promotionLabels.set(this, labels)
+  }
+
+  const originalStartNextDay = StoreScene.prototype.startNextDay
+  StoreScene.prototype.startNextDay = function startNextDayWithPromotionRefresh() {
+    const previousDay = this.day
+    const result = originalStartNextDay.call(this)
+    if (this.day !== previousDay) this.drawBuildings()
+    return result
   }
 
   gameEvents.on('product:purchase-decision', event => {
