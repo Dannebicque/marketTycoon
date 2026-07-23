@@ -10,6 +10,7 @@
         <p v-if="saveMessage" class="form-success">{{ saveMessage }}</p>
         <h2>Alertes</h2><div v-if="!alerts.length" class="success-state">Aucune alerte logistique.</div><div v-for="alert in alerts" :key="alert" class="alert-card">{{ alert }}</div>
         <h2>Commandes en cours</h2><div v-if="!pendingOrders.length" class="empty-state">Aucune livraison en attente.</div><article v-for="order in pendingOrders" :key="order.id" class="order-card"><div><strong>{{ order.id }}</strong><span>Jour {{ order.expectedDay }}</span></div><small>{{ supplierName(order.supplierKey) }} · {{ money(order.orderedTotal) }}</small></article>
+        <PerformanceHistoryPanel />
       </div>
 
       <div v-else-if="tab === 'finances'" class="management-content">
@@ -41,6 +42,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
+import PerformanceHistoryPanel from './PerformanceHistoryPanel.vue'
 import PricingPanel from './PricingPanel.vue'
 import PurchaseOrdersPanel from './PurchaseOrdersPanel.vue'
 import SettingsPanel from './SettingsPanel.vue'
