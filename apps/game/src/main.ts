@@ -6,6 +6,7 @@ import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
+import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
@@ -27,6 +28,7 @@ async function bootstrap() {
   installStoreZones()
   installStoreNeeds()
   installPromotions()
+  installBusinessFinance()
   const progression = await createProgressionManager()
 
   createApp(App)
@@ -69,6 +71,8 @@ function migrateDevelopmentScenario() {
   localStorage.removeItem('market-tycoon.analytics.v1')
   localStorage.removeItem(PROMOTIONS_STORAGE_KEY)
   localStorage.removeItem(PROMOTION_ANALYTICS_STORAGE_KEY)
+  localStorage.removeItem(ADVERTISING_STORAGE_KEY)
+  localStorage.removeItem(LOANS_STORAGE_KEY)
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
 
