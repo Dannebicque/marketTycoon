@@ -93,6 +93,8 @@ export class StorePerformanceAnalyticsManager {
   clear() { this.records = [] }
 }
 
+export const storePerformanceAnalytics = new StorePerformanceAnalyticsManager()
+
 function sum<T>(items: T[], selector: (item: T) => number) {
   return items.reduce((total, item) => total + selector(item), 0)
 }
