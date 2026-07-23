@@ -23,6 +23,8 @@ export type {
   CustomerJourneyState,
   CustomerProfile,
   CustomerSatisfactionBreakdown,
+  CustomerSatisfactionDriver,
   CustomerSatisfactionFactor,
+  CustomerSatisfactionReport,
   CustomerSnapshot,
 } from './contracts'
