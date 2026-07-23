@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
+import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
@@ -12,6 +13,7 @@ import './style.css'
 import './progression.css'
 import './store-identity.css'
 import './zones.css'
+import './help.css'
 
 const DEV_SCENARIO_VERSION = '4'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
@@ -41,6 +43,11 @@ async function bootstrap() {
   progressionRoot.id = 'progression-ui'
   document.body.appendChild(progressionRoot)
   createApp(ProgressionWidget, { progression }).mount(progressionRoot)
+
+  const helpRoot = document.createElement('div')
+  helpRoot.id = 'help-ui'
+  document.body.appendChild(helpRoot)
+  createApp(HelpWidget).mount(helpRoot)
 }
 
 function migrateDevelopmentScenario() {
