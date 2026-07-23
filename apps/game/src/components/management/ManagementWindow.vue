@@ -19,6 +19,7 @@
       <CustomerAnalyticsPanel v-else-if="tab === 'customers'" v-bind="customerAnalytics" />
       <PricingPanel v-else-if="tab === 'pricing'" :lines="pricingLines" @update-price="(productKey, salePrice) => $emit('update-price', productKey, salePrice)" @apply-markup="$emit('apply-markup', $event)" />
       <MarketingPanel v-else-if="tab === 'marketing'" :day="ui.day" />
+      <BusinessFinancePanel v-else-if="tab === 'business-finance'" />
       <EmployeesPanel v-else-if="tab === 'employees'" :employees="employees" :candidates="candidates" :roles="employeeRoles" :checkouts="checkouts" :buildings="buildings" :payroll="payroll" :tasks="employeeTasks" :selected-employee-id="selectedEmployeeId" @hire="$emit('hire', $event)" @dismiss="$emit('dismiss', $event)" @assign="(employeeId, buildingId) => $emit('assign', employeeId, buildingId)" @refresh-candidates="$emit('refresh-candidates')" @select-employee="$emit('select-employee', $event)" />
       <PurchaseOrdersPanel v-else-if="tab === 'orders'" :suppliers="suppliers" :products="products" :storage-capacities="storageCapacities" :cash="ui.cash" :orders="orders" :message="orderMessage" :message-type="orderMessageType" @submit="(supplierKey, lines) => $emit('submit-order', supplierKey, lines)" />
       <SettingsPanel v-else-if="tab === 'settings'" />
@@ -26,13 +27,14 @@
   </div>
 </template>
 
-<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'needs' | 'reserve' | 'customers' | 'pricing' | 'marketing' | 'employees' | 'orders' | 'settings'</script>
+<script lang="ts">export type ManagementTab = 'dashboard' | 'finances' | 'needs' | 'reserve' | 'customers' | 'pricing' | 'marketing' | 'business-finance' | 'employees' | 'orders' | 'settings'</script>
 <script setup lang="ts">
 import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
 import type { EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import type { EmployeeState, EmployeeWorkTask } from '@market-tycoon/employees'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BusinessFinancePanel from './BusinessFinancePanel.vue'
 import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
 import MarketingPanel from './MarketingPanel.vue'
@@ -46,7 +48,7 @@ const props = defineProps<{ tab:ManagementTab; ui:any; alerts:string[]; pendingO
 defineEmits<{ close:[]; 'update:tab':[tab:ManagementTab]; 'submit-order':[supplierKey:string,lines:Array<{productKey:string;quantity:number}>]; 'update-price':[productKey:string,salePrice:number]; 'apply-markup':[markupRate:number]; hire:[candidateId:string]; dismiss:[employeeId:string]; assign:[employeeId:string,buildingId?:string]; 'select-employee':[employeeId?:string]; 'refresh-candidates':[]; 'save-game':[]; 'load-game':[]; 'delete-save':[] }>()
 const { t, locale } = useI18n({ useScope:'global' })
 const tabs = computed<Array<{key:ManagementTab;label:string}>>(() => { void locale.value; return [
-  {key:'dashboard',label:t('management.tabs.dashboard')},{key:'finances',label:t('management.tabs.finances')},{key:'needs',label:'Besoins'},{key:'reserve',label:t('management.tabs.reserve')},{key:'customers',label:t('management.tabs.customers')},{key:'pricing',label:t('management.tabs.pricing')},{key:'marketing',label:'Marketing'},{key:'employees',label:t('management.tabs.employees')},{key:'orders',label:t('management.tabs.orders')},{key:'settings',label:t('management.tabs.settings')},
+  {key:'dashboard',label:t('management.tabs.dashboard')},{key:'finances',label:t('management.tabs.finances')},{key:'business-finance',label:'Publicité & emprunts'},{key:'needs',label:'Besoins'},{key:'reserve',label:t('management.tabs.reserve')},{key:'customers',label:t('management.tabs.customers')},{key:'pricing',label:t('management.tabs.pricing')},{key:'marketing',label:'Promotions'},{key:'employees',label:t('management.tabs.employees')},{key:'orders',label:t('management.tabs.orders')},{key:'settings',label:t('management.tabs.settings')},
 ] })
 function supplierName(key:string){return props.suppliers.find(item=>item.key===key)?.name??key}
 function storageLabel(type:StorageType){return type==='ambient'?'Ambiante':type==='cold'?'Froide':'Surgelée'}
