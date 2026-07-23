@@ -51,7 +51,7 @@ import { promotionAnalytics } from '@market-tycoon/analytics'
 import { PRODUCTS, type ProductDefinition } from '@market-tycoon/catalog'
 import { promotionManager, type ProductPromotion, type PromotionChannel, type PromotionType } from '@market-tycoon/economy'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { chargePromotionCampaign, getPromotionBudget, persistPromotions } from '../../promotions/installPromotions'
+import { chargePromotionCampaign, getPromotionBudget, persistPromotions, refundPromotionCampaign } from '../../promotions/installPromotions'
 
 const props = defineProps<{ day: number }>()
 const products = PRODUCTS
@@ -89,7 +89,8 @@ const activeCount = computed(() => promotions.value.filter(item => status(item) 
 function schedule() {
   feedback.value = ''
   if (!canSubmit.value || !preview.value) return
-  if (!chargePromotionCampaign(preview.value.campaignCost)) {
+  const campaignCost = preview.value.campaignCost
+  if (!chargePromotionCampaign(campaignCost)) {
     feedbackType.value = 'error'
     feedback.value = 'La campagne n’a pas été créée : trésorerie insuffisante.'
     version.value += 1
@@ -97,8 +98,9 @@ function schedule() {
   }
   const promotion = promotionManager.schedule({ ...form })
   if (!promotion) {
+    refundPromotionCampaign(campaignCost)
     feedbackType.value = 'error'
-    feedback.value = 'Le paiement a été accepté, mais la campagne n’a pas pu être créée. Vérifiez les paramètres.'
+    feedback.value = 'La campagne n’a pas pu être créée. Le débit marketing a été automatiquement annulé.'
     version.value += 1
     return
   }
