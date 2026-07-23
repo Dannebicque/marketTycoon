@@ -8,9 +8,9 @@ import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
+import { installPromotions, PROMOTIONS_STORAGE_KEY } from './promotions/installPromotions'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
-import { ANALYTICS_STORAGE_KEY, installPersistentAnalytics } from './analytics/installPersistentAnalytics'
 import './style.css'
 import './progression.css'
 import './store-identity.css'
@@ -22,10 +22,10 @@ const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
-  installPersistentAnalytics()
   installViewDisplay()
   installStoreZones()
   installStoreNeeds()
+  installPromotions()
   const progression = await createProgressionManager()
 
   createApp(App)
@@ -58,11 +58,10 @@ function migrateDevelopmentScenario() {
   if (!import.meta.env.DEV) return
   if (localStorage.getItem(DEV_SCENARIO_VERSION_KEY) === DEV_SCENARIO_VERSION) return
 
-  // Le scénario de démonstration a changé de géométrie. Une ancienne sauvegarde
-  // empêcherait son initialisation et conserverait des zones devenues incohérentes.
   localStorage.removeItem(SAVE_GAME_STORAGE_KEY)
-  localStorage.removeItem(ANALYTICS_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.zones.v1')
+  localStorage.removeItem('market-tycoon.analytics.v1')
+  localStorage.removeItem(PROMOTIONS_STORAGE_KEY)
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
 
