@@ -79,6 +79,7 @@ export function getBusinessFinanceSnapshot() {
   return {
     cash: activeSimulation?.metrics.cash ?? 0,
     currentDay,
+    trafficMultiplier: advertisingManager.getTrafficMultiplier(currentDay),
     campaigns: advertisingManager.getCampaigns(),
     loans: loanManager.getLoans(),
     outstandingBalance: loanManager.getOutstandingBalance(),
@@ -106,7 +107,7 @@ function processLoanInstallments(simulation: StoreSimulation, day: number) {
   const result = loanManager.processDay(day, simulation.metrics.cash)
   if (!result.paid && !result.missed) return
   simulation.metrics.cash -= result.paid
-  simulation.metrics.operatingExpenses += result.paid
+  simulation.metrics.operatingExpenses += result.interestPaid
   persistBusinessFinance()
   window.dispatchEvent(new CustomEvent('market-tycoon:loan-payment', { detail: result }))
 }
