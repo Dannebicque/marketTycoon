@@ -17,6 +17,7 @@ export interface LoanPayment {
   principal: number
   interest: number
   paid: number
+  paidInterest: number
   missed: number
 }
 
@@ -37,7 +38,7 @@ export interface LoanContract {
   createdAt: number
 }
 
-export interface LoanState { nextLoan?: number; loans?: LoanContract[] }
+export interface LoanState { nextLoan?: number; loans?: LoanContract[]; processedDays?: number[] }
 
 export const LOAN_OFFERS: LoanOffer[] = [
   { key: 'micro', name: 'Microcrédit commercial', minAmount: 250, maxAmount: 1_500, interestRate: .08, durationDays: 10, setupFeeRate: .01, description: 'Financement court et accessible, mais taux élevé.' },
@@ -52,7 +53,7 @@ export class LoanManager {
 
   quote(offerKey: string, amount: number, startDay: number) {
     const offer = LOAN_OFFERS.find(item => item.key === offerKey)
-    const principal = Math.round(Number(amount) * 100) / 100
+    const principal = round(Number(amount))
     if (!offer || principal < offer.minAmount || principal > offer.maxAmount) return null
     const setupFee = round(principal * offer.setupFeeRate)
     const interest = round(principal * offer.interestRate)
@@ -65,20 +66,12 @@ export class LoanManager {
     const quote = this.quote(offerKey, amount, startDay)
     if (!quote) return null
     const loan: LoanContract = {
-      id: `LOAN-${this.nextLoan++}`,
-      offerKey,
-      principal: quote.principal,
-      interestRate: quote.offer.interestRate,
-      durationDays: quote.offer.durationDays,
-      setupFee: quote.setupFee,
-      totalRepayable: quote.totalRepayable,
-      installment: quote.installment,
-      startDay: quote.startDay,
-      nextPaymentDay: quote.startDay + 1,
-      remainingBalance: quote.totalRepayable,
-      payments: [],
-      status: 'active',
-      createdAt: Date.now(),
+      id: `LOAN-${this.nextLoan++}`, offerKey, principal: quote.principal,
+      interestRate: quote.offer.interestRate, durationDays: quote.offer.durationDays,
+      setupFee: quote.setupFee, totalRepayable: quote.totalRepayable,
+      installment: quote.installment, startDay: quote.startDay,
+      nextPaymentDay: quote.startDay + 1, remainingBalance: quote.totalRepayable,
+      payments: [], status: 'active', createdAt: Date.now(),
     }
     this.loans.push(loan)
     return { loan: cloneLoan(loan), netCash: quote.netCash }
@@ -86,10 +79,11 @@ export class LoanManager {
 
   processDay(day: number, availableCash: number) {
     const normalizedDay = Math.max(1, Math.floor(day))
-    if (this.processedDays.has(normalizedDay)) return { paid: 0, missed: 0, details: [] as LoanPayment[] }
+    if (this.processedDays.has(normalizedDay)) return { paid: 0, interestPaid: 0, missed: 0, details: [] as LoanPayment[] }
     this.processedDays.add(normalizedDay)
     let cash = Math.max(0, availableCash)
     let paidTotal = 0
+    let interestPaidTotal = 0
     let missedTotal = 0
     const details: LoanPayment[] = []
     for (const loan of this.loans.filter(item => item.status === 'active' && item.nextPaymentDay <= normalizedDay)) {
@@ -97,12 +91,14 @@ export class LoanManager {
       const paid = round(Math.min(cash, due))
       const missed = round(due - paid)
       const interestShare = round(due * (loan.totalRepayable - loan.principal) / loan.totalRepayable)
-      const payment: LoanPayment = { day: normalizedDay, amount: due, principal: round(due - interestShare), interest: interestShare, paid, missed }
+      const paidInterest = due > 0 ? round(interestShare * paid / due) : 0
+      const payment: LoanPayment = { day: normalizedDay, amount: due, principal: round(due - interestShare), interest: interestShare, paid, paidInterest, missed }
       loan.payments.push(payment)
       loan.remainingBalance = round(loan.remainingBalance - paid)
       loan.nextPaymentDay = normalizedDay + 1
       cash = round(cash - paid)
       paidTotal = round(paidTotal + paid)
+      interestPaidTotal = round(interestPaidTotal + paidInterest)
       missedTotal = round(missedTotal + missed)
       if (missed > 0) {
         loan.remainingBalance = round(loan.remainingBalance + missed * .05)
@@ -111,7 +107,7 @@ export class LoanManager {
       if (loan.remainingBalance <= .01) { loan.remainingBalance = 0; loan.status = 'paid' }
       details.push({ ...payment })
     }
-    return { paid: paidTotal, missed: missedTotal, details }
+    return { paid: paidTotal, interestPaid: interestPaidTotal, missed: missedTotal, details }
   }
 
   repayEarly(id: string, availableCash: number) {
@@ -120,7 +116,7 @@ export class LoanManager {
     const amount = loan.remainingBalance
     loan.remainingBalance = 0
     loan.status = 'paid'
-    loan.payments.push({ day: loan.nextPaymentDay, amount, principal: amount, interest: 0, paid: amount, missed: 0 })
+    loan.payments.push({ day: loan.nextPaymentDay, amount, principal: amount, interest: 0, paid: amount, paidInterest: 0, missed: 0 })
     return amount
   }
 
@@ -128,8 +124,12 @@ export class LoanManager {
   getOffers() { return LOAN_OFFERS.map(item => ({ ...item })) }
   getOutstandingBalance() { return round(this.loans.filter(item => item.status === 'active' || item.status === 'defaulted').reduce((sum, item) => sum + item.remainingBalance, 0)) }
   getNextInstallments() { return round(this.loans.filter(item => item.status === 'active').reduce((sum, item) => sum + Math.min(item.installment, item.remainingBalance), 0)) }
-  exportState(): LoanState { return { nextLoan: this.nextLoan, loans: this.getLoans() } }
-  importState(state?: LoanState) { this.nextLoan = Math.max(1, state?.nextLoan ?? 1); this.loans = (state?.loans ?? []).map(cloneLoan); this.processedDays.clear() }
+  exportState(): LoanState { return { nextLoan: this.nextLoan, loans: this.getLoans(), processedDays: [...this.processedDays] } }
+  importState(state?: LoanState) {
+    this.nextLoan = Math.max(1, state?.nextLoan ?? 1)
+    this.loans = (state?.loans ?? []).map(loan => ({ ...cloneLoan(loan), payments: loan.payments.map(payment => ({ ...payment, paidInterest: payment.paidInterest ?? 0 })) }))
+    this.processedDays = new Set(state?.processedDays ?? [])
+  }
 }
 
 export const loanManager = new LoanManager()
