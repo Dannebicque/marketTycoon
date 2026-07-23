@@ -21,3 +21,9 @@ export type {
   CustomerVisitStarted,
   CustomerVisitSummary,
 } from './CustomerVisitAnalyticsManager'
+export { StorePerformanceAnalyticsManager } from './StorePerformanceAnalyticsManager'
+export type {
+  StorePerformanceAnalyticsState,
+  StorePerformanceRecord,
+  StorePerformanceSummary,
+} from './StorePerformanceAnalyticsManager'
