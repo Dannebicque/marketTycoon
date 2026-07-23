@@ -1,19 +1,13 @@
 import { isCheckoutDefinition, isShelfDefinition } from '@market-tycoon/catalog'
 import { NavigationGrid, type GridCell, type PlacedBuilding } from '@market-tycoon/simulation-engine'
 import type { StoreScene } from '../StoreScene'
-import type { EmployeeManager } from '@market-tycoon/employees'
+import type { EmployeeManager, EmployeeState, EmployeeWorkTask } from '@market-tycoon/employees'
 import { EmployeeAgent } from './EmployeeAgent'
-import type { EmployeeState } from '@market-tycoon/employees'
-
-interface RepairRequest {
-  checkoutId: string
-  resolve: () => void
-}
 
 export class EmployeeRuntime {
   private readonly agents = new Map<string, EmployeeAgent>()
   private readonly loops = new Set<string>()
-  private readonly repairs: RepairRequest[] = []
+  private readonly repairResolvers = new Map<string, () => void>()
   private readonly navigation: NavigationGrid
   private active = true
 
@@ -57,7 +51,8 @@ export class EmployeeRuntime {
     this.agents.forEach(agent => agent.destroy())
     this.agents.clear()
     this.loops.clear()
-    while (this.repairs.length) this.repairs.shift()?.resolve()
+    for (const resolve of this.repairResolvers.values()) resolve()
+    this.repairResolvers.clear()
   }
 
   isCheckoutStaffed(checkout: PlacedBuilding) {
@@ -72,8 +67,20 @@ export class EmployeeRuntime {
         this.scene.time.delayedCall(4_000, resolve)
         return
       }
-      this.repairs.push({ checkoutId: checkout.id, resolve })
+      const task = this.manager.enqueueTask({
+        type: 'repairing',
+        label: `Réparation ${checkout.definition.name}`,
+        priority: 100,
+        requiredRoleKey: 'technician',
+        targetBuildingId: checkout.id,
+        dedupeKey: `repair:${checkout.id}`,
+      })
+      this.repairResolvers.set(task.id, resolve)
     })
+  }
+
+  getTasks() {
+    return this.manager.tasks.getTasks()
   }
 
   private async runEmployee(employeeId: string) {
@@ -83,11 +90,14 @@ export class EmployeeRuntime {
       if (!employee || !agent) break
       try {
         if (employee.roleKey === 'cashier') await this.runCashier(employee, agent)
-        else if (employee.roleKey === 'stocker') await this.runStocker(employee, agent)
-        else if (employee.roleKey === 'technician') await this.runTechnician(employee, agent)
-        else await this.idle(employee, agent)
+        else {
+          if (employee.roleKey === 'stocker') this.enqueueRestockTasks()
+          const task = this.manager.claimNextTask(employee.id)
+          if (task) await this.executeTask(employee, agent, task)
+          else await this.idle(employee, agent, employee.roleKey === 'technician' ? 'Maintenance préventive' : 'Surveillance des rayons')
+        }
       } catch {
-        this.manager.setTask(employee.id, 'idle', 'Disponible')
+        this.manager.releaseTask(employee.id)
         agent.setTask('Disponible')
         await this.wait(500)
       }
@@ -107,52 +117,85 @@ export class EmployeeRuntime {
     await this.wait(800)
   }
 
-  private async runStocker(employee: EmployeeState, agent: EmployeeAgent) {
-    const target = this.findRestockTarget()
-    if (!target) return this.idle(employee, agent, 'Surveillance des rayons')
-
-    this.manager.setTask(employee.id, 'restocking', `Réassort ${target.shelf.definition.name}`, target.shelf.id)
-    agent.setTask('Réassort')
-    await this.moveAdjacent(agent, target.shelf, employee.quality)
-    await this.wait(this.workDuration(employee.quality, 2_200))
-    this.scene.simulation.restockCompartment(target.shelf.id, target.compartmentId)
-    this.scene.drawBuildings()
-    this.manager.completeTask(employee.id)
-    await this.wait(300)
+  private async executeTask(employee: EmployeeState, agent: EmployeeAgent, task: EmployeeWorkTask) {
+    if (task.type === 'restocking') await this.executeRestock(employee, agent, task)
+    else if (task.type === 'repairing') await this.executeRepair(employee, agent, task)
+    else {
+      this.manager.completeTask(employee.id)
+      await this.wait(200)
+    }
   }
 
-  private async runTechnician(employee: EmployeeState, agent: EmployeeAgent) {
-    const request = this.repairs.shift()
-    if (!request) return this.idle(employee, agent, 'Maintenance préventive')
-    const checkout = this.scene.grid.getBuildings('checkout').find(item => item.id === request.checkoutId)
-    if (!checkout) {
-      request.resolve()
+  private async executeRestock(employee: EmployeeState, agent: EmployeeAgent, task: EmployeeWorkTask) {
+    const shelf = task.targetBuildingId
+      ? this.scene.grid.getBuildings('shelf').find(item => item.id === task.targetBuildingId)
+      : undefined
+    const compartment = shelf && task.targetCompartmentId
+      ? this.scene.simulation.getCompartment(shelf.id, task.targetCompartmentId)
+      : undefined
+    if (!shelf || !compartment?.productKey || compartment.quantity >= compartment.capacity || this.scene.simulation.getReserveQuantity(compartment.productKey) <= 0) {
+      this.manager.completeTask(employee.id)
       return
     }
 
-    this.manager.setTask(employee.id, 'repairing', `Réparation ${checkout.definition.name}`, checkout.id)
-    agent.setTask('Réparation')
-    await this.moveAdjacent(agent, checkout, employee.quality)
-    await this.wait(this.workDuration(employee.quality, 3_500))
-    request.resolve()
+    agent.setTask(`Réassort · priorité ${task.priority}`)
+    await this.moveAdjacent(agent, shelf, employee.quality)
+    await this.wait(this.workDuration(employee.quality, 2_200))
+    this.scene.simulation.restockCompartment(shelf.id, compartment.id)
+    this.scene.drawBuildings()
     this.manager.completeTask(employee.id)
     await this.wait(250)
+  }
+
+  private async executeRepair(employee: EmployeeState, agent: EmployeeAgent, task: EmployeeWorkTask) {
+    const building = task.targetBuildingId
+      ? this.scene.grid.getBuildings().find(item => item.id === task.targetBuildingId)
+      : undefined
+    if (!building) {
+      this.resolveRepair(task.id)
+      this.manager.completeTask(employee.id)
+      return
+    }
+
+    agent.setTask(`Réparation · priorité ${task.priority}`)
+    await this.moveAdjacent(agent, building, employee.quality)
+    await this.wait(this.workDuration(employee.quality, 3_500))
+    this.resolveRepair(task.id)
+    this.manager.completeTask(employee.id)
+    await this.wait(250)
+  }
+
+  private enqueueRestockTasks() {
+    for (const shelf of this.scene.grid.getBuildings('shelf')) {
+      if (!isShelfDefinition(shelf.definition)) continue
+      const inventory = this.scene.simulation.getEquipmentInventory(shelf.id)
+      for (const compartment of inventory?.compartments ?? []) {
+        if (!compartment.productKey || compartment.quantity >= compartment.capacity) continue
+        if (this.scene.simulation.getReserveQuantity(compartment.productKey) <= 0) continue
+        const fillRatio = compartment.capacity > 0 ? compartment.quantity / compartment.capacity : 1
+        this.manager.enqueueTask({
+          type: 'restocking',
+          label: `Réassort ${shelf.definition.name}`,
+          priority: Math.round(35 + (1 - fillRatio) * 55),
+          requiredRoleKey: 'stocker',
+          targetBuildingId: shelf.id,
+          targetCompartmentId: compartment.id,
+          dedupeKey: `restock:${shelf.id}:${compartment.id}`,
+        })
+      }
+    }
+  }
+
+  private resolveRepair(taskId: string) {
+    const resolve = this.repairResolvers.get(taskId)
+    if (resolve) resolve()
+    this.repairResolvers.delete(taskId)
   }
 
   private async idle(employee: EmployeeState, agent: EmployeeAgent, label = 'Disponible') {
     this.manager.setTask(employee.id, 'idle', label)
     agent.setTask(label)
     await this.wait(900)
-  }
-
-  private findRestockTarget() {
-    for (const shelf of this.scene.grid.getBuildings('shelf')) {
-      if (!isShelfDefinition(shelf.definition)) continue
-      const inventory = this.scene.simulation.getEquipmentInventory(shelf.id)
-      const compartment = inventory?.compartments.find(item => item.productKey && item.quantity < item.capacity && this.scene.simulation.getReserveQuantity(item.productKey) > 0)
-      if (compartment) return { shelf, compartmentId: compartment.id }
-    }
-    return undefined
   }
 
   private async moveAdjacent(agent: EmployeeAgent, building: PlacedBuilding, quality: number) {
