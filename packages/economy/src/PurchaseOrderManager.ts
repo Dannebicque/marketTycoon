@@ -34,6 +34,11 @@ export interface PurchaseOrderState {
   orders?: PurchaseOrder[]
 }
 
+interface DeliveryPlanLine extends PurchaseOrderLine {
+  deliveredQuantity: number
+  deliveredMerchandiseValue: number
+}
+
 export class PurchaseOrderManager {
   private orders: PurchaseOrder[] = []
   private nextOrder = 1
@@ -93,16 +98,38 @@ export class PurchaseOrderManager {
     for (const order of this.orders) {
       if (order.status !== 'ordered' || order.expectedDay > day) continue
 
-      order.deliveredTotal = order.deliveryFee
+      const plan: DeliveryPlanLine[] = order.lines.map(line => {
+        const deliveredQuantity = reserve.previewAccepted(line.productKey, line.quantity, buildings)
+        return {
+          ...line,
+          deliveredQuantity,
+          deliveredMerchandiseValue: deliveredQuantity * line.unitPrice,
+        }
+      })
+      const deliveredMerchandiseTotal = plan.reduce((total, line) => total + line.deliveredMerchandiseValue, 0)
+
+      order.deliveredTotal = deliveredMerchandiseTotal > 0 ? order.deliveryFee : 0
       order.rejectedLines = []
 
-      for (const line of order.lines) {
-        const delivered = reserve.add(line.productKey, line.quantity, buildings)
+      for (const line of plan) {
+        const feeShare = deliveredMerchandiseTotal > 0
+          ? order.deliveryFee * (line.deliveredMerchandiseValue / deliveredMerchandiseTotal)
+          : 0
+        const landedUnitCost = line.deliveredQuantity > 0
+          ? line.unitPrice + feeShare / line.deliveredQuantity
+          : line.unitPrice
+        const delivered = reserve.add(
+          line.productKey,
+          line.deliveredQuantity,
+          buildings,
+          landedUnitCost,
+        )
         order.deliveredTotal += delivered * line.unitPrice
         if (delivered < line.quantity) {
           order.rejectedLines.push({
-            ...line,
+            productKey: line.productKey,
             quantity: line.quantity - delivered,
+            unitPrice: line.unitPrice,
           })
         }
       }
