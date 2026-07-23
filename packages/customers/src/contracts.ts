@@ -19,6 +19,22 @@ export interface CustomerSatisfactionBreakdown {
   checkout: number
 }
 
+export interface CustomerSatisfactionDriver {
+  factor: CustomerSatisfactionFactor
+  score: number
+  impact: 'positive' | 'neutral' | 'negative'
+  deltaFromExpectation: number
+}
+
+export interface CustomerSatisfactionReport {
+  overall: number
+  expectedScore: number
+  breakdown: CustomerSatisfactionBreakdown
+  drivers: CustomerSatisfactionDriver[]
+  strongestPositive?: CustomerSatisfactionDriver
+  strongestNegative?: CustomerSatisfactionDriver
+}
+
 export interface CustomerProfile {
   id: string
   profileKey: CustomerProfileKey
@@ -53,5 +69,6 @@ export interface CustomerSnapshot {
   state: CustomerJourneyState
   satisfaction: number
   satisfactionBreakdown: CustomerSatisfactionBreakdown
+  satisfactionReport: CustomerSatisfactionReport
   basket: CustomerBasketSummary
 }
