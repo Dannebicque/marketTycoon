@@ -9,6 +9,16 @@ export type {
 } from './MarketDemandManager'
 export type { DemandProduct, PricingProduct } from './product'
 
+export { PromotionManager, promotionManager } from './promotionManagerInstance'
+export type {
+  ProductPromotion,
+  ProductPromotionInput,
+  PromotionPriceSummary,
+  PromotionState,
+  PromotionStatus,
+  PromotionType,
+} from './PromotionManager'
+
 export { ReserveManager, getProductStorageType } from './ReserveManager'
 export type {
   ReserveStockLine,
