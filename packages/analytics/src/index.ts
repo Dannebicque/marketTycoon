@@ -1,4 +1,4 @@
-export { CustomerAnalyticsManager } from './CustomerAnalyticsManager'
+export { CustomerAnalyticsManager, customerAnalytics } from './CustomerAnalyticsManager'
 export type {
   AnalyticsProduct,
   CustomerAnalyticsState,
@@ -21,7 +21,7 @@ export type {
   CustomerVisitStarted,
   CustomerVisitSummary,
 } from './CustomerVisitAnalyticsManager'
-export { StorePerformanceAnalyticsManager } from './StorePerformanceAnalyticsManager'
+export { StorePerformanceAnalyticsManager, storePerformanceAnalytics } from './StorePerformanceAnalyticsManager'
 export type {
   StorePerformanceAnalyticsState,
   StorePerformanceRecord,
