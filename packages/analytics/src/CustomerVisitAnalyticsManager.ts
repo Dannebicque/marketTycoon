@@ -1,9 +1,16 @@
 import type { PaymentMethod } from '@market-tycoon/catalog'
-import type { CustomerProfile, CustomerSatisfactionBreakdown } from '@market-tycoon/customers'
+import type {
+  CustomerProfile,
+  CustomerSatisfactionBreakdown,
+  CustomerSatisfactionReport,
+} from '@market-tycoon/customers'
 
 export type CustomerVisitOutcome = 'completed' | 'abandoned'
 export type CustomerAbandonReason = 'empty-basket' | 'no-compatible-checkout' | 'checkout-blocked' | 'impatient' | 'exit-blocked' | 'store-unavailable' | 'unknown'
-export type CustomerVisitSatisfaction = CustomerSatisfactionBreakdown & { overall: number }
+export type CustomerVisitSatisfaction = CustomerSatisfactionBreakdown & {
+  overall: number
+  report?: CustomerSatisfactionReport
+}
 
 export interface CustomerVisitStarted { day: number; customerId: string; profile: CustomerProfile; startedAt?: number }
 export interface CustomerVisitCompleted { articleCount: number; saleTotal: number; paymentMethod: PaymentMethod; queueTimeMs: number; satisfaction: CustomerVisitSatisfaction; completedAt?: number }
@@ -107,7 +114,7 @@ export class CustomerVisitAnalyticsManager {
       abandonReason: result.reason, articleCount: Math.max(0, result.articleCount),
       saleTotal: Math.max(0, result.saleTotal), potentialSaleTotal: Math.max(0, result.potentialSaleTotal),
       paymentMethod: result.paymentMethod, queueTimeMs: Math.max(0, result.queueTimeMs),
-      satisfaction: { ...result.satisfaction },
+      satisfaction: cloneSatisfaction(result.satisfaction),
     }
     this.visits.push(record)
     if (this.visits.length > MAX_VISITS) this.visits.splice(0, this.visits.length - MAX_VISITS)
@@ -139,6 +146,19 @@ function summarizeVisits(visits: CustomerVisitRecord[]): CustomerVisitSummary {
 }
 
 function cloneProfile(profile: CustomerProfile): CustomerProfile { return { ...profile, preferredCategories: [...profile.preferredCategories] } }
-function cloneVisit(visit: CustomerVisitRecord): CustomerVisitRecord { return { ...visit, satisfaction: { ...visit.satisfaction } } }
+function cloneReport(report?: CustomerSatisfactionReport): CustomerSatisfactionReport | undefined {
+  if (!report) return undefined
+  return {
+    ...report,
+    breakdown: { ...report.breakdown },
+    drivers: report.drivers.map(driver => ({ ...driver })),
+    strongestPositive: report.strongestPositive ? { ...report.strongestPositive } : undefined,
+    strongestNegative: report.strongestNegative ? { ...report.strongestNegative } : undefined,
+  }
+}
+function cloneSatisfaction(satisfaction: CustomerVisitSatisfaction): CustomerVisitSatisfaction {
+  return { ...satisfaction, report: cloneReport(satisfaction.report) }
+}
+function cloneVisit(visit: CustomerVisitRecord): CustomerVisitRecord { return { ...visit, satisfaction: cloneSatisfaction(visit.satisfaction) } }
 function sum<T>(items: T[], selector: (item: T) => number) { return items.reduce((total, item) => total + selector(item), 0) }
 function average<T>(items: T[], selector: (item: T) => number) { return items.length ? sum(items, selector) / items.length : 0 }
