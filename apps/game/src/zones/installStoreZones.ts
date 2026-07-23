@@ -4,6 +4,13 @@ import { StoreScene } from '../phaser/StoreScene'
 import { storeZoneManager, zoneRuntime } from './zoneRuntime'
 
 let installed = false
+let activeScene: (StoreScene & Record<string, any>) | undefined
+
+interface WallDragState {
+  x: number
+  y: number
+  direction: 0 | 1 | 2 | 3
+}
 
 export function installStoreZones() {
   if (installed) return
@@ -36,7 +43,9 @@ export function installStoreZones() {
   prototype.create = function () {
     originalCreate.call(this)
     const scene = this as StoreScene & Record<string, any>
+    activeScene = scene
     scene.zoneLayer = scene.add.graphics().setDepth(12)
+    scene.wallDragState = undefined
     zoneRuntime.setRedraw(() => drawZones(scene))
     zoneRuntime.setValidator(() => validateZones(storeZoneManager.getCells(), zoneRuntime.definitions, scene.grid))
     installGridValidationHooks(scene)
@@ -56,16 +65,26 @@ export function installStoreZones() {
       if (!painting || (!pointer.leftButtonDown() && !pointer.rightButtonDown())) return
       paintAtPointer(scene, pointer)
     })
-    scene.input.on('pointerup', () => { painting = false })
+    scene.input.on('pointerup', () => {
+      painting = false
+      scene.wallDragState = undefined
+    })
     drawZones(scene)
   }
 
   const originalRotate = prototype.rotateScene
   prototype.rotateScene = function (step: -1 | 1) {
+    const scene = this as StoreScene & Record<string, any>
+    scene.wallDragState = undefined
     const result = originalRotate.call(this, step)
-    drawZones(this as StoreScene & Record<string, any>)
+    drawZones(scene)
     return result
   }
+
+  window.addEventListener('market-tycoon:rotate', event => {
+    const step = (event as CustomEvent<{ step: -1 | 1 }>).detail?.step
+    if ((step === -1 || step === 1) && activeScene) activeScene.rotateScene(step)
+  })
 
   const originalPlaceSelected = prototype.placeSelected
   prototype.placeSelected = function () {
@@ -73,6 +92,15 @@ export function installStoreZones() {
     if (!zoneRuntime.isBuildingMode()) return
     const selected = scene.selected
     const hovered = scene.hovered
+
+    if (selected?.category === 'wall') {
+      scene.wallDragState = {
+        x: hovered.x,
+        y: hovered.y,
+        direction: scene.direction,
+      } satisfies WallDragState
+    }
+
     if (selected && hovered && selected.category !== 'wall' && selected.category !== 'door') {
       const footprint = scene.grid.getFootprint(selected, hovered.x, hovered.y, scene.direction)
       const invalidCell = footprint.find((cell: { x: number; y: number }) => {
@@ -88,10 +116,42 @@ export function installStoreZones() {
     return originalPlaceSelected.call(this)
   }
 
-  const originalPlaceDraggedWall = prototype.placeDraggedWall
   prototype.placeDraggedWall = function () {
+    const scene = this as StoreScene & Record<string, any>
     if (!zoneRuntime.isBuildingMode()) return
-    return originalPlaceDraggedWall.call(this)
+    const drag = scene.wallDragState as WallDragState | undefined
+    const selected = scene.selected
+    const hovered = scene.hovered
+    if (!drag || selected?.category !== 'wall' || !hovered) return
+
+    const horizontal = drag.direction % 2 === 0
+    const target = horizontal
+      ? { x: hovered.x, y: drag.y }
+      : { x: drag.x, y: hovered.y }
+    const start = horizontal ? drag.x : drag.y
+    const end = horizontal ? target.x : target.y
+    const min = Math.min(start, end)
+    const max = Math.max(start, end)
+    const dragKey = `${drag.x}:${drag.y}:${drag.direction}:${target.x}:${target.y}`
+    if (scene.lastDragKey === dragKey) return
+    scene.lastDragKey = dragKey
+
+    let placedCount = 0
+    for (let cursor = min; cursor <= max; cursor++) {
+      const x = horizontal ? cursor : drag.x
+      const y = horizontal ? drag.y : cursor
+      if (!scene.grid.isInside(x, y)) continue
+      if (!scene.simulation.canSpend(selected.price)) break
+      if (scene.grid.place(selected, x, y, drag.direction)) {
+        scene.simulation.spend(selected.price)
+        placedCount += 1
+      }
+    }
+
+    if (placedCount) {
+      scene.drawBuildings()
+      scene.setStatus(`${placedCount} segment(s) de mur ajouté(s) · tracé ${horizontal ? 'horizontal' : 'vertical'}.`, '#86efac')
+    }
   }
 }
 
@@ -135,8 +195,6 @@ function drawZones(scene: StoreScene & Record<string, any>) {
     const halfHeight = scene.grid.tileHeight / 2
     const invalid = invalidCells.has(`${cell.x}:${cell.y}`)
 
-    // Always retain the semantic color of the zone. Invalidity is represented by
-    // a red outline and a small warning marker instead of replacing the fill.
     layer.fillStyle(definition.color, editing ? .3 : .045)
     layer.lineStyle(invalid && editing ? 3 : 1, invalid && editing ? 0xef4444 : definition.color, editing ? .78 : .1)
     layer.beginPath()
