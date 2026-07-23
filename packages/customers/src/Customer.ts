@@ -26,6 +26,10 @@ export class Customer {
     return this.satisfaction.getOverall()
   }
 
+  getSatisfactionReport() {
+    return this.satisfaction.getReport(this.profile.requirement)
+  }
+
   getRemainingBudget() {
     return Math.max(0, this.profile.budget - this.basket.summarize().saleTotal)
   }
@@ -37,6 +41,7 @@ export class Customer {
       state: this.journey.getState(),
       satisfaction: this.satisfaction.getOverall(),
       satisfactionBreakdown: this.satisfaction.getBreakdown(),
+      satisfactionReport: this.getSatisfactionReport(),
       basket: this.basket.summarize(),
     }
   }
