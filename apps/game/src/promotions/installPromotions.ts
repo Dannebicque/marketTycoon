@@ -123,22 +123,23 @@ export function installPromotions() {
   window.addEventListener('beforeunload', persistPromotionAnalytics)
 }
 
-/**
- * Débite immédiatement le coût d'une campagne sur la trésorerie et l'impute
- * aux charges d'exploitation de la journée courante.
- */
 export function chargePromotionCampaign(cost: number) {
   const simulation = activeSimulation
   const amount = roundMoney(cost)
   if (!simulation || amount < 0 || simulation.metrics.cash < amount) return false
   simulation.metrics.cash = roundMoney(simulation.metrics.cash - amount)
   simulation.metrics.operatingExpenses = roundMoney(simulation.metrics.operatingExpenses + amount)
-  simulation.metrics.profit = roundMoney(
-    simulation.metrics.revenue
-      - simulation.metrics.constructionExpenses
-      - simulation.metrics.merchandiseExpenses
-      - simulation.metrics.operatingExpenses,
-  )
+  recalculateAccountingProfit(simulation)
+  return true
+}
+
+export function refundPromotionCampaign(cost: number) {
+  const simulation = activeSimulation
+  const amount = roundMoney(cost)
+  if (!simulation || amount <= 0) return false
+  simulation.metrics.cash = roundMoney(simulation.metrics.cash + amount)
+  simulation.metrics.operatingExpenses = roundMoney(Math.max(0, simulation.metrics.operatingExpenses - amount))
+  recalculateAccountingProfit(simulation)
   return true
 }
 
@@ -197,6 +198,15 @@ function positiveReaction(label?: string) {
 function hesitantReaction(label?: string) {
   const choices = [`Même avec ${label ?? 'la promo'}, je réfléchis…`, 'Pas aujourd’hui.', 'Le prix reste trop élevé pour moi.']
   return choices[Math.floor(Math.random() * choices.length)]
+}
+
+function recalculateAccountingProfit(simulation: StoreSimulation) {
+  simulation.metrics.profit = roundMoney(
+    simulation.metrics.revenue
+      - simulation.metrics.constructionExpenses
+      - simulation.metrics.merchandiseExpenses
+      - simulation.metrics.operatingExpenses,
+  )
 }
 
 function roundMoney(value: number) {
