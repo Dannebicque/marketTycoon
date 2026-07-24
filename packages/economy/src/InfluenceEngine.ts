@@ -1,4 +1,4 @@
-export type InfluenceSource = 'calendar' | 'reputation' | 'advertising' | 'promotions' | 'satisfaction' | 'competition' | 'events'
+export type InfluenceSource = 'calendar' | 'reputation' | 'advertising' | 'promotions' | 'satisfaction' | 'competition' | 'weather' | 'events'
 
 export interface InfluenceFactor {
   source: InfluenceSource
@@ -19,6 +19,11 @@ export interface InfluenceContext {
   averagePromotionDiscount?: number
   satisfactionScore?: number
   competitionMultiplier?: number
+  calendarMultiplier?: number
+  calendarLabel?: string
+  weatherMultiplier?: number
+  weatherDemandMultiplier?: number
+  weatherLabel?: string
   eventMultiplier?: number
 }
 
@@ -41,8 +46,8 @@ export class InfluenceEngine {
   forecast(context: InfluenceContext): TrafficForecast {
     const day = Math.max(1, Math.floor(context.day))
     const factors: InfluenceFactor[] = []
-    const calendarMultiplier = this.calendarMultiplier(day)
-    factors.push({ source: 'calendar', label: 'Calendrier', multiplier: calendarMultiplier, detail: this.calendarLabel(day) })
+    const calendarMultiplier = clamp(context.calendarMultiplier ?? this.calendarMultiplier(day), .65, 1.8)
+    factors.push({ source: 'calendar', label: 'Calendrier', multiplier: calendarMultiplier, detail: context.calendarLabel ?? this.calendarLabel(day) })
 
     const reputationMultiplier = clamp(.62 + clamp(context.notoriety, 0, 100) * .0072, .62, 1.34)
     factors.push({ source: 'reputation', label: 'Notoriété', multiplier: reputationMultiplier, detail: `${round(context.notoriety)} / 100` })
@@ -60,6 +65,9 @@ export class InfluenceEngine {
     const competitionMultiplier = clamp(context.competitionMultiplier ?? 1, .55, 1.2)
     factors.push({ source: 'competition', label: 'Concurrence', multiplier: competitionMultiplier, detail: competitionMultiplier === 1 ? 'Aucune pression concurrentielle' : 'Pression du marché' })
 
+    const weatherMultiplier = clamp(context.weatherMultiplier ?? 1, .55, 1.45)
+    factors.push({ source: 'weather', label: 'Météo', multiplier: weatherMultiplier, detail: context.weatherLabel ?? 'Conditions normales' })
+
     const eventMultiplier = clamp(context.eventMultiplier ?? 1, .6, 1.8)
     factors.push({ source: 'events', label: 'Évènements', multiplier: eventMultiplier, detail: eventMultiplier === 1 ? 'Aucun évènement majeur' : 'Contexte exceptionnel' })
 
@@ -68,7 +76,8 @@ export class InfluenceEngine {
     const satisfactionModifier = roundMultiplier(.85 + satisfactionScore * .003)
     const loyaltyBasketLift = clamp(context.loyalty, 0, 100) * .002
     const promotionBasketLift = clamp(context.averagePromotionDiscount ?? 0, 0, .8) * .22
-    const expectedBasket = roundMoney(context.baseBasket * satisfactionModifier * (1 + loyaltyBasketLift + promotionBasketLift))
+    const weatherDemandMultiplier = clamp(context.weatherDemandMultiplier ?? 1, .75, 1.35)
+    const expectedBasket = roundMoney(context.baseBasket * satisfactionModifier * (1 + loyaltyBasketLift + promotionBasketLift) * weatherDemandMultiplier)
     const expectedVisitors = Math.max(1, Math.round(Math.max(1, context.baseVisitors) * trafficMultiplier))
 
     const budgetWeight = clamp(.32 + (context.averagePromotionDiscount ?? 0) * .28, .2, .55)
@@ -79,7 +88,7 @@ export class InfluenceEngine {
       day,
       expectedVisitors,
       expectedBasket,
-      demandMultiplier: roundMultiplier(promotionMultiplier * satisfactionModifier),
+      demandMultiplier: roundMultiplier(promotionMultiplier * satisfactionModifier * weatherDemandMultiplier),
       trafficMultiplier,
       satisfactionModifier,
       profileWeights: normalizeWeights(budgetWeight, regularWeight, convenienceWeight),
