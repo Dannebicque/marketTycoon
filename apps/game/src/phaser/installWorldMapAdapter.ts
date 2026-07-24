@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import { GridManager, NavigationGrid } from '@market-tycoon/simulation-engine'
-import type { ParcelAccess, ParcelDefinition, WorldMapRuntime } from '@market-tycoon/world-map'
+import type { MapRect, ParcelAccess, ParcelDefinition, WorldMapRuntime } from '@market-tycoon/world-map'
 import { StoreScene } from './StoreScene'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
 
@@ -17,6 +17,7 @@ interface ParcelVisualStyle {
 interface ParcelVisuals {
   fillLayer: Phaser.GameObjects.Graphics
   borderLayer: Phaser.GameObjects.Graphics
+  storeFrameLayer: Phaser.GameObjects.Graphics
   labels: Phaser.GameObjects.Text[]
 }
 
@@ -72,18 +73,38 @@ export function installWorldMapPhaserAdapter() {
     if (!parcelId || !activeScene || !activeRuntime) return
     const parcel = activeRuntime.getParcel(parcelId)
     if (!parcel || !activeRuntime.canPurchase(parcelId)) {
-      emitPurchaseResult(false, parcelId, 'Cette parcelle n’est pas disponible à l’achat.')
+      emitActionResult(false, parcelId, 'Cette parcelle n’est pas disponible à l’achat.')
       return
     }
     const price = parcel.price ?? 0
     if (!activeScene.simulation.canSpend(price)) {
-      emitPurchaseResult(false, parcelId, 'Trésorerie insuffisante pour acheter cette parcelle.')
+      emitActionResult(false, parcelId, 'Trésorerie insuffisante pour acheter cette parcelle.')
       return
     }
     activeScene.simulation.spend(price)
     activeRuntime.purchase(parcelId)
     drawParcels(activeScene, activeRuntime)
-    emitPurchaseResult(true, parcelId, `${parcel.name} a été achetée pour ${price.toLocaleString('fr-FR')} €.`)
+    emitActionResult(true, parcelId, `${parcel.name} a été achetée pour ${price.toLocaleString('fr-FR')} €.`)
+    emitParcelSelection(activeRuntime, parcelId)
+  })
+
+  window.addEventListener('market-tycoon:building-extension-request', event => {
+    const parcelId = (event as CustomEvent<{ parcelId: string }>).detail?.parcelId
+    if (!parcelId || !activeScene || !activeRuntime) return
+    const parcel = activeRuntime.getParcel(parcelId)
+    if (!parcel || !activeRuntime.canExpandPlayerBuildingInto(parcelId)) {
+      emitActionResult(false, parcelId, 'Cette parcelle ne peut pas accueillir une extension du magasin.')
+      return
+    }
+    const cost = activeRuntime.getExtensionCost(parcelId)
+    if (!activeScene.simulation.canSpend(cost)) {
+      emitActionResult(false, parcelId, 'Trésorerie insuffisante pour construire cette extension.')
+      return
+    }
+    activeScene.simulation.spend(cost)
+    activeRuntime.expandPlayerBuildingInto(parcelId)
+    drawParcels(activeScene, activeRuntime)
+    emitActionResult(true, parcelId, `Extension construite sur ${parcel.name} pour ${cost.toLocaleString('fr-FR')} €.`)
     emitParcelSelection(activeRuntime, parcelId)
   })
 }
@@ -120,12 +141,17 @@ function emitParcelSelection(runtime: WorldMapRuntime, parcelId?: string) {
   const parcel = parcelId ? runtime.getParcel(parcelId) : undefined
   const state = parcel ? runtime.getParcelState(parcel.id) : undefined
   window.dispatchEvent(new CustomEvent('market-tycoon:parcel-selected', {
-    detail: parcel ? { parcel: { ...parcel, access: state?.access ?? parcel.access }, canPurchase: runtime.canPurchase(parcel.id) } : { parcel: null, canPurchase: false },
+    detail: parcel ? {
+      parcel: { ...parcel, access: state?.access ?? parcel.access },
+      canPurchase: runtime.canPurchase(parcel.id),
+      canExpand: runtime.canExpandPlayerBuildingInto(parcel.id),
+      extensionCost: runtime.getExtensionCost(parcel.id),
+    } : { parcel: null, canPurchase: false, canExpand: false, extensionCost: 0 },
   }))
 }
 
-function emitPurchaseResult(success: boolean, parcelId: string, message: string) {
-  window.dispatchEvent(new CustomEvent('market-tycoon:parcel-purchase-result', { detail: { success, parcelId, message } }))
+function emitActionResult(success: boolean, parcelId: string, message: string) {
+  window.dispatchEvent(new CustomEvent('market-tycoon:parcel-action-result', { detail: { success, parcelId, message } }))
 }
 
 function seedInitialStore(scene: StoreScene, runtime: WorldMapRuntime) {
@@ -165,11 +191,13 @@ function drawParcels(scene: StoreScene, runtime: WorldMapRuntime) {
   const previous = visuals.get(scene)
   previous?.fillLayer.destroy()
   previous?.borderLayer.destroy()
+  previous?.storeFrameLayer.destroy()
   previous?.labels.forEach(label => label.destroy())
 
   const current: ParcelVisuals = {
     fillLayer: scene.add.graphics().setDepth(2),
     borderLayer: scene.add.graphics().setDepth(3),
+    storeFrameLayer: scene.add.graphics().setDepth(5),
     labels: [],
   }
   visuals.set(scene, current)
@@ -181,6 +209,8 @@ function drawParcels(scene: StoreScene, runtime: WorldMapRuntime) {
     const label = drawParcelLabel(scene, parcel, style)
     if (label) current.labels.push(label)
   }
+
+  for (const area of runtime.getPlayerBuildingState()?.interiorAreas ?? []) drawStoreFrame(scene, current.storeFrameLayer, area)
 }
 
 function drawParcelFill(scene: StoreScene, layer: Phaser.GameObjects.Graphics, parcel: ParcelDefinition, style: ParcelVisualStyle) {
@@ -191,14 +221,31 @@ function drawParcelFill(scene: StoreScene, layer: Phaser.GameObjects.Graphics, p
 }
 
 function drawParcelBoundary(scene: StoreScene, layer: Phaser.GameObjects.Graphics, parcel: ParcelDefinition, style: ParcelVisualStyle) {
-  const top = scene.grid.gridToScreen(parcel.bounds.x, parcel.bounds.y)
-  const right = scene.grid.gridToScreen(parcel.bounds.x + parcel.bounds.width - 1, parcel.bounds.y)
-  const bottom = scene.grid.gridToScreen(parcel.bounds.x + parcel.bounds.width - 1, parcel.bounds.y + parcel.bounds.height - 1)
-  const left = scene.grid.gridToScreen(parcel.bounds.x, parcel.bounds.y + parcel.bounds.height - 1)
-  const halfWidth = scene.grid.tileWidth / 2
-  const halfHeight = scene.grid.tileHeight / 2
-  layer.lineStyle(style.lineWidth, style.line, style.lineAlpha).beginPath().moveTo(top.x, top.y).lineTo(right.x + halfWidth, right.y + halfHeight).lineTo(bottom.x, bottom.y + scene.grid.tileHeight).lineTo(left.x - halfWidth, left.y + halfHeight).closePath().strokePath()
-  if (parcel.access === 'unavailable' || parcel.access === 'locked') layer.lineStyle(2, style.line, .48).beginPath().moveTo(top.x, top.y).lineTo(bottom.x, bottom.y + scene.grid.tileHeight).moveTo(right.x + halfWidth, right.y + halfHeight).lineTo(left.x - halfWidth, left.y + halfHeight).strokePath()
+  drawRectBoundary(scene, layer, parcel.bounds, style.lineWidth, style.line, style.lineAlpha)
+  if (parcel.access === 'unavailable' || parcel.access === 'locked') {
+    const { top, right, bottom, left, halfWidth, halfHeight } = rectCorners(scene, parcel.bounds)
+    layer.lineStyle(2, style.line, .48).beginPath().moveTo(top.x, top.y).lineTo(bottom.x, bottom.y + scene.grid.tileHeight).moveTo(right.x + halfWidth, right.y + halfHeight).lineTo(left.x - halfWidth, left.y + halfHeight).strokePath()
+  }
+}
+
+function drawStoreFrame(scene: StoreScene, layer: Phaser.GameObjects.Graphics, area: MapRect) {
+  drawRectBoundary(scene, layer, area, 4, 0xf8fafc, .95)
+}
+
+function drawRectBoundary(scene: StoreScene, layer: Phaser.GameObjects.Graphics, bounds: MapRect, width: number, color: number, alpha: number) {
+  const { top, right, bottom, left, halfWidth, halfHeight } = rectCorners(scene, bounds)
+  layer.lineStyle(width, color, alpha).beginPath().moveTo(top.x, top.y).lineTo(right.x + halfWidth, right.y + halfHeight).lineTo(bottom.x, bottom.y + scene.grid.tileHeight).lineTo(left.x - halfWidth, left.y + halfHeight).closePath().strokePath()
+}
+
+function rectCorners(scene: StoreScene, bounds: MapRect) {
+  return {
+    top: scene.grid.gridToScreen(bounds.x, bounds.y),
+    right: scene.grid.gridToScreen(bounds.x + bounds.width - 1, bounds.y),
+    bottom: scene.grid.gridToScreen(bounds.x + bounds.width - 1, bounds.y + bounds.height - 1),
+    left: scene.grid.gridToScreen(bounds.x, bounds.y + bounds.height - 1),
+    halfWidth: scene.grid.tileWidth / 2,
+    halfHeight: scene.grid.tileHeight / 2,
+  }
 }
 
 function drawParcelLabel(scene: StoreScene, parcel: ParcelDefinition, style: ParcelVisualStyle) {
