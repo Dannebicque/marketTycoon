@@ -22,6 +22,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Ajouter les outils de modification des entrées, façades et enseignes
 - [x] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
 - [x] Conserver l'identité du bâtiment lors des transformations
+- [x] Préparer les opérations inverses d'achat et d'extension dans le runtime
 - [ ] Préparer les annexes : réserve, drive, bureaux, quai et galerie
 - [ ] Préparer plusieurs niveaux sans rendre cette fonctionnalité obligatoire
 
@@ -31,8 +32,11 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Utiliser les équipements du catalogue comme placables du premier adaptateur
 - [x] Ajouter un contrôleur explicite pour les outils sélection, placement, déplacement, suppression et rotation
 - [x] Raccorder sélection, déplacement et suppression à l'interface principale
+- [x] Rendre le déplacement indépendant du flux de placement standard
+- [x] Afficher explicitement l'équipement en attente de destination
 - [x] Conserver assortiment et stock lors d'un déplacement ou d'une restauration
 - [x] Regrouper outils, diagnostic et historique dans une barre horizontale sous la topbar
+- [x] Conserver la sidebar à sa position d'origine malgré la barre horizontale
 - [x] Ajouter une politique de remboursement de démolition configurable par difficulté
 - [ ] Intégrer la difficulté de construction dans les paramètres globaux de partie
 - [ ] Ajouter les outils mur, rectangle de pièce, sol et remplissage
