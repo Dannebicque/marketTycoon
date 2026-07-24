@@ -4,6 +4,13 @@ export { CustomerJourney } from './CustomerJourney'
 export { CustomerSatisfaction } from './CustomerSatisfaction'
 export { createCustomerProfile } from './CustomerProfileFactory'
 export { CUSTOMER_PROFILE_CATALOG } from './CustomerProfileCatalog'
+export { CustomerMemoryManager, customerMemoryManager } from './CustomerMemoryManager'
+export type {
+  CustomerMemory,
+  CustomerMemoryOutcome,
+  CustomerMemoryState,
+  CustomerMemorySummary,
+} from './CustomerMemoryManager'
 export {
   calculateCheckoutSatisfaction,
   calculateQueueSatisfaction,
