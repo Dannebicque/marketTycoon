@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
+import BuildHistoryWidget from './components/build/BuildHistoryWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
@@ -11,6 +12,7 @@ import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installBuildModeHistory } from './phaser/installBuildModeHistory'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
@@ -32,13 +34,14 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '11'
+const DEV_SCENARIO_VERSION = '12'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
   await loadWorldMap('retail-park')
   installWorldMapPhaserAdapter()
+  installBuildModeHistory()
   installViewDisplay()
   installStoreZones()
   installCommercialZones()
@@ -62,6 +65,11 @@ async function bootstrap() {
   storeIdentityRoot.id = 'store-identity-ui'
   document.body.appendChild(storeIdentityRoot)
   createApp(StoreIdentityWidget).mount(storeIdentityRoot)
+
+  const buildHistoryRoot = document.createElement('div')
+  buildHistoryRoot.id = 'build-history-ui'
+  document.body.appendChild(buildHistoryRoot)
+  createApp(BuildHistoryWidget).mount(buildHistoryRoot)
 
   const parcelRoot = document.createElement('div')
   parcelRoot.id = 'parcel-info-ui'
