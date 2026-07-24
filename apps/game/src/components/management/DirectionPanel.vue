@@ -35,11 +35,12 @@
     <section class="direction-card zone-satisfaction-card">
       <header>
         <div><span class="eyebrow">Expérience locale</span><h2>Satisfaction par secteur commercial</h2></div>
-        <p>Prix 40 % · disponibilité 45 % · attente 15 %</p>
+        <p>{{ assignedShelfCount }} rayon(s) rattaché(s) · {{ unassignedShelfCount }} hors zone</p>
       </header>
+      <p v-if="unassignedShelfCount" class="coverage-alert">⚠ {{ unassignedShelfCount }} rayon(s) ne sont rattachés à aucune zone commerciale. Peignez leur empreinte pour fiabiliser les analyses.</p>
       <div class="zone-satisfaction-grid">
         <article v-for="zone in zones" :key="zone.key" :class="zoneClass(zone.score)">
-          <div class="zone-title"><span>{{ zone.icon }}</span><div><strong>{{ zone.name }}</strong><small>{{ zone.zoneCount }} zone(s) · {{ zone.cellCount }} case(s)</small><small>{{ zone.observations ? `${zone.observations} décision(s) observée(s)` : 'Pas encore de données client' }}</small></div><b>{{ zone.score }}</b></div>
+          <div class="zone-title"><span>{{ zone.icon }}</span><div><strong>{{ zone.name }}</strong><small>{{ zone.zoneCount }} zone(s) · {{ zone.cellCount }} case(s) · {{ zone.shelfCount }} rayon(s)</small><small>{{ zone.observations ? `${zone.observations} décision(s) observée(s)` : 'Pas encore de données client' }}</small></div><b>{{ zone.score }}</b></div>
           <div class="zone-progress"><i :style="{ width: `${zone.score}%` }" /></div>
           <dl>
             <div><dt>Prix</dt><dd>{{ zone.breakdown.price }}</dd></div>
@@ -47,6 +48,8 @@
             <div><dt>Attente</dt><dd>{{ zone.breakdown.waiting }}</dd></div>
           </dl>
           <p v-if="!zone.zoneCount" class="zone-alert">⚠ Aucune zone physique définie</p>
+          <p v-else-if="zone.mixedShelfCount" class="zone-alert">⚠ {{ zone.mixedShelfCount }} rayon(s) chevauchent plusieurs zones</p>
+          <p v-else-if="zone.partialShelfCount" class="zone-alert">⚠ {{ zone.partialShelfCount }} rayon(s) seulement partiellement couverts</p>
           <p v-else-if="zone.strongestIssue" class="zone-alert">⚠ {{ issueLabel(zone.strongestIssue) }}</p>
           <p v-else-if="zone.observations" class="zone-ok">✓ Secteur maîtrisé</p>
         </article>
@@ -108,10 +111,13 @@ const snapshot = reactive(getInfluenceSnapshot())
 const memory = reactive(getCustomerMemorySnapshot(snapshot.day))
 const competition = reactive(getCompetitionSnapshot(snapshot.day))
 const zones = ref<ZoneSatisfactionSnapshot[]>([])
+const shelfCoverage = ref(commercialZoneRuntime.shelfCoverage)
 let refreshTimer: number | undefined
 
 const forecastProgress = computed(() => Math.min(100, snapshot.forecast.expectedVisitors > 0 ? snapshot.actualVisitors / snapshot.forecast.expectedVisitors * 100 : 0))
 const latestHistory = computed(() => snapshot.reputation.history.at(-1))
+const assignedShelfCount = computed(() => shelfCoverage.value.filter(item => item.status !== 'unassigned').length)
+const unassignedShelfCount = computed(() => shelfCoverage.value.filter(item => item.status === 'unassigned').length)
 const priceIndexClass = computed(() => snapshot.forecast.pricing.storePriceIndex < 97 ? 'positive-text' : snapshot.forecast.pricing.storePriceIndex > 103 ? 'negative-text' : '')
 const priceIndexLabel = computed(() => snapshot.forecast.pricing.storePriceIndex < 97 ? 'moins cher que le marché' : snapshot.forecast.pricing.storePriceIndex > 103 ? 'plus cher que le marché' : 'aligné sur le marché')
 const priceIndexTitle = computed(() => snapshot.forecast.pricing.storePriceIndex < 97 ? 'Avantage prix actif' : snapshot.forecast.pricing.storePriceIndex > 103 ? 'Risque de fuite client' : 'Positionnement équilibré')
@@ -121,6 +127,7 @@ function getCommercialSources(): CommercialSatisfactionSource[] {
   const configuredZones = commercialZoneRuntime.zones
   return commercialZoneRuntime.definitions.map(definition => {
     const sectorZones = configuredZones.filter(zone => zone.sectorKey === definition.key)
+    const shelves = shelfCoverage.value.filter(item => item.sectorKey === definition.key)
     return {
       key: definition.key,
       name: definition.name,
@@ -128,6 +135,9 @@ function getCommercialSources(): CommercialSatisfactionSource[] {
       categories: definition.defaultProductCategories ?? [],
       zoneCount: sectorZones.length,
       cellCount: sectorZones.reduce((total, zone) => total + zone.cells.length, 0),
+      shelfCount: shelves.length,
+      partialShelfCount: shelves.filter(item => item.status === 'partial').length,
+      mixedShelfCount: shelves.filter(item => item.status === 'mixed').length,
     }
   })
 }
@@ -136,6 +146,7 @@ function refresh() {
   Object.assign(snapshot, getInfluenceSnapshot())
   Object.assign(memory, getCustomerMemorySnapshot(snapshot.day))
   Object.assign(competition, getCompetitionSnapshot(snapshot.day))
+  shelfCoverage.value = commercialZoneRuntime.shelfCoverage
   const visits = customerVisitAnalytics.getSummary(snapshot.day)
   zones.value = zoneSatisfaction.getSnapshot(getCommercialSources(), customerAnalytics.getProductAnalytics(snapshot.day), visits.averageQueueTimeMs)
 }
@@ -152,5 +163,5 @@ onBeforeUnmount(() => { if (refreshTimer) window.clearInterval(refreshTimer); wi
 </script>
 
 <style scoped>
-.direction-panel{display:flex;flex-direction:column;gap:16px}.direction-hero,.pricing-impact,.direction-card{padding:16px;border:1px solid #1e293b;border-radius:12px;background:#0f172a}.direction-hero,.pricing-impact{display:flex;justify-content:space-between;gap:20px}.direction-hero h2,.pricing-impact h2,.direction-card h2{margin:4px 0 8px}.direction-hero p,.pricing-impact p,.panel-help{margin:0;color:#94a3b8;font-size:11px;line-height:1.5}.forecast-progress{min-width:190px}.forecast-progress strong,.forecast-progress span{display:block}.forecast-progress div,.zone-progress{height:7px;margin-top:10px;overflow:hidden;border-radius:999px;background:#1e293b}.forecast-progress i,.zone-progress i{display:block;height:100%;background:#4ade80}.direction-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.direction-kpis small{display:block;margin-top:5px;color:#94a3b8}.pricing-impact dl{min-width:260px;margin:0}.pricing-impact dl div,.factor-line,.profile-line{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #1e293b}.pricing-impact.competitive{border-color:#166534}.pricing-impact.expensive{border-color:#9a3412}.zone-satisfaction-card header{display:flex;justify-content:space-between;gap:16px}.zone-satisfaction-card header p{color:#64748b;font-size:10px}.zone-satisfaction-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.zone-satisfaction-grid>article{padding:12px;border:1px solid #334155;border-radius:10px;background:#111827}.zone-satisfaction-grid>article.warning{border-color:#a16207}.zone-satisfaction-grid>article.critical{border-color:#b91c1c}.zone-title{display:flex;align-items:center;gap:8px}.zone-title>span{font-size:22px}.zone-title>div{flex:1}.zone-title strong,.zone-title small{display:block}.zone-title small{margin-top:2px;color:#64748b;font-size:9px}.zone-title b{font-size:22px}.zone-satisfaction-grid dl{display:grid;gap:4px;margin:10px 0 0}.zone-satisfaction-grid dl div{display:flex;justify-content:space-between}.zone-satisfaction-grid dt{color:#94a3b8;font-size:9px}.zone-satisfaction-grid dd{margin:0;font-size:10px;font-weight:700}.zone-alert,.zone-ok{margin:9px 0 0;font-size:9px}.zone-alert{color:#fca5a5}.zone-ok{color:#86efac}.loyalty-summary,.comparison-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.loyalty-summary article,.comparison-grid div{padding:12px;border-radius:10px;background:#111827}.loyalty-summary span,.loyalty-summary strong,.loyalty-summary small,.comparison-grid span,.comparison-grid strong{display:block}.loyalty-summary span,.comparison-grid span{color:#94a3b8;font-size:10px}.loyalty-summary small{color:#64748b;font-size:9px}.direction-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.factor-line>div{display:flex;flex-direction:column}.factor-line small{color:#94a3b8;font-size:10px}.competitor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.competitor-grid>article{padding:12px;border:1px solid #1e293b;border-radius:10px;background:#111827}.competitor-grid>article.leader{border-color:#f59e0b}.competitor-title{display:flex;align-items:center;gap:8px}.competitor-title>div{flex:1}.competitor-title small{display:block;color:#94a3b8;font-size:9px}.competitor-grid dl div{display:flex;justify-content:space-between}.competitor-grid dd{margin:0}.reputation-reasons{color:#cbd5e1;font-size:11px}@media(max-width:950px){.zone-satisfaction-grid,.competitor-grid{grid-template-columns:1fr 1fr}.direction-kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.direction-hero,.pricing-impact{flex-direction:column}.zone-satisfaction-grid,.direction-grid,.loyalty-summary,.comparison-grid,.competitor-grid{grid-template-columns:1fr}}
+.direction-panel{display:flex;flex-direction:column;gap:16px}.direction-hero,.pricing-impact,.direction-card{padding:16px;border:1px solid #1e293b;border-radius:12px;background:#0f172a}.direction-hero,.pricing-impact{display:flex;justify-content:space-between;gap:20px}.direction-hero h2,.pricing-impact h2,.direction-card h2{margin:4px 0 8px}.direction-hero p,.pricing-impact p,.panel-help{margin:0;color:#94a3b8;font-size:11px;line-height:1.5}.forecast-progress{min-width:190px}.forecast-progress strong,.forecast-progress span{display:block}.forecast-progress div,.zone-progress{height:7px;margin-top:10px;overflow:hidden;border-radius:999px;background:#1e293b}.forecast-progress i,.zone-progress i{display:block;height:100%;background:#4ade80}.direction-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.direction-kpis small{display:block;margin-top:5px;color:#94a3b8}.pricing-impact dl{min-width:260px;margin:0}.pricing-impact dl div,.factor-line,.profile-line{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #1e293b}.pricing-impact.competitive{border-color:#166534}.pricing-impact.expensive{border-color:#9a3412}.zone-satisfaction-card header{display:flex;justify-content:space-between;gap:16px}.zone-satisfaction-card header p{color:#64748b;font-size:10px}.coverage-alert{margin:0 0 12px;padding:9px 11px;border:1px solid #92400e;border-radius:8px;background:rgba(146,64,14,.16);color:#fde68a;font-size:10px}.zone-satisfaction-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.zone-satisfaction-grid>article{padding:12px;border:1px solid #334155;border-radius:10px;background:#111827}.zone-satisfaction-grid>article.warning{border-color:#a16207}.zone-satisfaction-grid>article.critical{border-color:#b91c1c}.zone-title{display:flex;align-items:center;gap:8px}.zone-title>span{font-size:22px}.zone-title>div{flex:1}.zone-title strong,.zone-title small{display:block}.zone-title small{margin-top:2px;color:#64748b;font-size:9px}.zone-title b{font-size:22px}.zone-satisfaction-grid dl{display:grid;gap:4px;margin:10px 0 0}.zone-satisfaction-grid dl div{display:flex;justify-content:space-between}.zone-satisfaction-grid dt{color:#94a3b8;font-size:9px}.zone-satisfaction-grid dd{margin:0;font-size:10px;font-weight:700}.zone-alert,.zone-ok{margin:9px 0 0;font-size:9px}.zone-alert{color:#fca5a5}.zone-ok{color:#86efac}.loyalty-summary,.comparison-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.loyalty-summary article,.comparison-grid div{padding:12px;border-radius:10px;background:#111827}.loyalty-summary span,.loyalty-summary strong,.loyalty-summary small,.comparison-grid span,.comparison-grid strong{display:block}.loyalty-summary span,.comparison-grid span{color:#94a3b8;font-size:10px}.loyalty-summary small{color:#64748b;font-size:9px}.direction-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.factor-line>div{display:flex;flex-direction:column}.factor-line small{color:#94a3b8;font-size:10px}.competitor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.competitor-grid>article{padding:12px;border:1px solid #1e293b;border-radius:10px;background:#111827}.competitor-grid>article.leader{border-color:#f59e0b}.competitor-title{display:flex;align-items:center;gap:8px}.competitor-title>div{flex:1}.competitor-title small{display:block;color:#94a3b8;font-size:9px}.competitor-grid dl div{display:flex;justify-content:space-between}.competitor-grid dd{margin:0}.reputation-reasons{color:#cbd5e1;font-size:11px}@media(max-width:950px){.zone-satisfaction-grid,.competitor-grid{grid-template-columns:1fr 1fr}.direction-kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.direction-hero,.pricing-impact{flex-direction:column}.zone-satisfaction-grid,.direction-grid,.loyalty-summary,.comparison-grid,.competitor-grid{grid-template-columns:1fr}}
 </style>
