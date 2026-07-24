@@ -40,11 +40,16 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Conserver la sidebar à sa position d'origine malgré la barre horizontale
 - [x] Ajouter une politique de remboursement de démolition configurable par difficulté
 - [ ] Intégrer la difficulté de construction dans les paramètres globaux de partie
-- [ ] Ajouter les outils mur, rectangle de pièce, sol et remplissage
+- [x] Ajouter le domaine indépendant des surfaces de sol
+- [x] Ajouter l'outil pièce rectangulaire avec murs et sol
+- [x] Ajouter l'outil sol rectangulaire
+- [x] Ajouter l'outil remplissage de surface intérieure
+- [ ] Ajouter plusieurs styles de sols et leur coût
+- [ ] Ajouter une prévisualisation graphique du rectangle avant validation
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
-- [x] Intégrer achats de parcelles, extensions et peinture des zones dans le même historique
+- [x] Intégrer achats de parcelles, extensions, surfaces et peinture des zones dans le même historique
 - [x] Afficher les causes précises d'un placement invalide
 - [ ] Viser moins de trois actions pour les opérations courantes
 
