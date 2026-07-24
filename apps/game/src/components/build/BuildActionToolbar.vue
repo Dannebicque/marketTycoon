@@ -22,10 +22,15 @@
 
     <p v-if="validation && !validation.valid" class="build-bar-warning">{{ validation.message }}</p>
 
-    <div class="build-bar-refund" :title="`Difficulté construction : ${difficultyLabel}`">
-      <span>Revente</span>
-      <strong>{{ Math.round(refundRate * 100) }} %</strong>
-    </div>
+    <label class="build-bar-refund">
+      <span>Revente {{ Math.round(refundRate * 100) }} %</span>
+      <select v-model="difficulty" title="Difficulté de remboursement à la démolition" @change="changeDifficulty">
+        <option value="relaxed">Détendue</option>
+        <option value="standard">Standard</option>
+        <option value="hard">Difficile</option>
+        <option value="expert">Expert</option>
+      </select>
+    </label>
 
     <div class="build-bar-history">
       <button type="button" :disabled="history.undoCount === 0" :title="undoTitle" @click="undo">↶</button>
@@ -39,11 +44,15 @@
 import type { BuildDifficulty, BuildHistorySnapshot, BuildToolKind, BuildToolState, PlacementValidationResult } from '@market-tycoon/build-mode'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
+const storedDifficulty = localStorage.getItem('market-tycoon.build-difficulty')
+const initialDifficulty: BuildDifficulty = storedDifficulty === 'relaxed' || storedDifficulty === 'hard' || storedDifficulty === 'expert' ? storedDifficulty : 'standard'
+const rates: Record<BuildDifficulty, number> = { relaxed: 1, standard: .6, hard: .35, expert: 0 }
+
 const state = reactive<BuildToolState>({ activeTool: 'select', rotation: 0 })
 const history = reactive<BuildHistorySnapshot>({ undoCount: 0, redoCount: 0 })
 const validation = ref<PlacementValidationResult | null>(null)
-const difficulty = ref<BuildDifficulty>('standard')
-const refundRate = ref(.6)
+const difficulty = ref<BuildDifficulty>(initialDifficulty)
+const refundRate = ref(rates[initialDifficulty])
 
 const tools: Array<{ key: BuildToolKind; icon: string; label: string; title: string }> = [
   { key: 'select', icon: '↖', label: 'Sélection', title: 'Sélectionner et configurer un équipement' },
@@ -57,13 +66,16 @@ const toolLabel = computed(() => ({
 const undoTitle = computed(() => history.nextUndoLabel ? `Annuler : ${history.nextUndoLabel}` : 'Rien à annuler')
 const redoTitle = computed(() => history.nextRedoLabel ? `Rétablir : ${history.nextRedoLabel}` : 'Rien à rétablir')
 const historyStatus = computed(() => history.nextUndoLabel ? history.nextUndoLabel : 'Aucune modification')
-const difficultyLabel = computed(() => ({ relaxed: 'Détendue', standard: 'Standard', hard: 'Difficile', expert: 'Expert' } as Record<BuildDifficulty, string>)[difficulty.value])
 
 function activate(tool: BuildToolKind) {
   window.dispatchEvent(new CustomEvent('market-tycoon:build-tool-activate', { detail: { tool } }))
 }
 function undo() { window.dispatchEvent(new Event('market-tycoon:build-undo')) }
 function redo() { window.dispatchEvent(new Event('market-tycoon:build-redo')) }
+function changeDifficulty() {
+  refundRate.value = rates[difficulty.value]
+  window.dispatchEvent(new CustomEvent('market-tycoon:build-difficulty-change', { detail: { difficulty: difficulty.value } }))
+}
 function handleTool(event: Event) {
   Object.assign(state, (event as CustomEvent<BuildToolState>).detail)
   validation.value = null
@@ -129,10 +141,9 @@ onBeforeUnmount(() => {
 .build-bar-context strong { font-size: 12px; }
 .build-bar-context small, .build-bar-history small { margin-top: 2px; color: #94a3b8; font-size: 10px; }
 .build-bar-warning { min-width: 0; flex: 1; margin: 0; color: #fca5a5; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.build-bar-refund { min-width: 72px; padding: 5px 9px; border-left: 1px solid rgba(148, 163, 184, .2); }
-.build-bar-refund span, .build-bar-refund strong { display: block; }
-.build-bar-refund span { color: #94a3b8; font-size: 9px; text-transform: uppercase; }
-.build-bar-refund strong { margin-top: 2px; color: #86efac; font-size: 13px; }
+.build-bar-refund { min-width: 112px; padding-left: 10px; border-left: 1px solid rgba(148, 163, 184, .2); }
+.build-bar-refund span { display: block; margin-bottom: 3px; color: #86efac; font-size: 9px; text-transform: uppercase; }
+.build-bar-refund select { width: 100%; padding: 4px 6px; border: 1px solid #334155; border-radius: 7px; background: #0f172a; color: #e2e8f0; font-size: 10px; }
 .build-bar-history { display: grid; grid-template-columns: 36px 36px minmax(100px, 190px); gap: 6px; align-items: center; }
 .build-bar-history button { height: 34px; border: 1px solid #334155; border-radius: 8px; background: #1e293b; color: #f8fafc; font-size: 19px; cursor: pointer; }
 .build-bar-history button:disabled { opacity: .35; cursor: not-allowed; }
