@@ -1,5 +1,5 @@
 .category-toolbar {
-  top: 174px;
+  top: 112px;
 }
 
 .tool-palette {
@@ -13,7 +13,7 @@
 
 @media (max-width: 1000px) {
   .category-toolbar {
-    top: 174px;
+    top: 112px;
   }
 
   .tool-palette,
@@ -24,7 +24,7 @@
 
 @media (max-width: 760px) {
   .category-toolbar {
-    top: 166px;
+    top: 96px;
     bottom: 82px;
   }
 
