@@ -26,6 +26,15 @@ export interface CommercialZoneState {
   zones: CommercialZoneInstance[]
 }
 
+export interface CommercialZoneCoverage {
+  zoneId?: string
+  sectorKey?: string
+  coveredCells: number
+  totalCells: number
+  ratio: number
+  status: 'unassigned' | 'partial' | 'assigned' | 'mixed'
+}
+
 const cellKey = (x: number, y: number) => `${x}:${y}`
 
 export const DEFAULT_COMMERCIAL_SECTORS: CommercialSectorDefinition[] = [
@@ -112,6 +121,22 @@ export class CommercialZoneManager {
   getZone(zoneId: string) { const zone = this.zones.get(zoneId); return zone ? cloneZone(zone) : undefined }
   getZoneAt(x: number, y: number) { const zoneId = this.cells.get(cellKey(x, y)); return zoneId ? this.getZone(zoneId) : undefined }
   getSectorAt(x: number, y: number) { const zone = this.getZoneAt(x, y); return zone ? this.getDefinition(zone.sectorKey) : undefined }
+
+  getCoverage(cells: readonly CommercialZoneCell[]): CommercialZoneCoverage {
+    const totalCells = cells.length
+    if (!totalCells) return { coveredCells: 0, totalCells: 0, ratio: 0, status: 'unassigned' }
+    const counts = new Map<string, number>()
+    for (const cell of cells) {
+      const zoneId = this.cells.get(cellKey(cell.x, cell.y))
+      if (zoneId) counts.set(zoneId, (counts.get(zoneId) ?? 0) + 1)
+    }
+    const coveredCells = [...counts.values()].reduce((total, count) => total + count, 0)
+    if (!coveredCells) return { coveredCells, totalCells, ratio: 0, status: 'unassigned' }
+    const [zoneId, dominantCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]!
+    const zone = this.zones.get(zoneId)
+    const status = counts.size > 1 ? 'mixed' : coveredCells < totalCells ? 'partial' : 'assigned'
+    return { zoneId, sectorKey: zone?.sectorKey, coveredCells, totalCells, ratio: coveredCells / totalCells, status }
+  }
 
   exportState(): CommercialZoneState {
     return { definitions: this.getDefinitions().filter(definition => definition.custom), zones: this.getZones() }
