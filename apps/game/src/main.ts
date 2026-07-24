@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
+import BuildActionToolbar from './components/build/BuildActionToolbar.vue'
 import BuildHistoryWidget from './components/build/BuildHistoryWidget.vue'
 import BuildToolStatusWidget from './components/build/BuildToolStatusWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
@@ -14,6 +15,7 @@ import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } fr
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentityOverlay'
+import { installBuildInteractionTools } from './phaser/installBuildInteractionTools'
 import { installBuildModeHistory } from './phaser/installBuildModeHistory'
 import { installBuildToolController } from './phaser/installBuildToolController'
 import { installViewDisplay } from './phaser/installViewDisplay'
@@ -37,7 +39,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '13'
+const DEV_SCENARIO_VERSION = '14'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -46,6 +48,7 @@ async function bootstrap() {
   installWorldMapPhaserAdapter()
   installBuildModeHistory()
   installBuildToolController()
+  installBuildInteractionTools()
   installBuildingIdentityOverlay()
   installViewDisplay()
   installStoreZones()
@@ -70,6 +73,11 @@ async function bootstrap() {
   storeIdentityRoot.id = 'store-identity-ui'
   document.body.appendChild(storeIdentityRoot)
   createApp(StoreIdentityWidget).mount(storeIdentityRoot)
+
+  const buildActionRoot = document.createElement('div')
+  buildActionRoot.id = 'build-action-ui'
+  document.body.appendChild(buildActionRoot)
+  createApp(BuildActionToolbar).mount(buildActionRoot)
 
   const buildHistoryRoot = document.createElement('div')
   buildHistoryRoot.id = 'build-history-ui'
