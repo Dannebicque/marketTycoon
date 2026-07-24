@@ -1,5 +1,6 @@
+import Phaser from 'phaser'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
-import { GridManager, NavigationGrid, type Direction, type GridCell } from '@market-tycoon/simulation-engine'
+import { GridManager, NavigationGrid } from '@market-tycoon/simulation-engine'
 import type { ParcelAccess, WorldMapRuntime } from '@market-tycoon/world-map'
 import { StoreScene } from './StoreScene'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
@@ -124,9 +125,10 @@ function initializeStarterAssortment(scene: StoreScene) {
 function drawParcels(scene: StoreScene, runtime: WorldMapRuntime) {
   const layer = scene.add.graphics().setDepth(2)
 
-  for (const parcel of runtime.getParcels()) {
-    const color = ACCESS_COLORS[parcel.access]
-    const alpha = parcel.access === 'owned' ? 0.16 : parcel.access === 'public' ? 0.08 : 0.12
+  for (const parcel of runtime.definition.parcels) {
+    const access = runtime.getParcelState(parcel.id)?.access ?? parcel.access
+    const color = ACCESS_COLORS[access]
+    const alpha = access === 'owned' ? 0.16 : access === 'public' ? 0.08 : 0.12
 
     for (let y = parcel.bounds.y; y < parcel.bounds.y + parcel.bounds.height; y++) {
       for (let x = parcel.bounds.x; x < parcel.bounds.x + parcel.bounds.width; x++) {
@@ -169,7 +171,3 @@ function frameWorldCamera(scene: StoreScene) {
   scene.cameras.main.centerOn(center.x, center.y)
   scene.cameras.main.setZoom(0.72)
 }
-
-// Keeps the imported types explicit in generated declarations.
-export type WorldMapGridCell = GridCell
-export type WorldMapDirection = Direction
