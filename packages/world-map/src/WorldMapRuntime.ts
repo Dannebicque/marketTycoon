@@ -10,6 +10,7 @@ export interface ParcelRuntimeState {
 export interface BuildingRuntimeState {
   id: string
   interiorAreas: MapRect[]
+  entrances: MapPoint[]
   facadeStyle?: string
 }
 
@@ -24,6 +25,10 @@ function contains(rect: MapRect, point: MapPoint) {
 
 function sameRect(a: MapRect, b: MapRect) {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+}
+
+function samePoint(a: MapPoint, b: MapPoint) {
+  return a.x === b.x && a.y === b.y
 }
 
 export class WorldMapRuntime {
@@ -44,6 +49,7 @@ export class WorldMapRuntime {
       this.buildingStates.set(building.id, {
         id: building.id,
         interiorAreas: [{ ...building.bounds }],
+        entrances: (building.entrances ?? []).map(entrance => ({ ...entrance })),
         facadeStyle: building.facadeStyle,
       })
     }
@@ -93,6 +99,30 @@ export class WorldMapRuntime {
 
   getPlayerBuildingState() {
     return this.getBuildingState(this.definition.initialStore.buildingId)
+  }
+
+  setPlayerFacadeStyle(facadeStyle: string) {
+    const building = this.getPlayerBuildingState()
+    if (!building || !facadeStyle.trim()) return false
+    building.facadeStyle = facadeStyle.trim()
+    return true
+  }
+
+  addPlayerEntrance(point: MapPoint) {
+    const building = this.getPlayerBuildingState()
+    if (!building || !this.isStoreInterior(point)) return false
+    if (building.entrances.some(entrance => samePoint(entrance, point))) return false
+    building.entrances.push({ ...point })
+    return true
+  }
+
+  removePlayerEntrance(point: MapPoint) {
+    const building = this.getPlayerBuildingState()
+    if (!building) return false
+    const index = building.entrances.findIndex(entrance => samePoint(entrance, point))
+    if (index < 0) return false
+    building.entrances.splice(index, 1)
+    return true
   }
 
   isStoreInterior(point: MapPoint) {
@@ -159,6 +189,7 @@ export class WorldMapRuntime {
       buildings: [...this.buildingStates.values()].map(state => ({
         ...state,
         interiorAreas: state.interiorAreas.map(area => ({ ...area })),
+        entrances: state.entrances.map(entrance => ({ ...entrance })),
       })),
     }
   }
