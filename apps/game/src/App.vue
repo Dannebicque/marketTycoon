@@ -3,12 +3,13 @@
     <header class="hud">
       <div class="brand"><span class="eyebrow">Market Tycoon</span><strong>Jour {{ ui.day }}</strong></div>
       <div class="hud-stat"><span>Budget</span><strong>{{ money(ui.cash) }}</strong></div>
-      <div class="hud-stat"><span>Heure</span><strong>{{ ui.time }}</strong></div>
       <div class="hud-stat"><span>Clients</span><strong>{{ ui.customers }}</strong></div>
       <div class="hud-stat"><span>Rayons</span><strong>{{ ui.shelfStock }}</strong></div>
       <div class="hud-stat"><span>Réserve</span><strong>{{ ui.reserveStock }}</strong></div>
       <div class="hud-stat positive"><span>CA du jour</span><strong>{{ money(ui.dayRevenue) }}</strong></div>
-      <button class="management-button" @click="openManagement('dashboard')">☰ Gestion</button>
+      <nav class="management-shortcuts" aria-label="Espaces de gestion">
+        <button v-for="shortcut in managementShortcuts" :key="shortcut.section" :class="{ active: managementOpen && activeManagementSection === shortcut.section }" :title="shortcut.title" @click="openManagement(shortcut.tab)"><span>{{ shortcut.icon }}</span><small>{{ shortcut.label }}</small></button>
+      </nav>
     </header>
 
     <nav class="category-toolbar" aria-label="Catégories d'outils">
@@ -97,7 +98,7 @@ import { StorePricingManager } from '@market-tycoon/economy'
 import Phaser from 'phaser'
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import EquipmentPanel from './components/EquipmentPanel.vue'
-import ManagementWindow, { type ManagementTab } from './components/management/ManagementWindow.vue'
+import ManagementWindow, { type ManagementSection, type ManagementTab } from './components/management/ManagementWindow.vue'
 import { BUILDINGS, getBuildingDefinition, getBuildingMenuCategories, getBuildingMenuCategoryKey, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
 import type { BuildingDefinition, BuildingKey, BuildingMenuCategoryDefinition, BuildingMenuCategoryKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
 import { EmployeeManager, type EmployeeState, type EmployeeWorkTask } from '@market-tycoon/employees'
@@ -160,6 +161,18 @@ const selectedItem = computed(() => [...shelves.value, ...storages.value, ...che
 const buildingViewModels = computed(() => [...shelves.value, ...storages.value, ...checkouts.value])
 const pendingOrders = computed(() => orders.value.filter(order => order.status === 'ordered'))
 const pricingLines = computed(() => products.value.map(product => { const summary = pricingManager.getSummary(product); return { ...summary, name: product.name, category: product.category, recommendedPrice: recommendedPrices.get(product.key) ?? product.salePrice } }))
+const managementShortcuts: Array<{section:ManagementSection;tab:ManagementTab;icon:string;label:string;title:string}> = [
+  { section:'overview', tab:'dashboard', icon:'📊', label:'Pilotage', title:'Pilotage et performances' },
+  { section:'commerce', tab:'pricing', icon:'📣', label:'Commerce', title:'Prix, promotions et publicité' },
+  { section:'operations', tab:'needs', icon:'🏪', label:'Exploitation', title:'Stocks, commandes et équipe' },
+  { section:'system', tab:'settings', icon:'⚙️', label:'Système', title:'Paramètres et sauvegarde' },
+]
+const activeManagementSection = computed<ManagementSection>(() => {
+  if (['dashboard','finances','customers'].includes(managementTab.value)) return 'overview'
+  if (['pricing','marketing','business-finance'].includes(managementTab.value)) return 'commerce'
+  if (['needs','reserve','orders','employees'].includes(managementTab.value)) return 'operations'
+  return 'system'
+})
 const managementAlerts = computed(() => {
   const alerts: string[] = []
   for (const capacity of storageCapacities.value) {
@@ -289,3 +302,12 @@ function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event
 onMounted(() => { if (!gameContainer.value) return; game = new Phaser.Game({ type: Phaser.AUTO, parent: gameContainer.value, width: gameContainer.value.clientWidth, height: gameContainer.value.clientHeight, backgroundColor: '#0f172a', scene: [StoreScene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }, render: { antialias: true } }); refreshEmployees(); window.addEventListener('keydown', handleAzertyShortcuts, { capture: true }); refreshTimer = window.setInterval(refreshUi, 250) })
 onBeforeUnmount(() => { const scene = getScene(); scene?.events.off('employee:selected', selectEmployee); employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
 </script>
+
+<style scoped>
+.hud{grid-template-columns:minmax(150px,1.2fr) repeat(5,minmax(78px,.75fr)) minmax(220px,1.35fr)}
+.management-shortcuts{min-width:0;padding:4px;display:grid;grid-template-columns:repeat(4,minmax(42px,1fr));gap:4px;border-radius:11px;background:rgba(15,23,42,.82)}
+.management-shortcuts button{min-width:0;padding:5px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid transparent;border-radius:8px;background:transparent;color:#94a3b8;cursor:pointer}
+.management-shortcuts button span{font-size:17px;line-height:1}.management-shortcuts button small{max-width:100%;overflow:hidden;font-size:8px;text-overflow:ellipsis;white-space:nowrap}.management-shortcuts button:hover{border-color:#475569;background:#1e293b;color:#e2e8f0}.management-shortcuts button.active{border-color:#4ade80;background:rgba(22,101,52,.34);color:#dcfce7}
+@media(max-width:1050px){.hud{grid-template-columns:minmax(140px,1fr) repeat(3,minmax(72px,.7fr)) minmax(190px,1.2fr)}.hud>.hud-stat:nth-of-type(4),.hud>.hud-stat:nth-of-type(5){display:none}}
+@media(max-width:760px){.management-shortcuts button small{display:none}.management-shortcuts{grid-template-columns:repeat(4,38px);justify-content:end}.hud{grid-template-columns:minmax(130px,1fr) minmax(75px,.7fr) auto}.hud>.hud-stat{display:none}.hud>.hud-stat:first-of-type{display:flex}}
+</style>
