@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "retail-park",
+  "name": "Parc commercial",
+  "description": "Un petit magasin de périphérie entouré de parcelles permettant une expansion progressive.",
+  "size": { "columns": 48, "rows": 36 },
+  "tile": { "width": 64, "height": 32 },
+  "theme": "retail-park",
+  "parcels": [
+    { "id": "starter-store", "name": "Magasin initial", "bounds": { "x": 8, "y": 10, "width": 16, "height": 14 }, "access": "owned", "usage": "store", "buildable": true },
+    { "id": "starter-parking", "name": "Parking initial", "bounds": { "x": 8, "y": 25, "width": 16, "height": 7 }, "access": "owned", "usage": "parking", "buildable": true },
+    { "id": "west-extension", "name": "Extension ouest", "bounds": { "x": 1, "y": 10, "width": 6, "height": 22 }, "access": "for-sale", "usage": "commercial", "price": 45000, "buildable": true },
+    { "id": "east-extension", "name": "Extension est", "bounds": { "x": 25, "y": 10, "width": 12, "height": 22 }, "access": "locked", "usage": "commercial", "unlockCondition": "store-level-2", "buildable": true },
+    { "id": "service-area", "name": "Zone logistique", "bounds": { "x": 8, "y": 3, "width": 16, "height": 6 }, "access": "reserved", "usage": "service", "unlockCondition": "logistics-expansion", "buildable": true },
+    { "id": "competitor-lot", "name": "Commerce voisin", "bounds": { "x": 38, "y": 10, "width": 9, "height": 12 }, "access": "unavailable", "usage": "commercial", "buildable": false },
+    { "id": "public-road", "name": "Avenue commerciale", "bounds": { "x": 0, "y": 33, "width": 48, "height": 3 }, "access": "public", "usage": "infrastructure", "buildable": false }
+  ],
+  "buildings": [
+    { "id": "player-store", "name": "Supérette MarketTycoon", "kind": "store", "bounds": { "x": 10, "y": 12, "width": 12, "height": 10 }, "owner": "player", "dynamic": true, "facadeStyle": "starter-modern", "entrances": [{ "x": 15, "y": 22 }] },
+    { "id": "neighbour-shop", "name": "Commerce voisin", "kind": "shop", "bounds": { "x": 39, "y": 12, "width": 7, "height": 8 }, "owner": "competitor", "dynamic": false, "facadeStyle": "retail-box" }
+  ],
+  "roads": [
+    { "id": "main-road", "kind": "road", "width": 3, "points": [{ "x": 0, "y": 34 }, { "x": 47, "y": 34 }] },
+    { "id": "delivery-road", "kind": "service-road", "width": 1, "points": [{ "x": 4, "y": 7 }, { "x": 26, "y": 7 }] }
+  ],
+  "spawnPoints": [
+    { "id": "customers-south", "kind": "customer", "x": 16, "y": 31, "direction": 0 },
+    { "id": "delivery-north", "kind": "delivery", "x": 16, "y": 4, "direction": 2 },
+    { "id": "employees-store", "kind": "employee", "x": 11, "y": 20, "direction": 0 }
+  ],
+  "initialStore": {
+    "parcelId": "starter-store",
+    "buildingId": "player-store",
+    "equipment": [
+      { "id": "starter-shelf-1", "definitionKey": "standard-shelf", "x": 13, "y": 15, "direction": 0 },
+      { "id": "starter-shelf-2", "definitionKey": "standard-shelf", "x": 16, "y": 15, "direction": 0 }
+    ],
+    "edges": []
+  }
+}
