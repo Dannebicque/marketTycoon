@@ -24,7 +24,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '8'
+const DEV_SCENARIO_VERSION = '9'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
