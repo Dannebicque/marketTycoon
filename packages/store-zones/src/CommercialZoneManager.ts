@@ -29,12 +29,13 @@ export interface CommercialZoneState {
 const cellKey = (x: number, y: number) => `${x}:${y}`
 
 export const DEFAULT_COMMERCIAL_SECTORS: CommercialSectorDefinition[] = [
-  { key: 'produce', name: 'Fruits et légumes', description: 'Produits frais végétaux.', icon: '🥕', color: 0x22c55e, defaultProductCategories: ['produce'] },
+  { key: 'produce', name: 'Fruits et légumes', description: 'Produits frais végétaux.', icon: '🥕', color: 0x22c55e, defaultProductCategories: ['fruit', 'vegetable'] },
   { key: 'fresh', name: 'Produits frais', description: 'Crèmerie, viande et produits réfrigérés.', icon: '🧀', color: 0x38bdf8, defaultProductCategories: ['fresh'] },
   { key: 'grocery', name: 'Épicerie', description: 'Produits alimentaires ambiants.', icon: '🥫', color: 0xf59e0b, defaultProductCategories: ['grocery'] },
-  { key: 'drinks', name: 'Boissons', description: 'Boissons fraîches et ambiantes.', icon: '🥤', color: 0x8b5cf6, defaultProductCategories: ['drinks'] },
+  { key: 'drinks', name: 'Boissons', description: 'Boissons fraîches et ambiantes.', icon: '🥤', color: 0x8b5cf6, defaultProductCategories: ['drink'] },
   { key: 'hygiene', name: 'Hygiène', description: 'Hygiène et entretien.', icon: '🧴', color: 0xec4899, defaultProductCategories: ['hygiene'] },
   { key: 'frozen', name: 'Surgelés', description: 'Produits conservés à température négative.', icon: '❄️', color: 0x06b6d4, defaultProductCategories: ['frozen'] },
+  { key: 'bakery', name: 'Boulangerie', description: 'Pain, viennoiseries et produits de boulangerie.', icon: '🥖', color: 0xd97706, defaultProductCategories: ['bakery'] },
 ]
 
 export class CommercialZoneManager {
