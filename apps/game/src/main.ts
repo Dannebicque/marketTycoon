@@ -16,6 +16,7 @@ import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentity
 import { installBuildInteractionTools } from './phaser/installBuildInteractionTools'
 import { installBuildModeHistory } from './phaser/installBuildModeHistory'
 import { installBuildToolController } from './phaser/installBuildToolController'
+import { installSurfaceBuildTools } from './phaser/installSurfaceBuildTools'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
@@ -38,7 +39,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '15'
+const DEV_SCENARIO_VERSION = '16'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -48,6 +49,7 @@ async function bootstrap() {
   installBuildModeHistory()
   installBuildToolController()
   installBuildInteractionTools()
+  installSurfaceBuildTools()
   installBuildingIdentityOverlay()
   installViewDisplay()
   installStoreZones()
