@@ -32,7 +32,9 @@
         >{{ item.label }}</button>
       </nav>
 
-      <div v-if="tab === 'dashboard'" class="management-content">
+      <DirectionPanel v-if="tab === 'direction'" />
+
+      <div v-else-if="tab === 'dashboard'" class="management-content">
         <div class="kpi-grid"><article><span>Trésorerie</span><strong>{{ money(ui.cash) }}</strong></article><article><span>CA du jour</span><strong>{{ money(ui.dayRevenue) }}</strong></article><article><span>Bénéfice</span><strong :class="ui.dayProfit >= 0 ? 'positive-text' : 'negative-text'">{{ money(ui.dayProfit) }}</strong></article><article><span>Clients</span><strong>{{ ui.customers }}</strong></article><article><span>Stock en rayon</span><strong>{{ ui.shelfStock }}</strong></article><article><span>Masse salariale</span><strong>{{ money(payroll) }}/j</strong></article></div>
         <h2>Alertes</h2><div v-if="!alerts.length" class="success-state">Aucune alerte logistique.</div><div v-for="alert in alerts" :key="alert" class="alert-card">{{ alert }}</div>
         <h2>Commandes en cours</h2><div v-if="!pendingOrders.length" class="empty-state">Aucune livraison en attente.</div><article v-for="order in pendingOrders" :key="order.id" class="order-card"><div><strong>{{ order.id }}</strong><span>Jour {{ order.expectedDay }}</span></div><small>{{ supplierName(order.supplierKey) }} · {{ money(order.orderedTotal) }}</small></article>
@@ -61,7 +63,7 @@
 </template>
 
 <script lang="ts">
-export type ManagementTab = 'dashboard' | 'finances' | 'needs' | 'reserve' | 'customers' | 'pricing' | 'marketing' | 'business-finance' | 'employees' | 'orders' | 'settings'
+export type ManagementTab = 'direction' | 'dashboard' | 'finances' | 'needs' | 'reserve' | 'customers' | 'pricing' | 'marketing' | 'business-finance' | 'employees' | 'orders' | 'settings'
 export type ManagementSection = 'overview' | 'commerce' | 'operations' | 'system'
 </script>
 <script setup lang="ts">
@@ -71,6 +73,7 @@ import type { EmployeeState, EmployeeWorkTask } from '@market-tycoon/employees'
 import { computed } from 'vue'
 import BusinessFinancePanel from './BusinessFinancePanel.vue'
 import CustomerAnalyticsPanel from './CustomerAnalyticsPanel.vue'
+import DirectionPanel from './DirectionPanel.vue'
 import EmployeesPanel from './EmployeesPanel.vue'
 import MarketingPanel from './MarketingPanel.vue'
 import PerformanceHistoryPanel from './PerformanceHistoryPanel.vue'
@@ -85,7 +88,7 @@ const props = defineProps<{ tab:ManagementTab; ui:any; alerts:string[]; pendingO
 const emit = defineEmits<{ close:[]; 'update:tab':[tab:ManagementTab]; 'submit-order':[supplierKey:string,lines:Array<{productKey:string;quantity:number}>]; 'update-price':[productKey:string,salePrice:number]; 'apply-markup':[markupRate:number]; hire:[candidateId:string]; dismiss:[employeeId:string]; assign:[employeeId:string,buildingId?:string]; 'select-employee':[employeeId?:string]; 'refresh-candidates':[]; 'save-game':[]; 'load-game':[]; 'delete-save':[] }>()
 
 const sections: SectionDefinition[] = [
-  { key:'overview', label:'Pilotage', icon:'📊', description:'Performance, finances et connaissance client.', tabs:[{key:'dashboard',label:'Tableau de bord'},{key:'finances',label:'Finances'},{key:'customers',label:'Clients'}] },
+  { key:'overview', label:'Pilotage', icon:'📊', description:'Prévisions, performance, finances et connaissance client.', tabs:[{key:'direction',label:'Direction'},{key:'dashboard',label:'Tableau de bord'},{key:'finances',label:'Finances'},{key:'customers',label:'Clients'}] },
   { key:'commerce', label:'Commerce', icon:'📣', description:'Prix, offres commerciales, publicité et financement.', tabs:[{key:'pricing',label:'Prix'},{key:'marketing',label:'Promotions'},{key:'business-finance',label:'Publicité & emprunts'}] },
   { key:'operations', label:'Exploitation', icon:'🏪', description:'Stocks, approvisionnement et organisation de l’équipe.', tabs:[{key:'needs',label:'Besoins'},{key:'reserve',label:'Réserve'},{key:'orders',label:'Commandes'},{key:'employees',label:'Équipe'}] },
   { key:'system', label:'Système', icon:'⚙️', description:'Préférences et gestion de la partie.', tabs:[{key:'settings',label:'Paramètres & sauvegarde'}] },
