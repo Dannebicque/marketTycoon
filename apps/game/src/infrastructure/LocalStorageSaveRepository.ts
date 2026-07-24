@@ -19,5 +19,10 @@ export function deleteSaveGame() {
 }
 
 export function hasSaveGame() {
-  return Boolean(localStorage.getItem(SAVE_GAME_STORAGE_KEY))
+  const save = readSaveGame()
+  if (!save) return false
+  // En développement, une sauvegarde vide ne doit pas empêcher le chargement
+  // du magasin de démonstration. Elle peut notamment rester après un HMR.
+  if (import.meta.env.DEV && save.buildings.length === 0 && save.edges.length === 0) return false
+  return true
 }
