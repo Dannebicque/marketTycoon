@@ -31,6 +31,21 @@ function samePoint(a: MapPoint, b: MapPoint) {
   return a.x === b.x && a.y === b.y
 }
 
+function overlaps(a: MapRect, b: MapRect) {
+  return a.x < b.x + b.width
+    && a.x + a.width > b.x
+    && a.y < b.y + b.height
+    && a.y + a.height > b.y
+}
+
+function rectCells(rect: MapRect): MapPoint[] {
+  const cells: MapPoint[] = []
+  for (let y = rect.y; y < rect.y + rect.height; y++) {
+    for (let x = rect.x; x < rect.x + rect.width; x++) cells.push({ x, y })
+  }
+  return cells
+}
+
 export class WorldMapRuntime {
   private readonly parcelStates = new Map<string, ParcelRuntimeState>()
   private readonly buildingStates = new Map<string, BuildingRuntimeState>()
@@ -135,6 +150,31 @@ export class WorldMapRuntime {
     return this.parcelStates.get(parcel.id)?.owned === true
   }
 
+  canBuildArea(area: MapRect) {
+    if (area.width < 1 || area.height < 1) return false
+    return rectCells(area).every(cell => this.isBuildable(cell))
+  }
+
+  addPlayerInteriorArea(area: MapRect) {
+    const building = this.getPlayerBuildingState()
+    if (!building || !this.canBuildArea(area)) return false
+    if (building.interiorAreas.some(existing => sameRect(existing, area))) return false
+    building.interiorAreas.push({ ...area })
+    return true
+  }
+
+  removePlayerInteriorArea(area: MapRect) {
+    const building = this.getPlayerBuildingState()
+    if (!building) return false
+    const initialBounds = this.getPlayerBuilding()?.bounds
+    if (initialBounds && sameRect(initialBounds, area)) return false
+    const index = building.interiorAreas.findIndex(existing => sameRect(existing, area))
+    if (index < 0) return false
+    building.interiorAreas.splice(index, 1)
+    building.entrances = building.entrances.filter(entrance => !contains(area, entrance))
+    return true
+  }
+
   canPurchase(parcelId: string) {
     const parcel = this.getParcel(parcelId)
     const state = this.parcelStates.get(parcelId)
@@ -156,7 +196,7 @@ export class WorldMapRuntime {
     const state = this.parcelStates.get(parcelId)
     const buildingState = this.getPlayerBuildingState()
     if (!parcel || !state?.owned || parcel.access !== 'for-sale') return false
-    if (buildingState?.interiorAreas.some(area => sameRect(area, parcel.bounds))) return false
+    if (buildingState?.interiorAreas.some(area => overlaps(area, parcel.bounds))) return false
     state.owned = false
     state.access = 'for-sale'
     return true
@@ -180,21 +220,13 @@ export class WorldMapRuntime {
   expandPlayerBuildingInto(parcelId: string) {
     if (!this.canExpandPlayerBuildingInto(parcelId)) return false
     const parcel = this.getParcel(parcelId)
-    const buildingState = this.getPlayerBuildingState()
-    if (!parcel || !buildingState) return false
-    buildingState.interiorAreas.push({ ...parcel.bounds })
-    return true
+    return parcel ? this.addPlayerInteriorArea(parcel.bounds) : false
   }
 
   retractPlayerBuildingFrom(parcelId: string) {
     const parcel = this.getParcel(parcelId)
-    const buildingState = this.getPlayerBuildingState()
-    if (!parcel || !buildingState || parcelId === this.definition.initialStore.parcelId) return false
-    const index = buildingState.interiorAreas.findIndex(area => sameRect(area, parcel.bounds))
-    if (index < 0) return false
-    buildingState.interiorAreas.splice(index, 1)
-    buildingState.entrances = buildingState.entrances.filter(entrance => !contains(parcel.bounds, entrance))
-    return true
+    if (!parcel || parcelId === this.definition.initialStore.parcelId) return false
+    return this.removePlayerInteriorArea(parcel.bounds)
   }
 
   unlock(parcelId: string) {
