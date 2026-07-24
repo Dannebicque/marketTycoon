@@ -14,6 +14,7 @@ import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentityOverlay'
 import { installBuildModeHistory } from './phaser/installBuildModeHistory'
+import { installBuildToolController } from './phaser/installBuildToolController'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
@@ -35,7 +36,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '12'
+const DEV_SCENARIO_VERSION = '13'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -43,6 +44,7 @@ async function bootstrap() {
   await loadWorldMap('retail-park')
   installWorldMapPhaserAdapter()
   installBuildModeHistory()
+  installBuildToolController()
   installBuildingIdentityOverlay()
   installViewDisplay()
   installStoreZones()
