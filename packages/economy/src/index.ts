@@ -30,6 +30,14 @@ export type {
   MarketEventKind,
   MarketEventState,
 } from './MarketEventManager'
+export { CompetitionManager, competitionManager } from './CompetitionManager'
+export type {
+  CompetitionEffect,
+  CompetitionState,
+  CompetitorDefinition,
+  CompetitorState,
+  CompetitorStrategy,
+} from './CompetitionManager'
 
 export { AdvertisingManager, advertisingManager, ADVERTISING_MEDIA } from './AdvertisingManager'
 export type {
