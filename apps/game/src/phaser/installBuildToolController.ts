@@ -1,4 +1,4 @@
-import { BuildToolController, invalidPlacement, validPlacement, type PlacementValidationResult } from '@market-tycoon/build-mode'
+import { BuildToolController, invalidPlacement, validPlacement, type BuildToolKind, type PlacementValidationResult } from '@market-tycoon/build-mode'
 import type { BuildingDefinition } from '@market-tycoon/catalog'
 import { StoreScene } from './StoreScene'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
@@ -9,6 +9,8 @@ interface BuildScene extends StoreScene {
 }
 
 let installed = false
+let activeController: BuildToolController | undefined
+let activeScene: BuildScene | undefined
 
 export function installBuildToolController() {
   if (installed) return
@@ -21,11 +23,8 @@ export function installBuildToolController() {
     const scene = this as BuildScene & Record<string, any>
     const controller = new BuildToolController()
     scene.buildTools = controller
-
-    const selected = scene.selected as BuildingDefinition | undefined
-    if (selected) controller.selectDefinition(selected.key, selected.category === 'wall' ? 'wall' : 'place')
-
-    scene.input.keyboard?.on('keydown-R', () => controller.rotate(1))
+    activeController = controller
+    activeScene = scene
     controller.subscribe(state => {
       window.dispatchEvent(new CustomEvent('market-tycoon:build-tool-changed', { detail: state }))
     })
@@ -43,6 +42,7 @@ export function installBuildToolController() {
   const originalPlaceSelected = prototype.placeSelected
   prototype.placeSelected = function () {
     const scene = this as BuildScene & Record<string, any>
+    if (!['place', 'wall'].includes(scene.buildTools?.snapshot.activeTool ?? 'place')) return originalPlaceSelected.call(this)
     const validation = validatePlacement(scene)
     window.dispatchEvent(new CustomEvent('market-tycoon:placement-validation', { detail: validation }))
     if (!validation.valid) {
@@ -51,6 +51,13 @@ export function installBuildToolController() {
     }
     return originalPlaceSelected.call(this)
   }
+
+  window.addEventListener('market-tycoon:build-tool-activate', event => {
+    const tool = (event as CustomEvent<{ tool: BuildToolKind }>).detail?.tool
+    if (!tool || !activeController) return
+    activeController.activate(tool)
+    if (tool !== 'place' && tool !== 'wall') activeScene?.selectBuilding(null)
+  })
 }
 
 function validatePlacement(scene: BuildScene & Record<string, any>): PlacementValidationResult {
