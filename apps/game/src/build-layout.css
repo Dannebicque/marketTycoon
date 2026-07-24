@@ -1,0 +1,41 @@
+.category-toolbar {
+  top: 174px;
+}
+
+.tool-palette {
+  top: 174px;
+  max-height: calc(100vh - 252px);
+}
+
+.selection-panel {
+  top: 174px;
+}
+
+@media (max-width: 1000px) {
+  .category-toolbar {
+    top: 174px;
+  }
+
+  .tool-palette,
+  .selection-panel {
+    top: 174px;
+  }
+}
+
+@media (max-width: 760px) {
+  .category-toolbar {
+    top: 166px;
+    bottom: 82px;
+  }
+
+  .tool-palette {
+    left: 96px;
+    top: 166px;
+    width: calc(100vw - 112px);
+    max-height: calc(100vh - 258px);
+  }
+
+  .selection-panel {
+    top: 166px;
+  }
+}
