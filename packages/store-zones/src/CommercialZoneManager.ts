@@ -26,13 +26,17 @@ export interface CommercialZoneState {
   zones: CommercialZoneInstance[]
 }
 
+export type CommercialZoneCoverageStatus = 'unassigned' | 'partial' | 'assigned' | 'mixed'
+export type CommercialLayoutSeverity = 'none' | 'info' | 'warning' | 'problem'
+
 export interface CommercialZoneCoverage {
   zoneId?: string
   sectorKey?: string
   coveredCells: number
   totalCells: number
   ratio: number
-  status: 'unassigned' | 'partial' | 'assigned' | 'mixed'
+  status: CommercialZoneCoverageStatus
+  severity: CommercialLayoutSeverity
 }
 
 const cellKey = (x: number, y: number) => `${x}:${y}`
@@ -124,18 +128,18 @@ export class CommercialZoneManager {
 
   getCoverage(cells: readonly CommercialZoneCell[]): CommercialZoneCoverage {
     const totalCells = cells.length
-    if (!totalCells) return { coveredCells: 0, totalCells: 0, ratio: 0, status: 'unassigned' }
+    if (!totalCells) return createCoverage('unassigned', 0, 0)
     const counts = new Map<string, number>()
     for (const cell of cells) {
       const zoneId = this.cells.get(cellKey(cell.x, cell.y))
       if (zoneId) counts.set(zoneId, (counts.get(zoneId) ?? 0) + 1)
     }
     const coveredCells = [...counts.values()].reduce((total, count) => total + count, 0)
-    if (!coveredCells) return { coveredCells, totalCells, ratio: 0, status: 'unassigned' }
-    const [zoneId, dominantCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]!
+    if (!coveredCells) return createCoverage('unassigned', coveredCells, totalCells)
+    const [zoneId] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]!
     const zone = this.zones.get(zoneId)
-    const status = counts.size > 1 ? 'mixed' : coveredCells < totalCells ? 'partial' : 'assigned'
-    return { zoneId, sectorKey: zone?.sectorKey, coveredCells, totalCells, ratio: coveredCells / totalCells, status }
+    const status: CommercialZoneCoverageStatus = counts.size > 1 ? 'mixed' : coveredCells < totalCells ? 'partial' : 'assigned'
+    return { ...createCoverage(status, coveredCells, totalCells), zoneId, sectorKey: zone?.sectorKey }
   }
 
   exportState(): CommercialZoneState {
@@ -157,6 +161,17 @@ export class CommercialZoneManager {
     const zone = this.zones.get(zoneId)
     if (zone) zone.cells = zone.cells.filter(cell => cell.x !== x || cell.y !== y)
   }
+}
+
+export function getCommercialLayoutSeverity(status: CommercialZoneCoverageStatus): CommercialLayoutSeverity {
+  if (status === 'unassigned') return 'info'
+  if (status === 'partial') return 'warning'
+  if (status === 'mixed') return 'problem'
+  return 'none'
+}
+
+function createCoverage(status: CommercialZoneCoverageStatus, coveredCells: number, totalCells: number): CommercialZoneCoverage {
+  return { coveredCells, totalCells, ratio: totalCells ? coveredCells / totalCells : 0, status, severity: getCommercialLayoutSeverity(status) }
 }
 
 function cloneDefinition(definition: CommercialSectorDefinition): CommercialSectorDefinition {
