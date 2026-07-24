@@ -11,6 +11,7 @@ import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } fr
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
+import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
 import { COMPETITION_STORAGE_KEY, installCompetition } from './simulation/installCompetition'
 import { CUSTOMER_MEMORY_STORAGE_KEY, installCustomerMemory } from './simulation/installCustomerMemory'
@@ -30,12 +31,13 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '10'
+const DEV_SCENARIO_VERSION = '11'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
   await loadWorldMap('retail-park')
+  installWorldMapPhaserAdapter()
   installViewDisplay()
   installStoreZones()
   installCommercialZones()
