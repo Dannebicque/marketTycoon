@@ -12,7 +12,6 @@ export { CustomerVisitAnalyticsManager, customerVisitAnalytics } from './Custome
 export type {
   CustomerAbandonReason,
   CustomerProfileVisitAnalytics,
-  CustomerVisitAbandoned,
   CustomerVisitAnalyticsState,
   CustomerVisitCompleted,
   CustomerVisitOutcome,
@@ -21,10 +20,9 @@ export type {
   CustomerVisitStarted,
   CustomerVisitSummary,
 } from './CustomerVisitAnalyticsManager'
-export { COMMERCIAL_ZONES, ZoneSatisfactionManager } from './ZoneSatisfactionManager'
+export { ZoneSatisfactionManager } from './ZoneSatisfactionManager'
 export type {
-  CommercialZoneDefinition,
-  CommercialZoneKey,
+  CommercialSatisfactionSource,
   ZoneSatisfactionBreakdown,
   ZoneSatisfactionSnapshot,
 } from './ZoneSatisfactionManager'
