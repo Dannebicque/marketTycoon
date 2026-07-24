@@ -1,3 +1,4 @@
+import Phaser from 'phaser'
 import { BuildSurfaceMap, floodFillCells, rectangleCells, type BuildCommand, type BuildToolController } from '@market-tycoon/build-mode'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import type { Direction } from '@market-tycoon/simulation-engine'
@@ -47,7 +48,10 @@ export function installSurfaceBuildTools() {
 
   window.addEventListener('market-tycoon:build-tool-changed', event => {
     const tool = (event as CustomEvent<{ activeTool: string }>).detail?.activeTool
-    if (tool !== 'room' && tool !== 'floor') rectangleStart = undefined
+    if (tool !== 'room' && tool !== 'floor') {
+      rectangleStart = undefined
+      window.dispatchEvent(new CustomEvent('market-tycoon:build-surface-selection', { detail: { tool, start: null } }))
+    }
   })
 }
 
@@ -77,6 +81,7 @@ function handleSurfacePointer(scene: SurfaceScene & Record<string, any>, pointer
   const cells = rectangleCells(rectangleStart, cell)
   const start = rectangleStart
   rectangleStart = undefined
+  window.dispatchEvent(new CustomEvent('market-tycoon:build-surface-selection', { detail: { tool, start: null } }))
   if (!cells.every(candidate => requireWorldMapRuntime().isStoreInterior(candidate))) {
     scene.setStatus('Le rectangle doit rester entièrement dans le magasin.', '#f87171')
     return
@@ -114,12 +119,8 @@ function applyRoomCommand(scene: SurfaceScene, start: { x: number; y: number }, 
   const beforeFloor = surfaces.snapshot()
   const placedWalls: Array<{ x: number; y: number; direction: Direction }> = []
   const perimeter: Array<{ x: number; y: number; direction: Direction }> = []
-  for (let x = minX; x <= maxX; x++) {
-    perimeter.push({ x, y: minY, direction: 0 }, { x, y: maxY, direction: 2 })
-  }
-  for (let y = minY; y <= maxY; y++) {
-    perimeter.push({ x: minX, y, direction: 3 }, { x: maxX, y, direction: 1 })
-  }
+  for (let x = minX; x <= maxX; x++) perimeter.push({ x, y: minY, direction: 0 }, { x, y: maxY, direction: 2 })
+  for (let y = minY; y <= maxY; y++) perimeter.push({ x: minX, y, direction: 3 }, { x: maxX, y, direction: 1 })
 
   for (const edge of perimeter) {
     const placed = mutations.placeRaw(wall, edge.x, edge.y, edge.direction)
