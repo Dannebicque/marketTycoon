@@ -33,7 +33,8 @@
     "buildingId": "player-store",
     "equipment": [
       { "id": "starter-shelf-1", "definitionKey": "standard-shelf", "x": 13, "y": 15, "direction": 0 },
-      { "id": "starter-shelf-2", "definitionKey": "standard-shelf", "x": 16, "y": 15, "direction": 0 }
+      { "id": "starter-shelf-2", "definitionKey": "standard-shelf", "x": 16, "y": 15, "direction": 0 },
+      { "id": "starter-checkout", "definitionKey": "standard-checkout", "x": 19, "y": 19, "direction": 0 }
     ],
     "edges": []
   }
