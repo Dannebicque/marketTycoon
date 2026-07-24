@@ -19,6 +19,7 @@ import { installMarketEvents, MARKET_EVENTS_STORAGE_KEY } from './simulation/ins
 import { installPricingInfluence } from './simulation/installPricingInfluence'
 import { installSimulationContext } from './simulation/SimulationContext'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
+import { loadWorldMap } from './world/worldMapRuntime'
 import { COMMERCIAL_ZONE_STORAGE_KEY } from './zones/commercialZoneRuntime'
 import { installCommercialZones } from './zones/installCommercialZones'
 import { installStoreZones } from './zones/installStoreZones'
@@ -34,6 +35,7 @@ const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
+  await loadWorldMap('retail-park')
   installViewDisplay()
   installStoreZones()
   installCommercialZones()
