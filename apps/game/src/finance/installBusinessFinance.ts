@@ -1,6 +1,5 @@
 import { advertisingManager, loanManager, type AdvertisingMedium, type AdvertisingState, type LoanState } from '@market-tycoon/economy'
 import { StoreSimulation } from '@market-tycoon/simulation-engine'
-import { StoreScene } from '../phaser/StoreScene'
 
 export const ADVERTISING_STORAGE_KEY = 'market-tycoon.advertising.v1'
 export const LOANS_STORAGE_KEY = 'market-tycoon.loans.v1'
@@ -8,7 +7,6 @@ export const LOANS_STORAGE_KEY = 'market-tycoon.loans.v1'
 let installed = false
 let activeSimulation: StoreSimulation | null = null
 let currentDay = 1
-let trafficTimer: number | undefined
 
 export function installBusinessFinance() {
   if (installed) return
@@ -22,18 +20,6 @@ export function installBusinessFinance() {
     const result = originalSetCurrentDay.call(this, day)
     processLoanInstallments(this, currentDay)
     return result
-  }
-
-  const originalCreate = StoreScene.prototype.create
-  StoreScene.prototype.create = function createWithAdvertising() {
-    originalCreate.call(this)
-    if (trafficTimer) window.clearInterval(trafficTimer)
-    trafficTimer = window.setInterval(() => {
-      if (this.currentMinutes >= 20 * 60 || this.currentMinutes < 8 * 60) return
-      const multiplier = advertisingManager.getTrafficMultiplier(this.day)
-      const extraChance = Math.min(.9, Math.max(0, multiplier - 1) * .32)
-      if (Math.random() < extraChance) void this.spawnCustomer()
-    }, 4_000)
   }
 
   window.addEventListener('beforeunload', persistBusinessFinance)
@@ -53,6 +39,7 @@ export function scheduleAdvertising(medium: AdvertisingMedium, startDay: number,
     return { ok: false as const, reason: 'Création de campagne impossible.' }
   }
   persistBusinessFinance()
+  window.dispatchEvent(new CustomEvent('market-tycoon:influence-source-changed'))
   return { ok: true as const, campaign }
 }
 
