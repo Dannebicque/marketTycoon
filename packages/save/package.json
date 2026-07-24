@@ -1,0 +1,12 @@
+{
+  "name": "@market-tycoon/save",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@market-tycoon/economy": "0.1.0",
+    "@market-tycoon/employees": "0.1.0",
+    "@market-tycoon/simulation-engine": "0.1.0"
+  }
+}

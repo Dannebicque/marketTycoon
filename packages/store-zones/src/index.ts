@@ -1,0 +1,6 @@
+export { StoreZoneManager } from './StoreZoneManager'
+export { ZONES, getZoneDefinition } from './catalog'
+export { defineZone } from './contracts'
+export { validateZones } from './ZoneValidator'
+export type { ZoneCell, ZoneConstraints, ZoneCostDefinition, ZoneDefinition, ZoneSummary } from './contracts'
+export type { ZoneBoundaryEdge, ZoneComponentValidation, ZoneValidationGrid, ZoneValidationIssue, ZoneValidationIssueCode, ZoneValidationReport } from './ZoneValidator'

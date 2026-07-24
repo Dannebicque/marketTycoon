@@ -1,0 +1,313 @@
+<template>
+  <main class="app-shell">
+    <header class="hud">
+      <div class="brand"><span class="eyebrow">Market Tycoon</span><strong>Jour {{ ui.day }}</strong></div>
+      <div class="hud-stat"><span>Budget</span><strong>{{ money(ui.cash) }}</strong></div>
+      <div class="hud-stat"><span>Clients</span><strong>{{ ui.customers }}</strong></div>
+      <div class="hud-stat"><span>Rayons</span><strong>{{ ui.shelfStock }}</strong></div>
+      <div class="hud-stat"><span>Réserve</span><strong>{{ ui.reserveStock }}</strong></div>
+      <div class="hud-stat positive"><span>CA du jour</span><strong>{{ money(ui.dayRevenue) }}</strong></div>
+      <nav class="management-shortcuts" aria-label="Espaces de gestion">
+        <button v-for="shortcut in managementShortcuts" :key="shortcut.section" :class="{ active: managementOpen && activeManagementSection === shortcut.section }" :title="shortcut.title" @click="openManagement(shortcut.tab)"><span>{{ shortcut.icon }}</span><small>{{ shortcut.label }}</small></button>
+      </nav>
+    </header>
+
+    <nav class="category-toolbar" aria-label="Catégories d'outils">
+      <button v-for="category in toolCategories" :key="category.key" :class="{ active: activeCategory === category.key }" @click="activeCategory = category.key">
+        <span class="category-icon">{{ category.icon }}</span>
+        <span><strong>{{ category.label }}</strong><small>{{ category.description }}</small></span>
+        <span class="category-chevron">›</span>
+      </button>
+    </nav>
+
+    <aside v-if="activeCategory" class="tool-palette" :class="{ compact: activeCategory === 'operations' }" aria-label="Choix disponibles">
+      <header><div><span class="eyebrow">{{ currentCategory.label }}</span><strong>{{ currentCategory.description }}</strong></div><button class="palette-close" title="Fermer" @click="activeCategory = null">×</button></header>
+      <div v-if="activeCategory !== 'operations'" class="tool-grid">
+        <button v-for="tool in visibleTools" :key="tool.key" :disabled="!progressionAccess.isAccessible(tool)" :class="{ active: activeTool === tool.key, locked: !progressionAccess.isAccessible(tool) }" :title="toolTitle(tool)" @click="selectTool(tool.key)">
+          <span class="tool-icon">{{ progressionAccess.isAccessible(tool) ? (tool.toolbar?.icon ?? '•') : '🔒' }}</span>
+          <span class="tool-copy"><strong>{{ tool.name }}</strong><small>{{ progressionAccess.isAccessible(tool) ? tool.description : unlockLabel(tool.requiredUnlockKey) }}</small></span>
+          <span class="tool-price">{{ progressionAccess.isAccessible(tool) ? `${tool.price} €` : 'Verrouillé' }}</span>
+        </button>
+        <p v-if="!visibleTools.length" class="palette-empty">Aucun objet disponible dans cette catégorie.</p>
+      </div>
+      <div v-else class="operation-grid">
+        <button @click="command('spawnCustomer')"><span class="tool-icon">🧍</span><span><strong>Ajouter un client</strong><small>Lancer immédiatement une visite.</small></span></button>
+        <button :class="{ active: ui.autoSpawn }" @click="command('toggleAutoSpawn')"><span class="tool-icon">🚶</span><span><strong>Arrivées automatiques</strong><small>{{ ui.autoSpawn ? 'Actives' : 'Inactives' }}</small></span></button>
+        <button @click="command('restock')"><span class="tool-icon">📦</span><span><strong>Réassort</strong><small>Demander le remplissage des rayons.</small></span></button>
+        <button @click="openManagement('employees')"><span class="tool-icon">👷</span><span><strong>Employés</strong><small>Recruter et affecter l’équipe.</small></span></button>
+      </div>
+    </aside>
+
+    <section class="time-controls" aria-label="Contrôle du temps">
+      <div class="day-control"><span>Jour {{ ui.day }}</span><strong>{{ ui.time }}</strong></div>
+      <button class="pause-control" :class="{ active: simulationPaused }" :title="simulationPaused ? 'Reprendre' : 'Mettre en pause'" @click="toggleSimulationPause">{{ simulationPaused ? '▶' : 'Ⅱ' }}</button>
+      <div class="speed-controls" role="group" aria-label="Vitesse de simulation">
+        <button v-for="speed in simulationSpeeds" :key="speed" :class="{ active: simulationSpeed === speed }" @click="setSimulationSpeed(speed)">×{{ speed }}</button>
+      </div>
+      <button class="next-day-control" :disabled="ui.customers > 0 && !ui.storeOpen" @click="advanceDay">{{ ui.storeOpen ? 'Terminer la journée' : ui.customers > 0 ? 'Départ des clients…' : 'Jour suivant' }}</button>
+    </section>
+
+    <section ref="gameContainer" class="game-container" />
+    <EquipmentPanel :selected-item="selectedItem" :shelves="shelves" :storages="storages" :checkouts="checkouts" @select="selectBuilding" @assign-product="assignProduct" @restock-slot="restockSlot" @restock-equipment="restockEquipment" @open-management="openManagement" />
+
+    <ManagementWindow
+      v-if="managementOpen"
+      :tab="managementTab"
+      :ui="ui"
+      :alerts="managementAlerts"
+      :pending-orders="pendingOrders"
+      :suppliers="suppliers"
+      :storage-capacities="storageCapacities"
+      :reserve-lines="reserveLines"
+      :orders="orders"
+      :products="products"
+      :pricing-lines="pricingLines"
+      :customer-analytics="customerAnalytics"
+      :order-message="orderMessage"
+      :order-message-type="orderMessageType"
+      :employees="employees"
+      :candidates="candidates"
+      :employee-roles="employeeRoles"
+      :employee-tasks="employeeTasks"
+      :selected-employee-id="selectedEmployeeId"
+      :checkouts="checkouts"
+      :buildings="buildingViewModels"
+      :payroll="payroll"
+      :has-save="saveAvailable"
+      :save-message="saveMessage"
+      @close="managementOpen = false"
+      @update:tab="managementTab = $event"
+      @submit-order="submitOrder"
+      @update-price="updateProductPrice"
+      @apply-markup="applyMarkup"
+      @hire="hireEmployee"
+      @dismiss="dismissEmployee"
+      @assign="assignEmployee"
+      @select-employee="selectEmployee"
+      @refresh-candidates="refreshCandidates"
+      @save-game="saveGame"
+      @load-game="loadGame"
+      @delete-save="deleteCurrentSave"
+    />
+  </main>
+</template>
+
+<script setup lang="ts">
+import type { CustomerAnalyticsSummary, CustomerPurchaseObservation, ProductCustomerAnalytics } from '@market-tycoon/analytics'
+import { StorePricingManager } from '@market-tycoon/economy'
+import Phaser from 'phaser'
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import EquipmentPanel from './components/EquipmentPanel.vue'
+import ManagementWindow, { type ManagementSection, type ManagementTab } from './components/management/ManagementWindow.vue'
+import { BUILDINGS, getBuildingDefinition, getBuildingMenuCategories, getBuildingMenuCategoryKey, getProductDefinition, isCheckoutDefinition, isShelfDefinition, isStorageDefinition } from '@market-tycoon/catalog'
+import type { BuildingDefinition, BuildingKey, BuildingMenuCategoryDefinition, BuildingMenuCategoryKey, EmployeeRoleDefinition, ProductDefinition, StorageType } from '@market-tycoon/catalog'
+import { EmployeeManager, type EmployeeState, type EmployeeWorkTask } from '@market-tycoon/employees'
+import { ProgressionAccessPolicy, type ProgressionManager } from '@market-tycoon/progression'
+import { EmployeeRuntime } from './phaser/employees/EmployeeRuntime'
+import { SAVE_GAME_VERSION, type SaveGameV1 } from '@market-tycoon/save'
+import { deleteSaveGame, hasSaveGame, readSaveGame, storeSaveGame } from './infrastructure/LocalStorageSaveRepository'
+import { initializeDevelopmentScenario } from './dev/initializeDevelopmentScenario'
+import { StoreScene } from './phaser/StoreScene'
+
+const OPERATIONS_CATEGORY: BuildingMenuCategoryDefinition = { key: 'operations', label: 'Exploitation', description: 'Clients et équipe', icon: '⚙️', order: 1_000 }
+const progression = inject<ProgressionManager>('progression')
+if (!progression) throw new Error('ProgressionManager non fourni à l’application.')
+const progressionAccess = new ProgressionAccessPolicy(progression)
+
+const gameContainer = ref<HTMLElement | null>(null)
+const activeTool = ref<BuildingKey>('standard-shelf')
+const activeCategory = ref<BuildingMenuCategoryKey | null>('equipment')
+const selectedId = ref<string | null>(null)
+const selectedEmployeeId = ref<string | undefined>()
+const managementOpen = ref(false)
+const managementTab = ref<ManagementTab>('dashboard')
+const orderMessage = ref('')
+const orderMessageType = ref<'success' | 'error'>('success')
+const saveMessage = ref('')
+const saveAvailable = ref(hasSaveGame())
+const simulationPaused = ref(false)
+const simulationSpeed = ref(1)
+const simulationSpeeds = [1, 2, 4]
+let game: Phaser.Game | null = null
+let refreshTimer: number | undefined
+let processedDay = 0
+let payrollProcessedDay = 1
+let employeeRuntime: EmployeeRuntime | null = null
+let workforcePoliciesInstalled = false
+let employeeSelectionInstalled = false
+let pricingInitialized = false
+let developmentScenarioChecked = false
+
+const employeeManager = new EmployeeManager()
+const pricingManager = new StorePricingManager()
+const recommendedPrices = new Map<string, number>()
+const tools = BUILDINGS
+const toolCategories = [...getBuildingMenuCategories(tools), OPERATIONS_CATEGORY].sort((a, b) => a.order - b.order)
+const currentCategory = computed(() => toolCategories.find(category => category.key === activeCategory.value) ?? toolCategories[0])
+const visibleTools = computed<BuildingDefinition[]>(() => activeCategory.value === 'operations'
+  ? []
+  : tools.filter(tool => getBuildingMenuCategoryKey(tool) === activeCategory.value).filter(tool => progressionAccess.isVisible(tool)))
+const ui = reactive({ cash: 2000, day: 1, time: '08:00', customers: 0, shelfStock: 0, reserveStock: 0, autoSpawn: false, storeOpen: true, dayRevenue: 0, dayProfit: 0, dayConstructionCost: 0, dayMerchandiseCost: 0, dayOperatingCost: 0, dayExpenses: 0 })
+const shelves = ref<any[]>([]), storages = ref<any[]>([]), checkouts = ref<any[]>([]), suppliers = ref<any[]>([]), orders = ref<any[]>([]), reserveLines = ref<any[]>([]), storageCapacities = ref<any[]>([])
+const products = ref<ProductDefinition[]>([])
+const employees = ref<EmployeeState[]>([])
+const candidates = ref<EmployeeState[]>([])
+const employeeRoles = ref<EmployeeRoleDefinition[]>([])
+const employeeTasks = ref<EmployeeWorkTask[]>([])
+const emptySummary = (): CustomerAnalyticsSummary => ({ observations: 0, requestedQuantity: 0, acceptedQuantity: 0, rejectedQuantity: 0, conversionRate: 0, estimatedLostRevenue: 0, averageSatisfactionDelta: 0 })
+const customerAnalytics = reactive<{ day: number; daySummary: CustomerAnalyticsSummary; allSummary: CustomerAnalyticsSummary; dayProducts: ProductCustomerAnalytics[]; allProducts: ProductCustomerAnalytics[]; recent: CustomerPurchaseObservation[] }>({ day: 1, daySummary: emptySummary(), allSummary: emptySummary(), dayProducts: [], allProducts: [], recent: [] })
+const payroll = computed(() => employeeManager.getDailyPayroll())
+const selectedItem = computed(() => [...shelves.value, ...storages.value, ...checkouts.value].find(item => item.id === selectedId.value))
+const buildingViewModels = computed(() => [...shelves.value, ...storages.value, ...checkouts.value])
+const pendingOrders = computed(() => orders.value.filter(order => order.status === 'ordered'))
+const pricingLines = computed(() => products.value.map(product => { const summary = pricingManager.getSummary(product); return { ...summary, name: product.name, category: product.category, recommendedPrice: recommendedPrices.get(product.key) ?? product.salePrice } }))
+const managementShortcuts: Array<{section:ManagementSection;tab:ManagementTab;icon:string;label:string;title:string}> = [
+  { section:'overview', tab:'dashboard', icon:'📊', label:'Pilotage', title:'Pilotage et performances' },
+  { section:'commerce', tab:'pricing', icon:'📣', label:'Commerce', title:'Prix, promotions et publicité' },
+  { section:'operations', tab:'needs', icon:'🏪', label:'Exploitation', title:'Stocks, commandes et équipe' },
+  { section:'system', tab:'settings', icon:'⚙️', label:'Système', title:'Paramètres et sauvegarde' },
+]
+const activeManagementSection = computed<ManagementSection>(() => {
+  if (['dashboard','finances','customers'].includes(managementTab.value)) return 'overview'
+  if (['pricing','marketing','business-finance'].includes(managementTab.value)) return 'commerce'
+  if (['needs','reserve','orders','employees'].includes(managementTab.value)) return 'operations'
+  return 'system'
+})
+const managementAlerts = computed(() => {
+  const alerts: string[] = []
+  for (const capacity of storageCapacities.value) {
+    if (capacity.capacity === 0) alerts.push(`Aucune réserve ${storageLabel(capacity.type)} construite.`)
+    else if (capacity.ratio >= .85) alerts.push(`La réserve ${storageLabel(capacity.type)} est presque pleine (${capacity.used}/${capacity.capacity}).`)
+  }
+  if (ui.shelfStock === 0) alerts.push('Aucun produit disponible dans les rayons.')
+  if (progression.isUnlocked('core-store') && !employeeManager.hasRole('cashier')) alerts.push('Aucun caissier recruté : les caisses classiques sont fermées.')
+  if (progression.isUnlocked('core-store') && !employeeManager.hasRole('stocker')) alerts.push('Aucun employé de rayon : le réassort automatique est indisponible.')
+  if (progression.isUnlocked('advanced-logistics') && !employeeManager.hasRole('technician')) alerts.push('Aucun technicien : les incidents de caisse dureront plus longtemps.')
+  const urgentTasks = employeeTasks.value.filter(task => task.status === 'pending' && task.priority >= 80)
+  if (urgentTasks.length) alerts.push(`${urgentTasks.length} tâche(s) urgente(s) attendent une prise en charge.`)
+  const lossCount = pricingLines.value.filter(line => line.isLossLeader).length
+  const lowMarginCount = pricingLines.value.filter(line => !line.isLossLeader && line.markupRate < .1).length
+  if (lossCount) alerts.push(`${lossCount} produit(s) sont vendus à perte.`)
+  if (lowMarginCount) alerts.push(`${lowMarginCount} produit(s) ont une marge inférieure à 10 %.`)
+  const highLossProducts = customerAnalytics.dayProducts.filter(line => line.observations >= 3 && line.quantityConversionRate < .6)
+  if (highLossProducts.length) alerts.push(`${highLossProducts.length} produit(s) perdent plus de 40 % de la demande client. Consultez l’onglet Clients.`)
+  if (customerAnalytics.daySummary.estimatedLostRevenue >= 20) alerts.push(`${money(customerAnalytics.daySummary.estimatedLostRevenue)} de CA potentiel perdu aujourd’hui selon les décisions d’achat.`)
+  return alerts
+})
+
+function unlockLabel(key?: string) { return key ? `Débloqué avec ${key}` : 'Disponible' }
+function toolTitle(tool: BuildingDefinition) { return progressionAccess.isAccessible(tool) ? tool.description : `${tool.description} — ${unlockLabel(tool.requiredUnlockKey)}` }
+function getScene() { return game ? game.scene.getScene('StoreScene') as StoreScene : null }
+function openManagement(tab: ManagementTab) { managementTab.value = tab; managementOpen.value = true; refreshUi() }
+function selectEmployee(employeeId?: string) { selectedEmployeeId.value = employeeId; if (employeeId) openManagement('employees') }
+function selectTool(key: BuildingKey) { const tool = getBuildingDefinition(key); if (!tool || !progressionAccess.isAccessible(tool)) { saveMessage.value = tool ? unlockLabel(tool.requiredUnlockKey) : 'Équipement inconnu.'; return } activeTool.value = key; getScene()?.select(key) }
+function selectBuilding(id: string | null) { selectedId.value = id; getScene()?.selectBuilding(id) }
+function command(name: 'spawnCustomer' | 'toggleAutoSpawn' | 'restock') { const scene = getScene(); if (!scene) return; if (name === 'restock' && !employeeManager.hasRole('stocker')) { openManagement('employees'); return } if (name === 'spawnCustomer') void scene.spawnCustomer(); else if (name === 'restock') saveMessage.value = 'Les employés de rayon gèrent automatiquement le réassort.'; else scene[name]() }
+function toggleSimulationPause() { simulationPaused.value = !simulationPaused.value; applySimulationSpeed() }
+function setSimulationSpeed(speed: number) { simulationSpeed.value = speed; simulationPaused.value = false; applySimulationSpeed() }
+function applySimulationSpeed() { const scene = getScene(); if (!scene) return; const scale = simulationPaused.value ? 0 : simulationSpeed.value; scene.time.timeScale = scale; scene.tweens.timeScale = scale }
+function advanceDay() { const scene = getScene(); if (!scene) return; if (ui.storeOpen) { simulationPaused.value = false; applySimulationSpeed(); scene.currentMinutes = 20 * 60; return } if (!scene.customers.size) scene.startNextDay() }
+function assignProduct(buildingId: string, slotId: string, event: Event) { getScene()?.configureCompartment(buildingId, slotId, (event.target as HTMLSelectElement).value || null); refreshUi() }
+function restockSlot(buildingId: string, slotId: string) { getScene()?.restockCompartment(buildingId, slotId); refreshUi() }
+function restockEquipment(buildingId: string) { getScene()?.restockEquipment(buildingId); refreshUi() }
+function submitOrder(supplierKey: string, lines: Array<{ productKey: string; quantity: number }>) { const scene = getScene(); if (!scene) return; const order = scene.simulation.createPurchaseOrder(supplierKey, lines, scene.day); orderMessageType.value = order ? 'success' : 'error'; orderMessage.value = order ? `${order.id} enregistrée. Livraison prévue au jour ${order.expectedDay}.` : 'Le bon de commande n’a pas pu être enregistré.'; refreshUi() }
+function updateProductPrice(productKey: string, salePrice: number) { if (!pricingManager.setSalePrice(productKey, salePrice)) { saveMessage.value = 'Le prix de vente doit être supérieur à 0.'; return } applyPricingToProducts(); saveMessage.value = `Prix de ${getProductDefinition(productKey)?.name ?? productKey} mis à jour.` }
+function applyMarkup(markupRate: number) { pricingManager.applyMarkup(products.value, markupRate); applyPricingToProducts(); saveMessage.value = `Coefficient de marge de ${(markupRate * 100).toFixed(0)} % appliqué à tous les produits.` }
+function initializePricing(source: ProductDefinition[]) { if (pricingInitialized) return; source.forEach(product => recommendedPrices.set(product.key, product.salePrice)); pricingManager.reset(source); pricingInitialized = true }
+function applyPricingToProducts() { for (const product of products.value) product.salePrice = pricingManager.getSalePrice(product) }
+function hireEmployee(candidateId: string) { const scene = getScene(); if (!scene) return; const candidate = employeeManager.getCandidates().find(item => item.id === candidateId); const role = candidate ? employeeManager.getRoles().find(item => item.key === candidate.roleKey) : undefined; if (!candidate || !role || !progressionAccess.isAccessible(role)) { saveMessage.value = role ? unlockLabel(role.requiredUnlockKey) : 'Candidat introuvable.'; return } const employee = employeeManager.hire(candidateId, scene.day); saveMessage.value = employee ? `${employee.firstName} ${employee.lastName} a rejoint l’équipe.` : 'Candidat introuvable.'; if (employee) selectedEmployeeId.value = employee.id; syncWorkforce() }
+function dismissEmployee(employeeId: string) { employeeManager.dismiss(employeeId); if (selectedEmployeeId.value === employeeId) selectedEmployeeId.value = undefined; syncWorkforce() }
+function assignEmployee(employeeId: string, buildingId?: string) { employeeManager.assign(employeeId, buildingId); syncWorkforce() }
+function refreshCandidates() { employeeManager.refreshCandidates(getScene()?.day ?? 1); refreshEmployees() }
+function refreshEmployees() { employees.value = employeeManager.getEmployees(); employeeRoles.value = employeeManager.getRoles().filter(role => progressionAccess.isVisible(role)); const accessibleRoleKeys = new Set(employeeRoles.value.filter(role => progressionAccess.isAccessible(role)).map(role => role.key)); candidates.value = employeeManager.getCandidates().filter(candidate => accessibleRoleKeys.has(candidate.roleKey)); employeeTasks.value = employeeManager.tasks.getTasks() }
+function syncWorkforce() { employeeRuntime?.sync(); refreshEmployees(); refreshUi() }
+
+function ensureEmployeeRuntime(scene: StoreScene) {
+  if (!employeeRuntime) employeeRuntime = new EmployeeRuntime(scene, employeeManager)
+  employeeRuntime.sync()
+  if (!employeeSelectionInstalled) {
+    employeeSelectionInstalled = true
+    scene.events.on('employee:selected', selectEmployee)
+  }
+  if (workforcePoliciesInstalled) return
+  workforcePoliciesInstalled = true
+  const originalChooseCheckout = scene.simulation.chooseCheckout.bind(scene.simulation)
+  scene.simulation.chooseCheckout = (available, basket, payment) => originalChooseCheckout(available.filter(checkout => employeeRuntime?.isCheckoutStaffed(checkout)), basket, payment)
+  const originalCheckoutTiming = scene.simulation.getCheckoutTiming.bind(scene.simulation)
+  scene.simulation.getCheckoutTiming = (checkout, articleCount, payment) => { const timing = originalCheckoutTiming(checkout, articleCount, payment); if (!timing.incident) return timing; void employeeRuntime?.requestRepair(checkout); const quality = employeeManager.getAverageQuality('technician'); const repairDelay = quality > 0 ? Math.max(900, Math.round(3_800 * (1.15 - quality / 130))) : 4_000; return { ...timing, durationMs: Math.max(0, timing.durationMs - 4_000 + repairDelay) } }
+}
+function applyPayroll(day: number) { const scene = getScene(); if (!scene || payrollProcessedDay >= day) return; const cost = employeeManager.getDailyPayroll(); scene.simulation.metrics.cash -= cost; scene.simulation.metrics.operatingExpenses += cost; payrollProcessedDay = day }
+
+function saveGame() {
+  const scene = getScene(); if (!scene) return
+  const simulation = scene.simulation
+  const save: SaveGameV1 = {
+    version: SAVE_GAME_VERSION, savedAt: new Date().toISOString(), day: scene.day, currentMinutes: scene.currentMinutes,
+    metrics: { ...simulation.metrics },
+    buildings: scene.grid.getBuildings().map(building => ({ oldId: building.id, definitionKey: building.definition.key, gridX: building.gridX, gridY: building.gridY, direction: building.direction, compartments: simulation.getEquipmentInventory(building.id)?.compartments.map(slot => ({ id: slot.id, productKey: slot.productKey, quantity: slot.quantity, capacity: slot.capacity, averageUnitCost: slot.averageUnitCost })) })),
+    edges: scene.grid.getEdges().map(edge => ({ definitionKey: edge.definitionKey, gridX: edge.gridX, gridY: edge.gridY, direction: edge.direction })),
+    reserve: simulation.reserve.exportState(), purchaseOrders: simulation.purchaseOrders.exportState(), employees: employeeManager.exportState(), pricing: pricingManager.exportState(),
+  }
+  storeSaveGame(save); saveAvailable.value = true; saveMessage.value = `Partie sauvegardée le ${new Date(save.savedAt).toLocaleString('fr-FR')}.`
+}
+
+function loadGame() {
+  const save = readSaveGame(), scene = getScene()
+  if (!save || !scene || scene.customers.size) { saveMessage.value = 'Chargement impossible pendant la présence de clients.'; return }
+  employeeRuntime?.destroy(); employeeRuntime = null; employeeSelectionInstalled = false
+  for (const edge of scene.grid.getEdges()) scene.grid.removeAt(edge.gridX, edge.gridY, edge.direction)
+  for (const building of scene.grid.getBuildings()) scene.grid.removeAt(building.gridX, building.gridY)
+  const idMap = new Map<string, string>()
+  for (const saved of save.buildings) { const definition = getBuildingDefinition(saved.definitionKey); if (!definition) continue; const placed = scene.grid.place(definition, saved.gridX, saved.gridY, saved.direction); if (placed && 'definition' in placed) idMap.set(saved.oldId, placed.id) }
+  for (const edge of save.edges) { const definition = getBuildingDefinition(edge.definitionKey); if (definition) scene.grid.place(definition, edge.gridX, edge.gridY, edge.direction) }
+  scene.simulation.syncBuildings(scene.grid.getBuildings())
+  for (const saved of save.buildings) { const newId = idMap.get(saved.oldId); const inventory = newId ? scene.simulation.getEquipmentInventory(newId) : undefined; if (!inventory || !saved.compartments) continue; for (const savedSlot of saved.compartments) { const slot = inventory.compartments.find(item => item.id === savedSlot.id); if (slot) Object.assign(slot, savedSlot) } }
+  Object.assign(scene.simulation.metrics, save.metrics)
+  scene.simulation.reserve.importState(save.reserve); scene.simulation.purchaseOrders.importState(save.purchaseOrders)
+  employeeManager.importState({ ...save.employees, employees: save.employees.employees?.map(employee => ({ ...employee, assignedBuildingId: employee.assignedBuildingId ? idMap.get(employee.assignedBuildingId) : undefined })) })
+  pricingManager.importState(save.pricing, scene.simulation.getProducts()); products.value = scene.simulation.getProducts(); applyPricingToProducts()
+  scene.day = save.day; scene.currentMinutes = save.currentMinutes; processedDay = save.day; payrollProcessedDay = save.day
+  scene.rotateScene(1); scene.rotateScene(-1); ensureEmployeeRuntime(scene); refreshEmployees(); refreshUi(); saveMessage.value = `Partie du ${new Date(save.savedAt).toLocaleString('fr-FR')} chargée.`
+}
+
+function deleteCurrentSave() { deleteSaveGame(); saveAvailable.value = false; saveMessage.value = 'Sauvegarde supprimée.' }
+function refreshUi() {
+  const scene = getScene(); if (!scene) return
+  if (!developmentScenarioChecked) {
+    developmentScenarioChecked = true
+    if (!saveAvailable.value && initializeDevelopmentScenario(scene, employeeManager)) saveMessage.value = 'Mode développement : magasin de démonstration initialisé.'
+  }
+  ensureEmployeeRuntime(scene)
+  const simulation = scene.simulation
+  simulation.setCurrentDay(scene.day)
+  simulation.syncBuildings(scene.grid.getBuildings())
+  if (processedDay !== scene.day) { simulation.processDeliveries(scene.day); applyPayroll(scene.day); employeeManager.refreshCandidates(scene.day); processedDay = scene.day }
+  const minutes = scene.currentMinutes
+  Object.assign(ui, { cash: simulation.metrics.cash, day: scene.day, time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`, customers: scene.customers.size, shelfStock: simulation.getTotalShelfStock(), reserveStock: simulation.getTotalReserveStock(), autoSpawn: scene.autoSpawn, storeOpen: minutes < 20 * 60, dayRevenue: simulation.getDayRevenue(), dayProfit: simulation.getDayProfit(), dayConstructionCost: simulation.getDayConstructionExpenses(), dayMerchandiseCost: simulation.getDayMerchandiseExpenses(), dayOperatingCost: simulation.getDayOperatingExpenses() })
+  ui.dayExpenses = ui.dayConstructionCost + ui.dayMerchandiseCost + ui.dayOperatingCost
+  const buildings = scene.grid.getBuildings()
+  shelves.value = buildings.filter(b => isShelfDefinition(b.definition)).map(building => { const definition = building.definition, inventory = simulation.getEquipmentInventory(building.id); const slots = (inventory?.compartments ?? []).map(slot => { const product = slot.productKey ? getProductDefinition(slot.productKey) : undefined; return { ...slot, productName: product?.name ?? 'Vide', reserveQuantity: product ? simulation.getReserveQuantity(product.key) : 0, color: product ? `#${product.color.toString(16).padStart(6, '0')}` : '#334155' } }); return { id: building.id, type: 'shelf', buildingName: definition.name, description: definition.description, columns: definition.layout.columns, levels: definition.layout.levels, slots, stock: slots.reduce((sum, slot) => sum + slot.quantity, 0), capacity: slots.reduce((sum, slot) => sum + slot.capacity, 0), configuredSlots: slots.filter(slot => slot.productKey).length, compatibleProducts: simulation.getCompatibleProducts(building.id).map(product => ({ key: product.key, name: product.name, capacity: product.capacities[definition.layout.compartmentType] ?? 0 })), columnGroups: Array.from({ length: definition.layout.columns }, (_, index) => ({ index, slots: slots.filter(slot => slot.column === index).sort((a, b) => b.level - a.level) })) } })
+  storages.value = buildings.filter(b => isStorageDefinition(b.definition)).map(building => { const type = building.definition.storageType, capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { id: building.id, type: 'storage', buildingName: building.definition.name, description: building.definition.description, storageType: type, capacity, used, free: Math.max(0, capacity - used), ratio: capacity ? used / capacity : 0 } })
+  checkouts.value = buildings.filter(b => isCheckoutDefinition(b.definition)).map(building => { const assigned = employeeManager.getAssignedTo(building.id); return { id: building.id, type: 'checkout', buildingName: building.definition.name, description: building.definition.description, queueLength: simulation.queueLength(building.id), busy: simulation.isCheckoutBusy(building.id), payments: building.definition.acceptedPayments.map(paymentLabel), employeeName: assigned ? `${assigned.firstName} ${assigned.lastName}` : null, open: !building.definition.requiresEmployee || Boolean(assigned) } })
+  suppliers.value = simulation.getSuppliers(); orders.value = simulation.getPurchaseOrders(); products.value = simulation.getProducts(); initializePricing(products.value); applyPricingToProducts(); reserveLines.value = simulation.getReserveLines().map(line => ({ ...line, productName: getProductDefinition(line.productKey)?.name ?? line.productKey })); storageCapacities.value = (['ambient', 'cold', 'frozen'] as StorageType[]).map(type => { const capacity = simulation.getStorageCapacity(type), used = simulation.getStorageUsed(type); return { type, capacity, used, ratio: capacity ? used / capacity : 0 } })
+  Object.assign(customerAnalytics, { day: scene.day, daySummary: simulation.customerAnalytics.getSummary(scene.day), allSummary: simulation.customerAnalytics.getSummary(), dayProducts: simulation.customerAnalytics.getProductAnalytics(scene.day), allProducts: simulation.customerAnalytics.getProductAnalytics(), recent: simulation.customerAnalytics.getRecent(30) })
+  selectedId.value = scene.selectedBuildingId; refreshEmployees()
+}
+
+function storageLabel(type: StorageType) { return type === 'ambient' ? 'ambiante' : type === 'cold' ? 'froide' : 'surgelée' }
+function paymentLabel(value: string) { return value === 'contactless' ? 'sans contact' : value === 'card' ? 'carte' : 'espèces' }
+function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0) }
+function handleAzertyShortcuts(event: KeyboardEvent) { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || managementOpen.value) return; const target = event.target as HTMLElement | null; if (target?.matches('input, textarea, select, button, [contenteditable="true"]')) return; const key = event.key.toLocaleLowerCase('fr-FR'), scene = getScene(); if (!scene) return; if (!event.shiftKey && key === 'a') scene.rotateScene(-1); if (!event.shiftKey && key === 'e') scene.rotateScene(1); if (event.code === 'Space') { event.preventDefault(); toggleSimulationPause() } if (event.shiftKey && key === 'a') command('restock'); if (event.shiftKey && key === 's') scene.toggleAutoSpawn() }
+
+onMounted(() => { if (!gameContainer.value) return; game = new Phaser.Game({ type: Phaser.AUTO, parent: gameContainer.value, width: gameContainer.value.clientWidth, height: gameContainer.value.clientHeight, backgroundColor: '#0f172a', scene: [StoreScene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }, render: { antialias: true } }); refreshEmployees(); window.addEventListener('keydown', handleAzertyShortcuts, { capture: true }); refreshTimer = window.setInterval(refreshUi, 250) })
+onBeforeUnmount(() => { const scene = getScene(); scene?.events.off('employee:selected', selectEmployee); employeeRuntime?.destroy(); window.removeEventListener('keydown', handleAzertyShortcuts, { capture: true }); if (refreshTimer) window.clearInterval(refreshTimer); game?.destroy(true) })
+</script>
+
+<style scoped>
+.hud{grid-template-columns:minmax(150px,1.2fr) repeat(5,minmax(78px,.75fr)) minmax(220px,1.35fr)}
+.management-shortcuts{min-width:0;padding:4px;display:grid;grid-template-columns:repeat(4,minmax(42px,1fr));gap:4px;border-radius:11px;background:rgba(15,23,42,.82)}
+.management-shortcuts button{min-width:0;padding:5px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid transparent;border-radius:8px;background:transparent;color:#94a3b8;cursor:pointer}
+.management-shortcuts button span{font-size:17px;line-height:1}.management-shortcuts button small{max-width:100%;overflow:hidden;font-size:8px;text-overflow:ellipsis;white-space:nowrap}.management-shortcuts button:hover{border-color:#475569;background:#1e293b;color:#e2e8f0}.management-shortcuts button.active{border-color:#4ade80;background:rgba(22,101,52,.34);color:#dcfce7}
+@media(max-width:1050px){.hud{grid-template-columns:minmax(140px,1fr) repeat(3,minmax(72px,.7fr)) minmax(190px,1.2fr)}.hud>.hud-stat:nth-of-type(4),.hud>.hud-stat:nth-of-type(5){display:none}}
+@media(max-width:760px){.management-shortcuts button small{display:none}.management-shortcuts{grid-template-columns:repeat(4,38px);justify-content:end}.hud{grid-template-columns:minmax(130px,1fr) minmax(75px,.7fr) auto}.hud>.hud-stat{display:none}.hud>.hud-stat:first-of-type{display:flex}}
+</style>

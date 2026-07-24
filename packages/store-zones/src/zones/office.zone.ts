@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'office', name:'Bureaux', description:'Administration, gestion et espaces réservés au personnel.', icon:'💼', color:0xa855f7, order:30, costs:{ electricityPerCell:.55, cleaningPerCell:.3, maintenancePerCell:.12, heatingPerCell:.22, securityPerCell:.04 }, constraints:{ indoor:true, requiresWalls:true, requiresDoor:true, minimumArea:4 }, allowedBuildingCategories:['wall','door'] })

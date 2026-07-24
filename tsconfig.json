@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "noEmit": true,
+    "paths": {
+      "@market-tycoon/simulation-engine": ["packages/simulation-engine/src/index.ts"],
+      "@market-tycoon/economy": ["packages/economy/src/index.ts"],
+      "@market-tycoon/analytics": ["packages/analytics/src/index.ts"],
+      "@market-tycoon/employees": ["packages/employees/src/index.ts"],
+      "@market-tycoon/events": ["packages/events/src/index.ts"],
+      "@market-tycoon/save": ["packages/save/src/index.ts"],
+      "@market-tycoon/catalog": ["packages/catalog/src/index.ts"],
+      "@market-tycoon/customers": ["packages/customers/src/index.ts"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.vue", "packages/**/*.ts", "scripts/**/*.mjs"]
+}

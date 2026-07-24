@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "title": "Paramètres",
+    "intro": "Configurez les préférences générales du jeu.",
+    "language": "Langue",
+    "languageHelp": "Le changement est appliqué immédiatement et mémorisé sur cet appareil."
+  },
+  "management": {
+    "eyebrow": "Pilotage du magasin",
+    "title": "Gestion et suivi",
+    "tabs": {
+      "dashboard": "Tableau de bord",
+      "finances": "Finances",
+      "reserve": "Réserve",
+      "customers": "Clients",
+      "pricing": "Prix & marges",
+      "employees": "Employés",
+      "orders": "Commandes",
+      "settings": "Paramètres"
+    }
+  },
+  "objects": {
+    "standard-shelf": {
+      "name": "Rayon standard",
+      "description": "Un rayon polyvalent pour les produits d'épicerie."
+    }
+  },
+  "phaser": {
+    "objectSelected": "{name} sélectionné · {price} €"
+  }
+}

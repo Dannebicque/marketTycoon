@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "levels": [
+    {
+      "level": 1,
+      "title": "Commerce de proximité",
+      "description": "Les bases du magasin.",
+      "requiredObjectiveKeys": [],
+      "unlockKeys": ["core-store"]
+    },
+    {
+      "level": 2,
+      "title": "Supermarché local",
+      "description": "Une activité structurée et une première équipe.",
+      "requiredObjectiveKeys": [
+        "welcome-first-customer",
+        "serve-first-customers",
+        "reach-first-revenue"
+      ],
+      "unlockKeys": ["cold-chain"]
+    },
+    {
+      "level": 3,
+      "title": "Supermarché établi",
+      "description": "Le magasin entre dans une nouvelle phase de développement.",
+      "requiredObjectiveKeys": ["expand-store", "build-team"],
+      "unlockKeys": ["advanced-logistics"]
+    },
+    {
+      "level": 4,
+      "title": "Enseigne régionale",
+      "description": "Le magasin est prêt pour les systèmes avancés.",
+      "requiredObjectiveKeys": ["complete-week"],
+      "unlockKeys": ["marketing", "automation"]
+    }
+  ],
+  "objectives": [
+    {
+      "key": "welcome-first-customer",
+      "title": "Premiers clients",
+      "description": "Accueillir 5 clients.",
+      "metric": "customers-entered",
+      "target": 5,
+      "level": 1
+    },
+    {
+      "key": "serve-first-customers",
+      "title": "Premières ventes",
+      "description": "Servir 3 clients.",
+      "metric": "customers-served",
+      "target": 3,
+      "level": 1
+    },
+    {
+      "key": "reach-first-revenue",
+      "title": "Premier chiffre d’affaires",
+      "description": "Atteindre 100 € de chiffre d’affaires cumulé.",
+      "metric": "revenue",
+      "target": 100,
+      "level": 1
+    },
+    {
+      "key": "expand-store",
+      "title": "Agrandir le magasin",
+      "description": "Construire 5 équipements.",
+      "metric": "buildings-placed",
+      "target": 5,
+      "level": 2
+    },
+    {
+      "key": "build-team",
+      "title": "Former une équipe",
+      "description": "Recruter 3 employés.",
+      "metric": "employees-hired",
+      "target": 3,
+      "level": 2
+    },
+    {
+      "key": "complete-week",
+      "title": "Installer le magasin",
+      "description": "Terminer 7 journées.",
+      "metric": "days-completed",
+      "target": 7,
+      "level": 3
+    }
+  ]
+}

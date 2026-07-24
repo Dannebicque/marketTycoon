@@ -1,0 +1,11 @@
+{
+  "name": "@market-tycoon/analytics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@market-tycoon/catalog": "0.3.0",
+    "@market-tycoon/customers": "0.1.0"
+  }
+}
