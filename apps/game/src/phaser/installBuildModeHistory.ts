@@ -1,5 +1,5 @@
 import { BuildHistory, type BuildCommand } from '@market-tycoon/build-mode'
-import type { BuildingDefinition } from '@market-tycoon/catalog'
+import { getBuildingDefinition } from '@market-tycoon/catalog'
 import type { Direction, GridManager, PlacedBuilding, PlacedEdge } from '@market-tycoon/simulation-engine'
 import { StoreScene } from './StoreScene'
 
@@ -100,16 +100,11 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
 function capturePlacement(grid: GridManager, x: number, y: number, direction?: Direction) {
   if (direction !== undefined) {
     const edge = grid.getEdges().find(item => item.gridX === x && item.gridY === y && item.direction === direction)
-    if (edge) return { definition: requireDefinition(edge), x, y, direction }
+    const definition = edge ? getBuildingDefinition(edge.definitionKey) : undefined
+    if (edge && definition) return { definition, x, y, direction }
   }
   const building = grid.getBuildingAt(x, y)
   return building ? { definition: building.definition, x: building.gridX, y: building.gridY, direction: building.direction } : undefined
-}
-
-function requireDefinition(edge: PlacedEdge): BuildingDefinition {
-  const definition = (edge as PlacedEdge & { definition?: BuildingDefinition }).definition
-  if (definition) return definition
-  throw new Error(`Définition absente pour l'arête ${edge.definitionKey}.`)
 }
 
 function installKeyboardHistory(scene: StoreScene, history: BuildHistory) {
@@ -138,5 +133,5 @@ function refreshScene(scene: StoreScene) {
 }
 
 function setSceneStatus(scene: StoreScene, message: string) {
-  ;(scene as StoreScene & { setStatus(message: string, color?: string): void }).setStatus(message, '#86efac')
+  ;(scene as any).setStatus(message, '#86efac')
 }
