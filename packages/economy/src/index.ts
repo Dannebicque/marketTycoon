@@ -1,5 +1,10 @@
 export { StorePricingManager } from './StorePricingManager'
-export type { ProductPricingSummary, StoreProductPricing } from './StorePricingManager'
+export type {
+  PricePosition,
+  ProductPricingSummary,
+  StorePricingSnapshot,
+  StoreProductPricing,
+} from './StorePricingManager'
 export { MarketDemandManager } from './MarketDemandManager'
 export type {
   CustomerPriceContext,
