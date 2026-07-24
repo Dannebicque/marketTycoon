@@ -12,6 +12,7 @@ import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentityOverlay'
 import { installBuildModeHistory } from './phaser/installBuildModeHistory'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
@@ -42,6 +43,7 @@ async function bootstrap() {
   await loadWorldMap('retail-park')
   installWorldMapPhaserAdapter()
   installBuildModeHistory()
+  installBuildingIdentityOverlay()
   installViewDisplay()
   installStoreZones()
   installCommercialZones()
