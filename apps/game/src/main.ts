@@ -11,6 +11,7 @@ import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
+import { COMPETITION_STORAGE_KEY, installCompetition } from './simulation/installCompetition'
 import { CUSTOMER_MEMORY_STORAGE_KEY, installCustomerMemory } from './simulation/installCustomerMemory'
 import { installInfluence, STORE_REPUTATION_STORAGE_KEY } from './simulation/installInfluence'
 import { installMarketEvents, MARKET_EVENTS_STORAGE_KEY } from './simulation/installMarketEvents'
@@ -35,6 +36,7 @@ async function bootstrap() {
   installPromotions()
   installBusinessFinance()
   installSimulationContext()
+  installCompetition()
   installMarketEvents()
   installInfluence()
   installCustomerMemory()
@@ -85,6 +87,7 @@ function migrateDevelopmentScenario() {
   localStorage.removeItem(STORE_REPUTATION_STORAGE_KEY)
   localStorage.removeItem(CUSTOMER_MEMORY_STORAGE_KEY)
   localStorage.removeItem(MARKET_EVENTS_STORAGE_KEY)
+  localStorage.removeItem(COMPETITION_STORAGE_KEY)
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
 
