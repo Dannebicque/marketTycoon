@@ -1,6 +1,8 @@
 export { JsonWorldMapSource, WorldMapLoader } from './WorldMapLoader'
+export { WorldMapRuntime } from './WorldMapRuntime'
 export { requireValidWorldMap, validateWorldMap } from './WorldMapValidator'
 export type { WorldMapSource } from './WorldMapLoader'
+export type { ParcelRuntimeState } from './WorldMapRuntime'
 export type { WorldMapValidationResult } from './WorldMapValidator'
 export type {
   InitialEdgeDefinition,
