@@ -5,6 +5,7 @@ import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
+import ParcelInfoWidget from './components/world/ParcelInfoWidget.vue'
 import CommercialZoneWidget from './components/zones/CommercialZoneWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
@@ -61,6 +62,11 @@ async function bootstrap() {
   storeIdentityRoot.id = 'store-identity-ui'
   document.body.appendChild(storeIdentityRoot)
   createApp(StoreIdentityWidget).mount(storeIdentityRoot)
+
+  const parcelRoot = document.createElement('div')
+  parcelRoot.id = 'parcel-info-ui'
+  document.body.appendChild(parcelRoot)
+  createApp(ParcelInfoWidget).mount(parcelRoot)
 
   const zoneRoot = document.createElement('div')
   zoneRoot.id = 'zone-ui'
