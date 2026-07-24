@@ -5,6 +5,7 @@ import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
+import CommercialZoneWidget from './components/zones/CommercialZoneWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
@@ -18,6 +19,8 @@ import { installMarketEvents, MARKET_EVENTS_STORAGE_KEY } from './simulation/ins
 import { installPricingInfluence } from './simulation/installPricingInfluence'
 import { installSimulationContext } from './simulation/SimulationContext'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
+import { COMMERCIAL_ZONE_STORAGE_KEY } from './zones/commercialZoneRuntime'
+import { installCommercialZones } from './zones/installCommercialZones'
 import { installStoreZones } from './zones/installStoreZones'
 import './style.css'
 import './progression.css'
@@ -26,13 +29,14 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '9'
+const DEV_SCENARIO_VERSION = '10'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
   installViewDisplay()
   installStoreZones()
+  installCommercialZones()
   installStoreNeeds()
   installPromotions()
   installBusinessFinance()
@@ -59,6 +63,11 @@ async function bootstrap() {
   document.body.appendChild(zoneRoot)
   createApp(ZoneToolbarWidget, { progression }).mount(zoneRoot)
 
+  const commercialZoneRoot = document.createElement('div')
+  commercialZoneRoot.id = 'commercial-zone-ui'
+  document.body.appendChild(commercialZoneRoot)
+  createApp(CommercialZoneWidget).mount(commercialZoneRoot)
+
   const progressionRoot = document.createElement('div')
   progressionRoot.id = 'progression-ui'
   document.body.appendChild(progressionRoot)
@@ -81,6 +90,7 @@ function migrateDevelopmentScenario() {
 
   localStorage.removeItem(SAVE_GAME_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.zones.v1')
+  localStorage.removeItem(COMMERCIAL_ZONE_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.analytics.v1')
   localStorage.removeItem(PROMOTIONS_STORAGE_KEY)
   localStorage.removeItem(PROMOTION_ANALYTICS_STORAGE_KEY)
