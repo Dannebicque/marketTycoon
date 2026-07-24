@@ -9,18 +9,18 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Valider les cartes avant leur utilisation par le rendu
 - [x] Ajouter une carte de démonstration « Parc commercial »
 - [x] Ajouter une carte de démonstration « Centre-ville »
-- [ ] Créer un `WorldMapRuntime` pour suivre propriété, achats et déblocages
-- [ ] Charger une carte avant l'initialisation de la scène Phaser
-- [ ] Instancier le magasin et les équipements initiaux depuis la carte
-- [ ] Séparer cellules accessibles, constructibles et possédées
-- [ ] Ajouter l'overlay et le panneau d'achat des parcelles
+- [x] Créer un `WorldMapRuntime` pour suivre propriété, achats et déblocages
+- [x] Charger une carte avant l'initialisation de la scène Phaser
+- [x] Instancier le magasin et les équipements initiaux depuis la carte
+- [x] Séparer cellules accessibles, constructibles et possédées
+- [x] Ajouter l'overlay et le panneau d'achat des parcelles
 
 ## 2. Bâtiments dynamiques
 
-- [ ] Introduire une entité bâtiment indépendante de ses murs et équipements
+- [x] Introduire une entité bâtiment indépendante de ses murs et équipements
 - [ ] Gérer emprise, entrées, façade, enseigne et style
-- [ ] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
-- [ ] Conserver l'identité du bâtiment lors des transformations
+- [x] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
+- [x] Conserver l'identité du bâtiment lors des transformations
 - [ ] Préparer les annexes : réserve, drive, bureaux, quai et galerie
 - [ ] Préparer plusieurs niveaux sans rendre cette fonctionnalité obligatoire
 
