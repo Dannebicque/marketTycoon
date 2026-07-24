@@ -8,6 +8,9 @@ export interface CommercialSatisfactionSource {
   categories: ProductCategory[]
   zoneCount?: number
   cellCount?: number
+  shelfCount?: number
+  partialShelfCount?: number
+  mixedShelfCount?: number
 }
 
 export interface ZoneSatisfactionBreakdown {
@@ -26,6 +29,9 @@ export interface ZoneSatisfactionSnapshot {
   acceptedQuantity: number
   zoneCount: number
   cellCount: number
+  shelfCount: number
+  partialShelfCount: number
+  mixedShelfCount: number
   breakdown: ZoneSatisfactionBreakdown
   strongestIssue?: keyof ZoneSatisfactionBreakdown
 }
@@ -66,6 +72,9 @@ export class ZoneSatisfactionManager {
       acceptedQuantity,
       zoneCount: source.zoneCount ?? 0,
       cellCount: source.cellCount ?? 0,
+      shelfCount: source.shelfCount ?? 0,
+      partialShelfCount: source.partialShelfCount ?? 0,
+      mixedShelfCount: source.mixedShelfCount ?? 0,
       breakdown,
       strongestIssue: strongestIssue && breakdown[strongestIssue] < 75 ? strongestIssue : undefined,
     }
