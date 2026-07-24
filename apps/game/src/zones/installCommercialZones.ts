@@ -1,6 +1,15 @@
 import Phaser from 'phaser'
+import type { BuildCommand } from '@market-tycoon/build-mode'
 import { StoreScene } from '../phaser/StoreScene'
+import type { BuildMutationApi } from '../phaser/installBuildModeHistory'
 import { commercialZoneManager, commercialZoneRuntime } from './commercialZoneRuntime'
+
+interface CommercialZoneScene extends StoreScene {
+  buildMutations?: BuildMutationApi
+  commercialZoneLayer?: Phaser.GameObjects.Graphics
+}
+
+type CommercialZoneState = ReturnType<typeof commercialZoneManager.exportState>
 
 let installed = false
 
@@ -11,7 +20,7 @@ export function installCommercialZones() {
   const originalCreate = prototype.create
   prototype.create = function () {
     originalCreate.call(this)
-    const scene = this as StoreScene & Record<string, any>
+    const scene = this as CommercialZoneScene
     scene.commercialZoneLayer = scene.add.graphics().setDepth(13)
     commercialZoneRuntime.setRedraw(() => drawCommercialZones(scene))
     commercialZoneRuntime.setShelfCoverageResolver(() => scene.grid.getBuildings('shelf').map((building: any) => ({
@@ -20,24 +29,55 @@ export function installCommercialZones() {
     })))
     commercialZoneRuntime.restore()
     let painting = false
+    let beforePaint: CommercialZoneState | undefined
+
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!commercialZoneRuntime.isEditing()) return
       painting = true
+      beforePaint = cloneState(commercialZoneManager.exportState())
       paintAtPointer(scene, pointer)
     })
     scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!painting || (!pointer.leftButtonDown() && !pointer.rightButtonDown())) return
       paintAtPointer(scene, pointer)
     })
-    scene.input.on('pointerup', () => { painting = false })
+    scene.input.on('pointerup', () => {
+      if (!painting) return
+      painting = false
+      const afterPaint = cloneState(commercialZoneManager.exportState())
+      if (beforePaint && JSON.stringify(beforePaint) !== JSON.stringify(afterPaint)) {
+        recordZonePainting(scene, beforePaint, afterPaint)
+      }
+      beforePaint = undefined
+    })
     drawCommercialZones(scene)
   }
   const originalRotate = prototype.rotateScene
   prototype.rotateScene = function (step: -1 | 1) {
     const result = originalRotate.call(this, step)
-    drawCommercialZones(this as StoreScene & Record<string, any>)
+    drawCommercialZones(this as CommercialZoneScene)
     return result
   }
+}
+
+function recordZonePainting(scene: CommercialZoneScene, before: CommercialZoneState, after: CommercialZoneState) {
+  const history = scene.buildMutations?.history
+  if (!history) return
+  const apply = (state: CommercialZoneState) => {
+    commercialZoneManager.importState(cloneState(state))
+    commercialZoneRuntime.notifyChanged()
+    return true
+  }
+  const command: BuildCommand = {
+    label: commercialZoneRuntime.eraseMode ? 'Effacer une zone commerciale' : 'Peindre une zone commerciale',
+    execute: () => apply(after),
+    undo: () => apply(before),
+  }
+  history.record(command)
+}
+
+function cloneState(state: CommercialZoneState): CommercialZoneState {
+  return JSON.parse(JSON.stringify(state)) as CommercialZoneState
 }
 
 function paintAtPointer(scene: StoreScene & Record<string, any>, pointer: Phaser.Input.Pointer) {
@@ -49,8 +89,8 @@ function paintAtPointer(scene: StoreScene & Record<string, any>, pointer: Phaser
   commercialZoneRuntime.notifyChanged()
 }
 
-function drawCommercialZones(scene: StoreScene & Record<string, any>) {
-  const layer = scene.commercialZoneLayer as Phaser.GameObjects.Graphics | undefined
+function drawCommercialZones(scene: CommercialZoneScene) {
+  const layer = scene.commercialZoneLayer
   if (!layer) return
   layer.clear()
   const editing = commercialZoneRuntime.isEditing()
