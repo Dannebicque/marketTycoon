@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
 import BuildHistoryWidget from './components/build/BuildHistoryWidget.vue'
+import BuildToolStatusWidget from './components/build/BuildToolStatusWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
@@ -74,6 +75,11 @@ async function bootstrap() {
   buildHistoryRoot.id = 'build-history-ui'
   document.body.appendChild(buildHistoryRoot)
   createApp(BuildHistoryWidget).mount(buildHistoryRoot)
+
+  const buildToolRoot = document.createElement('div')
+  buildToolRoot.id = 'build-tool-ui'
+  document.body.appendChild(buildToolRoot)
+  createApp(BuildToolStatusWidget).mount(buildToolRoot)
 
   const parcelRoot = document.createElement('div')
   parcelRoot.id = 'parcel-info-ui'
