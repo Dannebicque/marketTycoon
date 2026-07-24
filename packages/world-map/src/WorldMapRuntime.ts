@@ -32,12 +32,27 @@ export class WorldMapRuntime {
     return this.definition.parcels.find(parcel => parcel.id === id)
   }
 
+  getParcels() {
+    return this.definition.parcels.map(parcel => ({
+      ...parcel,
+      access: this.parcelStates.get(parcel.id)?.access ?? parcel.access,
+    }))
+  }
+
   getParcelState(id: string) {
     return this.parcelStates.get(id)
   }
 
   getParcelAt(point: MapPoint) {
     return this.definition.parcels.find(parcel => contains(parcel.bounds, point))
+  }
+
+  getPlayerBuildings() {
+    return this.definition.buildings.filter(building => building.owner === 'player')
+  }
+
+  isInsidePlayerBuilding(point: MapPoint) {
+    return this.getPlayerBuildings().some(building => contains(building.bounds, point))
   }
 
   getOwnedParcels() {
@@ -47,20 +62,26 @@ export class WorldMapRuntime {
   getPurchasableParcels() {
     return this.definition.parcels.filter(parcel => {
       const state = this.parcelStates.get(parcel.id)
-      return parcel.access === 'for-sale' && state?.unlocked && !state.owned
+      return state?.access === 'for-sale' && state.unlocked && !state.owned
     })
   }
 
+  /** Land ownership/buildability, used by future exterior construction tools. */
   isBuildable(point: MapPoint) {
     const parcel = this.getParcelAt(point)
     if (!parcel?.buildable) return false
     return this.parcelStates.get(parcel.id)?.owned === true
   }
 
+  /** Interior equipment and commercial-zone editing are limited to the store envelope. */
+  isStoreInterior(point: MapPoint) {
+    return this.isBuildable(point) && this.isInsidePlayerBuilding(point)
+  }
+
   canPurchase(parcelId: string) {
     const parcel = this.getParcel(parcelId)
     const state = this.parcelStates.get(parcelId)
-    return Boolean(parcel && state && parcel.access === 'for-sale' && state.unlocked && !state.owned)
+    return Boolean(parcel && state && state.access === 'for-sale' && state.unlocked && !state.owned)
   }
 
   purchase(parcelId: string) {
