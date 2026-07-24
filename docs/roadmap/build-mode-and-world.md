@@ -14,6 +14,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Instancier le magasin et les équipements initiaux depuis la carte
 - [x] Séparer cellules accessibles, constructibles et possédées
 - [x] Ajouter l'overlay et le panneau d'achat des parcelles
+- [x] Distinguer aperçu au survol et sélection de parcelle épinglée au clic
 
 ## 2. Bâtiments dynamiques
 
@@ -43,7 +44,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
-- [ ] Intégrer les zones, extensions et achats dans le même historique
+- [x] Intégrer achats de parcelles, extensions et peinture des zones dans le même historique
 - [x] Afficher les causes précises d'un placement invalide
 - [ ] Viser moins de trois actions pour les opérations courantes
 
