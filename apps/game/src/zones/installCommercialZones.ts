@@ -14,6 +14,10 @@ export function installCommercialZones() {
     const scene = this as StoreScene & Record<string, any>
     scene.commercialZoneLayer = scene.add.graphics().setDepth(13)
     commercialZoneRuntime.setRedraw(() => drawCommercialZones(scene))
+    commercialZoneRuntime.setShelfCoverageResolver(() => scene.grid.getBuildings('shelf').map((building: any) => ({
+      buildingId: building.id,
+      ...commercialZoneManager.getCoverage(scene.grid.getFootprint(building.definition, building.gridX, building.gridY, building.direction)),
+    })))
     commercialZoneRuntime.restore()
     let painting = false
     scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
