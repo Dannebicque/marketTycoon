@@ -1,13 +1,13 @@
 import type { ProductCategory } from '@market-tycoon/catalog'
 import type { ProductCustomerAnalytics } from './CustomerAnalyticsManager'
 
-export type CommercialZoneKey = 'fruit-and-vegetables' | 'fresh' | 'grocery' | 'drinks' | 'hygiene' | 'frozen'
-
-export interface CommercialZoneDefinition {
-  key: CommercialZoneKey
+export interface CommercialSatisfactionSource {
+  key: string
   name: string
   icon: string
   categories: ProductCategory[]
+  zoneCount?: number
+  cellCount?: number
 }
 
 export interface ZoneSatisfactionBreakdown {
@@ -17,33 +17,26 @@ export interface ZoneSatisfactionBreakdown {
 }
 
 export interface ZoneSatisfactionSnapshot {
-  key: CommercialZoneKey
+  key: string
   name: string
   icon: string
   score: number
   observations: number
   requestedQuantity: number
   acceptedQuantity: number
+  zoneCount: number
+  cellCount: number
   breakdown: ZoneSatisfactionBreakdown
   strongestIssue?: keyof ZoneSatisfactionBreakdown
 }
 
-export const COMMERCIAL_ZONES: CommercialZoneDefinition[] = [
-  { key: 'fruit-and-vegetables', name: 'Fruits et légumes', icon: '🍎', categories: ['fruit'] },
-  { key: 'fresh', name: 'Frais', icon: '🥛', categories: ['fresh', 'bakery'] },
-  { key: 'grocery', name: 'Épicerie', icon: '🥫', categories: ['grocery'] },
-  { key: 'drinks', name: 'Boissons', icon: '🥤', categories: ['drink'] },
-  { key: 'hygiene', name: 'Hygiène', icon: '🧼', categories: ['hygiene'] },
-  { key: 'frozen', name: 'Surgelés', icon: '❄️', categories: ['frozen'] },
-]
-
 export class ZoneSatisfactionManager {
-  getSnapshot(products: ProductCustomerAnalytics[], averageQueueTimeMs = 0): ZoneSatisfactionSnapshot[] {
-    return COMMERCIAL_ZONES.map(zone => this.createZoneSnapshot(zone, products, averageQueueTimeMs))
+  getSnapshot(sources: readonly CommercialSatisfactionSource[], products: ProductCustomerAnalytics[], averageQueueTimeMs = 0): ZoneSatisfactionSnapshot[] {
+    return sources.map(source => this.createSnapshot(source, products, averageQueueTimeMs))
   }
 
-  private createZoneSnapshot(zone: CommercialZoneDefinition, products: ProductCustomerAnalytics[], averageQueueTimeMs: number): ZoneSatisfactionSnapshot {
-    const lines = products.filter(product => zone.categories.includes(product.category))
+  private createSnapshot(source: CommercialSatisfactionSource, products: ProductCustomerAnalytics[], averageQueueTimeMs: number): ZoneSatisfactionSnapshot {
+    const lines = products.filter(product => source.categories.includes(product.category))
     const observations = sum(lines, line => line.observations)
     const requestedQuantity = sum(lines, line => line.requestedQuantity)
     const acceptedQuantity = sum(lines, line => line.acceptedQuantity)
@@ -64,13 +57,15 @@ export class ZoneSatisfactionManager {
       : undefined
 
     return {
-      key: zone.key,
-      name: zone.name,
-      icon: zone.icon,
+      key: source.key,
+      name: source.name,
+      icon: source.icon,
       score,
       observations,
       requestedQuantity,
       acceptedQuantity,
+      zoneCount: source.zoneCount ?? 0,
+      cellCount: source.cellCount ?? 0,
       breakdown,
       strongestIssue: strongestIssue && breakdown[strongestIssue] < 75 ? strongestIssue : undefined,
     }
