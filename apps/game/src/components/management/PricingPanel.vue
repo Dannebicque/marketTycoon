@@ -96,8 +96,13 @@ const priceIndexExplanation = computed(() => {
 
 function changePrice(productKey: string, event: Event) {
   emit('update-price', productKey, Number((event.target as HTMLInputElement).value))
+  dispatchPricingChanged()
 }
-function applyBulk() { emit('apply-markup', Number(bulkMarkup.value) / 100) }
+function applyBulk() {
+  emit('apply-markup', Number(bulkMarkup.value) / 100)
+  dispatchPricingChanged()
+}
+function dispatchPricingChanged() { window.dispatchEvent(new CustomEvent('market-tycoon:pricing-changed')) }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value || 0) }
 function percent(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 }).format(value || 0) }
 </script>
