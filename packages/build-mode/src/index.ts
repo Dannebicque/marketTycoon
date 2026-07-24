@@ -1,2 +1,6 @@
 export { BuildHistory } from './BuildHistory'
+export { BuildToolController } from './BuildToolController'
+export { invalidPlacement, validPlacement } from './PlacementValidation'
 export type { BuildCommand, BuildHistoryListener, BuildHistorySnapshot } from './BuildHistory'
+export type { BuildToolKind, BuildToolListener, BuildToolState } from './BuildToolController'
+export type { PlacementInvalidReason, PlacementValidationResult } from './PlacementValidation'
