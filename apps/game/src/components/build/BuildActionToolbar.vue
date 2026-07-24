@@ -16,11 +16,13 @@
 
     <div class="build-bar-context">
       <strong>{{ toolLabel }}</strong>
-      <small v-if="state.selectedDefinitionKey">{{ state.selectedDefinitionKey }} · {{ state.rotation * 90 }}°</small>
+      <small v-if="moveState.waitingForDestination">{{ moveState.name }} · cliquez sur la destination</small>
+      <small v-else-if="state.selectedDefinitionKey">{{ state.selectedDefinitionKey }} · {{ state.rotation * 90 }}°</small>
       <small v-else>Sélectionnez un outil ou un équipement.</small>
     </div>
 
-    <p v-if="validation && !validation.valid" class="build-bar-warning">{{ validation.message }}</p>
+    <p v-if="moveState.message" class="build-bar-warning">{{ moveState.message }}</p>
+    <p v-else-if="validation && !validation.valid" class="build-bar-warning">{{ validation.message }}</p>
 
     <label class="build-bar-refund">
       <span>Revente {{ Math.round(refundRate * 100) }} %</span>
@@ -50,6 +52,7 @@ const rates: Record<BuildDifficulty, number> = { relaxed: 1, standard: .6, hard:
 
 const state = reactive<BuildToolState>({ activeTool: 'select', rotation: 0 })
 const history = reactive<BuildHistorySnapshot>({ undoCount: 0, redoCount: 0 })
+const moveState = reactive<{ buildingId: string | null; name?: string; waitingForDestination: boolean; message?: string }>({ buildingId: null, waitingForDestination: false })
 const validation = ref<PlacementValidationResult | null>(null)
 const difficulty = ref<BuildDifficulty>(initialDifficulty)
 const refundRate = ref(rates[initialDifficulty])
@@ -79,9 +82,11 @@ function changeDifficulty() {
 function handleTool(event: Event) {
   Object.assign(state, (event as CustomEvent<BuildToolState>).detail)
   validation.value = null
+  if (state.activeTool !== 'move') Object.assign(moveState, { buildingId: null, name: undefined, waitingForDestination: false, message: undefined })
 }
 function handleHistory(event: Event) { Object.assign(history, (event as CustomEvent<BuildHistorySnapshot>).detail) }
 function handleValidation(event: Event) { validation.value = (event as CustomEvent<PlacementValidationResult>).detail }
+function handleMoveState(event: Event) { Object.assign(moveState, (event as CustomEvent<typeof moveState>).detail) }
 function handleRefundPolicy(event: Event) {
   const detail = (event as CustomEvent<{ difficulty: BuildDifficulty; refundRate: number }>).detail
   if (!detail) return
@@ -93,12 +98,14 @@ onMounted(() => {
   window.addEventListener('market-tycoon:build-tool-changed', handleTool)
   window.addEventListener('market-tycoon:build-history-changed', handleHistory)
   window.addEventListener('market-tycoon:placement-validation', handleValidation)
+  window.addEventListener('market-tycoon:build-move-state', handleMoveState)
   window.addEventListener('market-tycoon:demolition-refund-policy', handleRefundPolicy)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('market-tycoon:build-tool-changed', handleTool)
   window.removeEventListener('market-tycoon:build-history-changed', handleHistory)
   window.removeEventListener('market-tycoon:placement-validation', handleValidation)
+  window.removeEventListener('market-tycoon:build-move-state', handleMoveState)
   window.removeEventListener('market-tycoon:demolition-refund-policy', handleRefundPolicy)
 })
 </script>
@@ -123,21 +130,13 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(12px);
 }
 .build-bar-tools { display: flex; gap: 6px; }
-.build-bar-tools button {
-  min-width: 74px;
-  padding: 6px 9px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: #cbd5e1;
-  cursor: pointer;
-}
+.build-bar-tools button { min-width: 74px; padding: 6px 9px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #cbd5e1; cursor: pointer; }
 .build-bar-tools button span, .build-bar-tools button small { display: block; }
 .build-bar-tools button span { font-size: 17px; }
 .build-bar-tools button small { margin-top: 2px; font-size: 10px; }
 .build-bar-tools button:hover { background: rgba(51, 65, 85, .72); }
 .build-bar-tools button.active { border-color: #38bdf8; background: rgba(14, 116, 144, .42); color: #f8fafc; }
-.build-bar-context { min-width: 150px; display: flex; flex-direction: column; }
+.build-bar-context { min-width: 180px; display: flex; flex-direction: column; }
 .build-bar-context strong { font-size: 12px; }
 .build-bar-context small, .build-bar-history small { margin-top: 2px; color: #94a3b8; font-size: 10px; }
 .build-bar-warning { min-width: 0; flex: 1; margin: 0; color: #fca5a5; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
