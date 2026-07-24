@@ -1,4 +1,6 @@
 import type Phaser from 'phaser'
+import { getProductDefinition, type ProductCategory } from '@market-tycoon/catalog'
+import { CUSTOMER_PROFILE_CATALOG, type CustomerProfile, type CustomerProfileKey } from '@market-tycoon/customers'
 import {
   InfluenceEngine,
   advertisingManager,
@@ -8,6 +10,7 @@ import {
   type TrafficForecast,
 } from '@market-tycoon/economy'
 import { gameEvents, type StoreDayClosedEvent } from '@market-tycoon/events'
+import { CustomerVisitRegistry, StoreSimulation, type ShoppingPlanItem } from '@market-tycoon/simulation-engine'
 import { StoreScene } from '../phaser/StoreScene'
 import { getSimulationContext } from './SimulationContext'
 
@@ -27,11 +30,14 @@ const engine = new InfluenceEngine()
 let installed = false
 let activeScene: StoreScene | null = null
 let runtime: InfluenceRuntimeSnapshot = createRuntime(1)
+let pendingCustomerProfile: CustomerProfile | null = null
 
 export function installInfluence() {
   if (installed) return
   installed = true
   restoreInfluence()
+  installCustomerProfileSelection()
+  installDemandAwareShoppingPlans()
 
   const originalCreate = StoreScene.prototype.create
   StoreScene.prototype.create = function createWithInfluence() {
@@ -103,6 +109,106 @@ export function restoreInfluence() {
   } catch {
     storeReputationManager.importState()
   }
+}
+
+function installCustomerProfileSelection() {
+  const originalStart = CustomerVisitRegistry.prototype.start
+  CustomerVisitRegistry.prototype.start = function startInfluencedVisit(customerId, options) {
+    const profileKey = options.profileKey ?? chooseProfileKey(runtime.forecast.profileWeights)
+    const customer = originalStart.call(this, customerId, { ...options, profileKey })
+    pendingCustomerProfile = customer.profile
+    return customer
+  }
+}
+
+function installDemandAwareShoppingPlans() {
+  const originalCreateShoppingPlan = StoreSimulation.prototype.createShoppingPlan
+  StoreSimulation.prototype.createShoppingPlan = function createInfluencedShoppingPlan(buildings) {
+    const profile = pendingCustomerProfile
+    pendingCustomerProfile = null
+    if (!profile) return originalCreateShoppingPlan.call(this, buildings)
+
+    const candidates = uniquePlanItems([
+      ...originalCreateShoppingPlan.call(this, buildings),
+      ...originalCreateShoppingPlan.call(this, buildings),
+      ...originalCreateShoppingPlan.call(this, buildings),
+    ])
+    if (!candidates.length) return []
+
+    const context = getSimulationContext(runtime.day)
+    const categoryBoosts = getContextCategoryBoosts(context.weather.kind, context.calendar.periodLabel)
+    const scored = candidates
+      .map(item => ({ item, score: scorePlanItem(this, item, profile, categoryBoosts) + Math.random() * .3 }))
+      .sort((a, b) => b.score - a.score)
+
+    const demand = Math.max(.55, Math.min(2.2, runtime.forecast.demandMultiplier))
+    const requirementLift = .75 + profile.requirement * .65
+    const targetLines = Math.max(1, Math.min(5, Math.round((1.4 + Math.random() * 1.6) * demand * requirementLift)))
+    const quantityMultiplier = Math.max(.7, Math.min(2.4, demand * (.85 + profile.requirement * .45)))
+
+    return scored.slice(0, targetLines).map(({ item }) => ({
+      ...item,
+      requestedQuantity: Math.max(1, Math.min(6, Math.round(item.requestedQuantity * quantityMultiplier + (Math.random() < demand - 1 ? 1 : 0)))),
+    }))
+  }
+}
+
+function chooseProfileKey(weights: TrafficForecast['profileWeights']): CustomerProfileKey {
+  const bucket = weightedChoice([
+    ['budget', weights.budget],
+    ['regular', weights.regular],
+    ['convenience', weights.convenience],
+  ] as const)
+  if (bucket === 'budget') return Math.random() < .82 ? 'budget' : 'family'
+  if (bucket === 'convenience') return Math.random() < .82 ? 'hurried' : 'premium'
+  const loyalty = storeReputationManager.getSnapshot().loyalty
+  const roll = Math.random()
+  if (loyalty >= 55 && roll < .52) return 'regular'
+  if (roll < .72) return 'family'
+  return roll < .88 ? 'regular' : 'premium'
+}
+
+function weightedChoice<T extends string>(entries: readonly (readonly [T, number])[]) {
+  const total = entries.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0)
+  let cursor = Math.random() * Math.max(total, .0001)
+  for (const [key, weight] of entries) {
+    cursor -= Math.max(0, weight)
+    if (cursor <= 0) return key
+  }
+  return entries.at(-1)![0]
+}
+
+function scorePlanItem(simulation: StoreSimulation, item: ShoppingPlanItem, profile: CustomerProfile, categoryBoosts: Map<ProductCategory, number>) {
+  const productKey = simulation.getCompartment(item.shelf.id, item.compartmentId)?.productKey
+  const product = productKey ? getProductDefinition(productKey) : undefined
+  if (!product) return 0
+  const preferred = profile.preferredCategories.includes(product.category) ? 1.4 : 0
+  const contextBoost = categoryBoosts.get(product.category) ?? 0
+  const priceFit = profile.profileKey === 'budget' && product.salePrice <= profile.budget * .18 ? .35 : 0
+  const convenienceFit = profile.profileKey === 'hurried' && ['drink', 'bakery', 'fresh'].includes(product.category) ? .45 : 0
+  return 1 + preferred + contextBoost + priceFit + convenienceFit
+}
+
+function getContextCategoryBoosts(weatherKind: ReturnType<typeof getSimulationContext>['weather']['kind'], periodLabel?: string) {
+  const boosts = new Map<ProductCategory, number>()
+  const add = (category: ProductCategory, value: number) => boosts.set(category, (boosts.get(category) ?? 0) + value)
+  if (weatherKind === 'heatwave' || weatherKind === 'sunny') { add('drink', 1.2); add('fresh', .65); add('fruit', .55); add('frozen', .4) }
+  if (weatherKind === 'rain' || weatherKind === 'storm') { add('grocery', .75); add('bakery', .45); add('hygiene', .2) }
+  if (weatherKind === 'snow' || weatherKind === 'cold') { add('grocery', 1); add('frozen', .45); add('bakery', .55) }
+  if (periodLabel?.includes('Fêtes')) { add('drink', 1); add('fresh', .8); add('bakery', .75); add('grocery', .45) }
+  if (periodLabel?.includes('Rentrée')) { add('grocery', .9); add('drink', .5); add('hygiene', .45) }
+  if (periodLabel?.includes('Pâques')) { add('grocery', .8); add('bakery', .65) }
+  return boosts
+}
+
+function uniquePlanItems(items: ShoppingPlanItem[]) {
+  const seen = new Set<string>()
+  return items.filter(item => {
+    const key = `${item.shelf.id}:${item.compartmentId}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function processClosedDay(snapshot: StoreDayClosedEvent) {
