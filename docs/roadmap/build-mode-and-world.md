@@ -18,7 +18,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 ## 2. Bâtiments dynamiques
 
 - [x] Introduire une entité bâtiment indépendante de ses murs et équipements
-- [ ] Gérer emprise, entrées, façade, enseigne et style
+- [x] Gérer l'emprise et conserver les entrées et le style de façade dans le runtime
+- [ ] Ajouter les outils de modification des entrées, façades et enseignes
 - [x] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
 - [x] Conserver l'identité du bâtiment lors des transformations
 - [ ] Préparer les annexes : réserve, drive, bureaux, quai et galerie
@@ -26,13 +27,14 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 
 ## 3. Build Mode orienté outils
 
-- [ ] Extraire un package `build-mode` indépendant de Phaser
-- [ ] Unifier les placables sous la notion d'équipement de catalogue
-- [ ] Ajouter les outils sélection, placement, déplacement, suppression et rotation
+- [x] Extraire un package `build-mode` indépendant de Phaser
+- [x] Utiliser les équipements du catalogue comme placables du premier adaptateur
+- [ ] Ajouter un contrôleur explicite pour les outils sélection, placement, déplacement, suppression et rotation
 - [ ] Ajouter les outils mur, rectangle de pièce, sol et remplissage
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
-- [ ] Ajouter historique annuler/refaire
+- [x] Ajouter l'historique annuler/refaire pour les poses et suppressions
+- [ ] Intégrer les zones, extensions et achats dans le même historique
 - [ ] Afficher les causes précises d'un placement invalide
 - [ ] Viser moins de trois actions pour les opérations courantes
 
