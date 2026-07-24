@@ -19,6 +19,7 @@ export type {
   InfluenceContext,
   InfluenceFactor,
   InfluenceSource,
+  PricingInfluence,
   TrafficForecast,
 } from './InfluenceEngine'
 export { StoreReputationManager, storeReputationManager } from './StoreReputationManager'
