@@ -155,11 +155,32 @@ function renderWeather(hud: Element | null, weatherValue: SimulationWeather) {
     node = document.createElement('div')
     node.dataset.simulationWeather = 'true'
     node.className = 'hud-stat weather-stat'
+    node.tabIndex = 0
+    node.setAttribute('role', 'button')
+    node.setAttribute('aria-label', 'Afficher les effets de la météo')
     const shortcuts = hud.querySelector('.management-shortcuts')
     hud.insertBefore(node, shortcuts)
   }
-  node.title = weatherValue.detail
-  node.innerHTML = `<span>Météo</span><strong>${weatherValue.icon} ${weatherValue.temperature} °C</strong><small>${weatherValue.label}</small>`
+  node.innerHTML = `<span>Météo</span><strong>${weatherValue.icon} ${weatherValue.temperature} °C</strong><small>${weatherValue.label}</small>${weatherPopover(weatherValue)}`
+}
+
+function weatherPopover(weatherValue: SimulationWeather) {
+  const traffic = impact(weatherValue.trafficMultiplier)
+  const demand = impact(weatherValue.demandMultiplier)
+  return `<aside class="weather-popover" role="tooltip"><header><b>${weatherValue.icon}</b><span><strong>${weatherValue.label} · ${weatherValue.temperature} °C</strong><small>Effets sur le magasin aujourd’hui</small></span></header><div class="weather-impact"><span>Fréquentation attendue</span><strong class="${traffic.className}">${traffic.label}</strong><span>Taille et quantité du panier</span><strong class="${demand.className}">${demand.label}</strong></div><p>${weatherValue.detail}</p><p>${weatherCategoryHint(weatherValue.kind)}</p></aside>`
+}
+
+function weatherCategoryHint(kind: WeatherKind) {
+  if (kind === 'heatwave' || kind === 'sunny') return 'Demande favorisée : boissons, produits frais, fruits et surgelés.'
+  if (kind === 'rain' || kind === 'storm') return 'Demande favorisée : épicerie, boulangerie et achats de dépannage.'
+  if (kind === 'snow' || kind === 'cold') return 'Demande favorisée : épicerie, boulangerie et produits de réserve.'
+  return 'Aucune catégorie de produits n’est fortement favorisée.'
+}
+
+function impact(multiplier: number) {
+  const percent = Math.round((multiplier - 1) * 100)
+  if (Math.abs(percent) < 1) return { label: 'Stable', className: 'neutral' }
+  return { label: `${percent > 0 ? '+' : '−'}${Math.abs(percent)} %`, className: percent > 0 ? 'positive' : 'negative' }
 }
 
 function renderCalendar(dayControl: Element | null, calendar: SimulationDate) {
