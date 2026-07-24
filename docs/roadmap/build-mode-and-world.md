@@ -30,11 +30,12 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Extraire un package `build-mode` indépendant de Phaser
 - [x] Utiliser les équipements du catalogue comme placables du premier adaptateur
 - [x] Ajouter un contrôleur explicite pour les outils sélection, placement, déplacement, suppression et rotation
-- [ ] Raccorder les outils déplacement et suppression à l'interface principale
+- [x] Raccorder sélection, déplacement et suppression à l'interface principale
+- [x] Conserver assortiment et stock lors d'un déplacement ou d'une restauration
 - [ ] Ajouter les outils mur, rectangle de pièce, sol et remplissage
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
-- [x] Ajouter l'historique annuler/refaire pour les poses et suppressions
+- [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
 - [ ] Intégrer les zones, extensions et achats dans le même historique
 - [x] Afficher les causes précises d'un placement invalide
 - [ ] Viser moins de trois actions pour les opérations courantes
