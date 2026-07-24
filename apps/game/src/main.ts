@@ -15,6 +15,7 @@ import { COMPETITION_STORAGE_KEY, installCompetition } from './simulation/instal
 import { CUSTOMER_MEMORY_STORAGE_KEY, installCustomerMemory } from './simulation/installCustomerMemory'
 import { installInfluence, STORE_REPUTATION_STORAGE_KEY } from './simulation/installInfluence'
 import { installMarketEvents, MARKET_EVENTS_STORAGE_KEY } from './simulation/installMarketEvents'
+import { installPricingInfluence } from './simulation/installPricingInfluence'
 import { installSimulationContext } from './simulation/SimulationContext'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
 import { installStoreZones } from './zones/installStoreZones'
@@ -39,6 +40,7 @@ async function bootstrap() {
   installCompetition()
   installMarketEvents()
   installInfluence()
+  installPricingInfluence()
   installCustomerMemory()
   const progression = await createProgressionManager()
 
