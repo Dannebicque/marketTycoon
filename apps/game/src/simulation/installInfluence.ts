@@ -9,6 +9,7 @@ import {
 } from '@market-tycoon/economy'
 import { gameEvents, type StoreDayClosedEvent } from '@market-tycoon/events'
 import { StoreScene } from '../phaser/StoreScene'
+import { getSimulationContext } from './SimulationContext'
 
 export const STORE_REPUTATION_STORAGE_KEY = 'market-tycoon.store-reputation.v1'
 
@@ -20,15 +21,6 @@ interface InfluenceRuntimeSnapshot {
   previousDayServed: number
   previousDayLost: number
   previousDaySatisfaction: number
-}
-
-interface SpawnControlledScene {
-  autoSpawn: boolean
-  currentMinutes: number
-  time: Phaser.Time.Clock
-  spawnTimer?: Phaser.Time.TimerEvent
-  spawnCustomer: () => Promise<unknown>
-  setStatus?: (message: string, color?: string) => void
 }
 
 const engine = new InfluenceEngine()
@@ -46,12 +38,12 @@ export function installInfluence() {
     originalCreate.call(this)
     activeScene = this
     refreshForecast(this.day)
-    configureSpawnTimer(this as unknown as SpawnControlledScene)
+    configureSpawnTimer(this)
   }
 
   const originalToggleAutoSpawn = StoreScene.prototype.toggleAutoSpawn
   StoreScene.prototype.toggleAutoSpawn = function toggleInfluencedAutoSpawn() {
-    const scene = this as unknown as SpawnControlledScene
+    const scene = this as StoreScene & { spawnTimer?: Phaser.Time.TimerEvent; setStatus?: (message: string, color?: string) => void }
     if (scene.currentMinutes >= 20 * 60) return originalToggleAutoSpawn.call(this)
     scene.autoSpawn = !scene.autoSpawn
     configureSpawnTimer(scene)
@@ -72,18 +64,22 @@ export function installInfluence() {
     activeScene = this
     runtime.actualVisitors = 0
     refreshForecast(this.day)
-    configureSpawnTimer(this as unknown as SpawnControlledScene)
+    configureSpawnTimer(this)
     persistInfluence()
-    dispatchUpdate()
+    window.dispatchEvent(new CustomEvent('market-tycoon:influence-updated', { detail: getInfluenceSnapshot() }))
   }
 
   gameEvents.on('store:day-closed', processClosedDay)
-  window.addEventListener('market-tycoon:influence-source-changed', refreshCurrentForecast)
   window.addEventListener('beforeunload', persistInfluence)
+  window.addEventListener('market-tycoon:commercial-context-changed', () => {
+    if (!activeScene) return
+    refreshForecast(activeScene.day)
+    configureSpawnTimer(activeScene)
+    window.dispatchEvent(new CustomEvent('market-tycoon:influence-updated', { detail: getInfluenceSnapshot() }))
+  })
 }
 
 export function getInfluenceSnapshot() {
-  refreshForecast(activeScene?.day ?? runtime.day)
   return {
     ...runtime,
     forecast: {
@@ -92,6 +88,7 @@ export function getInfluenceSnapshot() {
       profileWeights: { ...runtime.forecast.profileWeights },
     },
     reputation: storeReputationManager.getSnapshot(),
+    context: getSimulationContext(runtime.day),
   }
 }
 
@@ -133,21 +130,20 @@ function processClosedDay(snapshot: StoreDayClosedEvent) {
   runtime.previousDayLost = snapshot.lostCustomers
   runtime.previousDaySatisfaction = snapshot.averageSatisfaction
   persistInfluence()
-  dispatchUpdate()
-}
-
-function refreshCurrentForecast() {
-  refreshForecast(activeScene?.day ?? runtime.day)
-  if (activeScene) configureSpawnTimer(activeScene as unknown as SpawnControlledScene)
-  dispatchUpdate()
 }
 
 function refreshForecast(day: number) {
   const reputation = storeReputationManager.getSnapshot()
   const promotions = getActivePromotions(day)
+  const context = getSimulationContext(day)
   const averagePromotionDiscount = promotions.length
     ? promotions.reduce((sum, item) => sum + promotionDiscount(item), 0) / promotions.length
     : 0
+  const weekdayMultiplier = [1, .92, .94, .98, 1.08, 1.24, 1.15][(day - 1) % 7]
+  const calendarMultiplier = weekdayMultiplier * context.calendar.periodMultiplier
+  const calendarLabel = context.calendar.periodLabel
+    ? `${capitalize(context.calendar.weekday)} · ${context.calendar.periodLabel}`
+    : capitalize(context.calendar.weekday)
 
   runtime.day = day
   runtime.forecast = engine.forecast({
@@ -161,10 +157,15 @@ function refreshForecast(day: number) {
     activePromotions: promotions.length,
     averagePromotionDiscount,
     satisfactionScore: reputation.trust,
+    calendarMultiplier,
+    calendarLabel,
+    weatherMultiplier: context.weather.trafficMultiplier,
+    weatherDemandMultiplier: context.weather.demandMultiplier,
+    weatherLabel: `${context.weather.icon} ${context.weather.label}, ${context.weather.temperature} °C`,
   })
 }
 
-function configureSpawnTimer(scene: SpawnControlledScene) {
+function configureSpawnTimer(scene: StoreScene & { spawnTimer?: Phaser.Time.TimerEvent }) {
   scene.spawnTimer?.destroy()
   scene.spawnTimer = undefined
   if (!scene.autoSpawn || scene.currentMinutes >= 20 * 60) return
@@ -192,15 +193,24 @@ function promotionDiscount(promotion: ReturnType<typeof promotionManager.getProm
   return .12
 }
 
-function dispatchUpdate() {
-  window.dispatchEvent(new CustomEvent('market-tycoon:influence-updated', { detail: getInfluenceSnapshot() }))
-}
-
 function createRuntime(day: number): InfluenceRuntimeSnapshot {
   const reputation = storeReputationManager.getSnapshot()
+  const context = getSimulationContext(day)
   return {
     day,
-    forecast: engine.forecast({ day, baseVisitors: 24, baseBasket: 15, notoriety: reputation.notoriety, trust: reputation.trust, loyalty: reputation.loyalty }),
+    forecast: engine.forecast({
+      day,
+      baseVisitors: 24,
+      baseBasket: 15,
+      notoriety: reputation.notoriety,
+      trust: reputation.trust,
+      loyalty: reputation.loyalty,
+      calendarMultiplier: context.calendar.periodMultiplier,
+      calendarLabel: capitalize(context.calendar.weekday),
+      weatherMultiplier: context.weather.trafficMultiplier,
+      weatherDemandMultiplier: context.weather.demandMultiplier,
+      weatherLabel: `${context.weather.icon} ${context.weather.label}, ${context.weather.temperature} °C`,
+    }),
     actualVisitors: 0,
     previousDayVisitors: 0,
     previousDayServed: 0,
@@ -208,3 +218,5 @@ function createRuntime(day: number): InfluenceRuntimeSnapshot {
     previousDaySatisfaction: 0,
   }
 }
+
+function capitalize(value: string) { return value.charAt(0).toUpperCase() + value.slice(1) }
