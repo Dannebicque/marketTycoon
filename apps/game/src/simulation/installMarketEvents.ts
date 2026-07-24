@@ -16,7 +16,8 @@ export function installMarketEvents() {
 
   const originalForecast = InfluenceEngine.prototype.forecast
   InfluenceEngine.prototype.forecast = function forecastWithMarketEvents(context) {
-    const effect = marketEventManager.processDay(context.day)
+    marketEventManager.processDay(context.day)
+    const effect = marketEventManager.getCombinedEffect(context.day)
     const result = originalForecast.call(this, {
       ...context,
       eventMultiplier: (context.eventMultiplier ?? 1) * effect.trafficMultiplier,
@@ -24,7 +25,12 @@ export function installMarketEvents() {
     const eventFactor = result.factors.find(factor => factor.source === 'events')
     if (eventFactor) {
       eventFactor.detail = effect.events.length
-        ? effect.events.map(event => `${marketEventManager.getDefinition(event.kind).icon} ${marketEventManager.getDefinition(event.kind).name}`).join(' · ')
+        ? effect.events
+          .map(event => {
+            const definition = marketEventManager.getDefinition(event.kind)
+            return definition ? `${definition.icon} ${definition.name}` : event.kind
+          })
+          .join(' · ')
         : 'Aucun évènement majeur'
     }
     const demandMultiplier = roundMultiplier(result.demandMultiplier * effect.demandMultiplier)
