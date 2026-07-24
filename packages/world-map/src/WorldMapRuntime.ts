@@ -126,6 +126,7 @@ export class WorldMapRuntime {
   }
 
   canExpandPlayerBuildingInto(parcelId: string) {
+    if (parcelId === this.definition.initialStore.parcelId) return false
     const parcel = this.getParcel(parcelId)
     const parcelState = this.parcelStates.get(parcelId)
     const buildingState = this.getPlayerBuildingState()
