@@ -150,6 +150,18 @@ export class WorldMapRuntime {
     return true
   }
 
+  relinquish(parcelId: string) {
+    if (parcelId === this.definition.initialStore.parcelId) return false
+    const parcel = this.getParcel(parcelId)
+    const state = this.parcelStates.get(parcelId)
+    const buildingState = this.getPlayerBuildingState()
+    if (!parcel || !state?.owned || parcel.access !== 'for-sale') return false
+    if (buildingState?.interiorAreas.some(area => sameRect(area, parcel.bounds))) return false
+    state.owned = false
+    state.access = 'for-sale'
+    return true
+  }
+
   getExtensionCost(parcelId: string) {
     const parcel = this.getParcel(parcelId)
     return parcel ? parcel.bounds.width * parcel.bounds.height * EXTENSION_COST_PER_TILE : 0
@@ -171,6 +183,17 @@ export class WorldMapRuntime {
     const buildingState = this.getPlayerBuildingState()
     if (!parcel || !buildingState) return false
     buildingState.interiorAreas.push({ ...parcel.bounds })
+    return true
+  }
+
+  retractPlayerBuildingFrom(parcelId: string) {
+    const parcel = this.getParcel(parcelId)
+    const buildingState = this.getPlayerBuildingState()
+    if (!parcel || !buildingState || parcelId === this.definition.initialStore.parcelId) return false
+    const index = buildingState.interiorAreas.findIndex(area => sameRect(area, parcel.bounds))
+    if (index < 0) return false
+    buildingState.interiorAreas.splice(index, 1)
+    buildingState.entrances = buildingState.entrances.filter(entrance => !contains(parcel.bounds, entrance))
     return true
   }
 
