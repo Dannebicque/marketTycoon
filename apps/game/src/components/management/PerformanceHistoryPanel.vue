@@ -1,4 +1,5 @@
 <template>
+  <DirectionPanel />
   <section class="performance-panel">
     <div class="panel-heading">
       <div><span class="eyebrow">Historique</span><h2>Performance du magasin</h2></div>
@@ -41,6 +42,7 @@
 <script setup lang="ts">
 import { storePerformanceAnalytics, type StorePerformanceRecord, type StorePerformanceSummary } from '@market-tycoon/analytics'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import DirectionPanel from './DirectionPanel.vue'
 
 const records = ref<StorePerformanceRecord[]>([])
 const summary = ref<StorePerformanceSummary>(storePerformanceAnalytics.getSummary(7))
@@ -55,7 +57,6 @@ function refresh() {
   records.value = storePerformanceAnalytics.getRecords(7)
   summary.value = storePerformanceAnalytics.getSummary(7)
 }
-
 function trend(current?: number, before?: number) {
   if (current === undefined || before === undefined || Math.abs(before) < .01) return null
   return (current - before) / Math.abs(before)
