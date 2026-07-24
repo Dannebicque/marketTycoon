@@ -9,6 +9,21 @@ export type {
 } from './MarketDemandManager'
 export type { DemandProduct, PricingProduct } from './product'
 
+export { InfluenceEngine } from './InfluenceEngine'
+export type {
+  InfluenceContext,
+  InfluenceFactor,
+  InfluenceSource,
+  TrafficForecast,
+} from './InfluenceEngine'
+export { StoreReputationManager, storeReputationManager } from './StoreReputationManager'
+export type {
+  ReputationDayResult,
+  StoreReputation,
+  StoreReputationSnapshot,
+  StoreReputationState,
+} from './StoreReputationManager'
+
 export { AdvertisingManager, advertisingManager, ADVERTISING_MEDIA } from './AdvertisingManager'
 export type {
   AdvertisingCampaign,
