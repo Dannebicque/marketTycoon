@@ -1,7 +1,9 @@
-import { BuildHistory, type BuildCommand } from '@market-tycoon/build-mode'
+import { BuildHistory, DemolitionRefundPolicy, type BuildCommand, type BuildDifficulty } from '@market-tycoon/build-mode'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import type { Direction, GridManager, PlacedBuilding, PlacedEdge } from '@market-tycoon/simulation-engine'
 import { StoreScene } from './StoreScene'
+
+const BUILD_DIFFICULTY_STORAGE_KEY = 'market-tycoon.build-difficulty'
 
 interface InventorySlotSnapshot {
   id: string
@@ -37,6 +39,7 @@ interface PlacementSnapshot {
 let installed = false
 let activeHistory: BuildHistory | undefined
 let activeScene: StoreScene | undefined
+const refundPolicy = new DemolitionRefundPolicy(readDifficulty())
 
 export function installBuildModeHistory() {
   if (installed) return
@@ -54,10 +57,32 @@ export function installBuildModeHistory() {
     history.subscribe(snapshot => {
       window.dispatchEvent(new CustomEvent('market-tycoon:build-history-changed', { detail: snapshot }))
     })
+    emitRefundPolicy()
   }
 
   window.addEventListener('market-tycoon:build-undo', () => runHistoryAction('undo'))
   window.addEventListener('market-tycoon:build-redo', () => runHistoryAction('redo'))
+  window.addEventListener('market-tycoon:build-difficulty-change', event => {
+    const difficulty = (event as CustomEvent<{ difficulty: BuildDifficulty }>).detail?.difficulty
+    if (!difficulty) return
+    refundPolicy.setDifficulty(difficulty)
+    localStorage.setItem(BUILD_DIFFICULTY_STORAGE_KEY, difficulty)
+    emitRefundPolicy()
+  })
+}
+
+function readDifficulty(): BuildDifficulty {
+  const value = localStorage.getItem(BUILD_DIFFICULTY_STORAGE_KEY)
+  return value === 'relaxed' || value === 'hard' || value === 'expert' ? value : 'standard'
+}
+
+function emitRefundPolicy() {
+  window.dispatchEvent(new CustomEvent('market-tycoon:demolition-refund-policy', {
+    detail: {
+      difficulty: refundPolicy.currentDifficulty,
+      refundRate: refundPolicy.refundRate,
+    },
+  }))
 }
 
 function runHistoryAction(action: 'undo' | 'redo') {
@@ -128,6 +153,12 @@ function installGridHistory(scene: BuildModeScene, grid: GridManager, history: B
     const removed = rawRemoveAt(x, y, direction)
     if (!removed || replaying || !snapshot) return removed
 
+    const refund = refundPolicy.calculate(snapshot.definition.price)
+    applyDemolitionRefund(scene, refund)
+    setSceneStatus(scene, refund > 0
+      ? `${snapshot.definition.name} supprimé · ${refund.toLocaleString('fr-FR')} € récupérés.`
+      : `${snapshot.definition.name} supprimé · aucun remboursement.`)
+
     let current: Placement | null = null
     const command: BuildCommand = {
       label: `Supprimer ${snapshot.definition.name}`,
@@ -136,15 +167,18 @@ function installGridHistory(scene: BuildModeScene, grid: GridManager, history: B
         const result = rawRemoveAt(snapshot.x, snapshot.y, snapshot.direction)
         replaying = false
         if (!result) return false
+        applyDemolitionRefund(scene, refund)
         current = null
         refresh()
         return true
       },
       undo: () => {
+        if (!scene.simulation.canSpend(refund)) return false
         replaying = true
         current = rawPlace(snapshot.definition, snapshot.x, snapshot.y, snapshot.direction)
         replaying = false
         if (!current) return false
+        if (refund > 0) scene.simulation.spend(refund)
         refresh()
         if ('definition' in current) restoreInventory(current.id, snapshot.inventory)
         refresh()
@@ -152,6 +186,7 @@ function installGridHistory(scene: BuildModeScene, grid: GridManager, history: B
       },
     }
     history.record(command)
+    refresh()
     return true
   }
 }
@@ -193,6 +228,10 @@ function installKeyboardHistory(scene: StoreScene, history: BuildHistory) {
       if (history.redo()) setSceneStatus(scene, 'Action rétablie.')
     }
   })
+}
+
+function applyDemolitionRefund(scene: StoreScene, amount: number) {
+  scene.simulation.metrics.cash += amount
 }
 
 function refundConstruction(scene: StoreScene, amount: number) {
