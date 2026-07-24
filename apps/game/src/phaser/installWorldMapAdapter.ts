@@ -1,8 +1,10 @@
 import Phaser from 'phaser'
+import type { BuildCommand } from '@market-tycoon/build-mode'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import { GridManager, NavigationGrid } from '@market-tycoon/simulation-engine'
 import type { MapRect, ParcelAccess, ParcelDefinition, WorldMapRuntime } from '@market-tycoon/world-map'
 import { StoreScene } from './StoreScene'
+import type { BuildMutationApi } from './installBuildModeHistory'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
 
 interface ParcelVisualStyle {
@@ -21,6 +23,10 @@ interface ParcelVisuals {
   labels: Phaser.GameObjects.Text[]
 }
 
+interface WorldBuildScene extends StoreScene {
+  buildMutations?: BuildMutationApi
+}
+
 const ACCESS_STYLES: Record<ParcelAccess, ParcelVisualStyle> = {
   owned: { fill: 0x1e293b, fillAlpha: .05, line: 0x94a3b8, lineAlpha: .42, lineWidth: 1, label: 'Possédée' },
   'for-sale': { fill: 0xfacc15, fillAlpha: .08, line: 0xfacc15, lineAlpha: .95, lineWidth: 3, label: 'À vendre' },
@@ -31,9 +37,10 @@ const ACCESS_STYLES: Record<ParcelAccess, ParcelVisualStyle> = {
 }
 
 let installed = false
-let activeScene: StoreScene | undefined
+let activeScene: WorldBuildScene | undefined
 let activeRuntime: WorldMapRuntime | undefined
 let hoveredParcelId: string | undefined
+let pinnedParcelId: string | undefined
 const visuals = new WeakMap<StoreScene, ParcelVisuals>()
 
 export function installWorldMapPhaserAdapter() {
@@ -68,44 +75,96 @@ export function installWorldMapPhaserAdapter() {
     frameWorldCamera(this)
   }
 
+  window.addEventListener('market-tycoon:parcel-close-request', () => {
+    pinnedParcelId = undefined
+    hoveredParcelId = undefined
+    if (activeRuntime) emitParcelSelection(activeRuntime)
+  })
+
   window.addEventListener('market-tycoon:parcel-purchase-request', event => {
     const parcelId = (event as CustomEvent<{ parcelId: string }>).detail?.parcelId
     if (!parcelId || !activeScene || !activeRuntime) return
-    const parcel = activeRuntime.getParcel(parcelId)
-    if (!parcel || !activeRuntime.canPurchase(parcelId)) {
+    const scene = activeScene
+    const runtime = activeRuntime
+    const parcel = runtime.getParcel(parcelId)
+    if (!parcel || !runtime.canPurchase(parcelId)) {
       emitActionResult(false, parcelId, 'Cette parcelle n’est pas disponible à l’achat.')
       return
     }
     const price = parcel.price ?? 0
-    if (!activeScene.simulation.canSpend(price)) {
+    if (!scene.simulation.canSpend(price)) {
       emitActionResult(false, parcelId, 'Trésorerie insuffisante pour acheter cette parcelle.')
       return
     }
-    activeScene.simulation.spend(price)
-    activeRuntime.purchase(parcelId)
-    drawParcels(activeScene, activeRuntime)
+
+    scene.simulation.spend(price)
+    runtime.purchase(parcelId)
+    refreshWorld(scene, runtime, parcelId)
     emitActionResult(true, parcelId, `${parcel.name} a été achetée pour ${price.toLocaleString('fr-FR')} €.`)
-    emitParcelSelection(activeRuntime, parcelId)
+
+    const command: BuildCommand = {
+      label: `Acheter ${parcel.name}`,
+      execute: () => {
+        if (!runtime.canPurchase(parcelId) || !scene.simulation.canSpend(price)) return false
+        scene.simulation.spend(price)
+        if (!runtime.purchase(parcelId)) {
+          refundConstruction(scene, price)
+          return false
+        }
+        refreshWorld(scene, runtime, parcelId)
+        return true
+      },
+      undo: () => {
+        if (!runtime.relinquish(parcelId)) return false
+        refundConstruction(scene, price)
+        refreshWorld(scene, runtime, parcelId)
+        return true
+      },
+    }
+    scene.buildMutations?.history.record(command)
   })
 
   window.addEventListener('market-tycoon:building-extension-request', event => {
     const parcelId = (event as CustomEvent<{ parcelId: string }>).detail?.parcelId
     if (!parcelId || !activeScene || !activeRuntime) return
-    const parcel = activeRuntime.getParcel(parcelId)
-    if (!parcel || !activeRuntime.canExpandPlayerBuildingInto(parcelId)) {
+    const scene = activeScene
+    const runtime = activeRuntime
+    const parcel = runtime.getParcel(parcelId)
+    if (!parcel || !runtime.canExpandPlayerBuildingInto(parcelId)) {
       emitActionResult(false, parcelId, 'Cette parcelle ne peut pas accueillir une extension du magasin.')
       return
     }
-    const cost = activeRuntime.getExtensionCost(parcelId)
-    if (!activeScene.simulation.canSpend(cost)) {
+    const cost = runtime.getExtensionCost(parcelId)
+    if (!scene.simulation.canSpend(cost)) {
       emitActionResult(false, parcelId, 'Trésorerie insuffisante pour construire cette extension.')
       return
     }
-    activeScene.simulation.spend(cost)
-    activeRuntime.expandPlayerBuildingInto(parcelId)
-    drawParcels(activeScene, activeRuntime)
+
+    scene.simulation.spend(cost)
+    runtime.expandPlayerBuildingInto(parcelId)
+    refreshWorld(scene, runtime, parcelId)
     emitActionResult(true, parcelId, `Extension construite sur ${parcel.name} pour ${cost.toLocaleString('fr-FR')} €.`)
-    emitParcelSelection(activeRuntime, parcelId)
+
+    const command: BuildCommand = {
+      label: `Construire l’extension ${parcel.name}`,
+      execute: () => {
+        if (!runtime.canExpandPlayerBuildingInto(parcelId) || !scene.simulation.canSpend(cost)) return false
+        scene.simulation.spend(cost)
+        if (!runtime.expandPlayerBuildingInto(parcelId)) {
+          refundConstruction(scene, cost)
+          return false
+        }
+        refreshWorld(scene, runtime, parcelId)
+        return true
+      },
+      undo: () => {
+        if (!runtime.retractPlayerBuildingFrom(parcelId)) return false
+        refundConstruction(scene, cost)
+        refreshWorld(scene, runtime, parcelId)
+        return true
+      },
+    }
+    scene.buildMutations?.history.record(command)
   })
 }
 
@@ -127,14 +186,33 @@ function installMapEntryPolicy(grid: GridManager, runtime: WorldMapRuntime) {
 }
 
 function installParcelPointerFeedback(scene: StoreScene, runtime: WorldMapRuntime) {
-  scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+  const parcelAtPointer = (pointer: Phaser.Input.Pointer) => {
     const world = pointer.positionToCamera(scene.cameras.main) as Phaser.Math.Vector2
-    const cell = scene.grid.screenToGrid(world.x, world.y)
-    const parcel = runtime.getParcelAt(cell)
+    return runtime.getParcelAt(scene.grid.screenToGrid(world.x, world.y))
+  }
+
+  scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+    if (pinnedParcelId) return
+    const parcel = parcelAtPointer(pointer)
     if (parcel?.id === hoveredParcelId) return
     hoveredParcelId = parcel?.id
     emitParcelSelection(runtime, parcel?.id)
   })
+
+  scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    if (!pointer.leftButtonDown()) return
+    const parcel = parcelAtPointer(pointer)
+    if (!parcel) return
+    pinnedParcelId = parcel.id
+    hoveredParcelId = parcel.id
+    emitParcelSelection(runtime, parcel.id)
+  })
+}
+
+function refreshWorld(scene: StoreScene, runtime: WorldMapRuntime, parcelId?: string) {
+  drawParcels(scene, runtime)
+  emitParcelSelection(runtime, parcelId ?? pinnedParcelId)
+  window.dispatchEvent(new Event('market-tycoon:building-runtime-changed'))
 }
 
 function emitParcelSelection(runtime: WorldMapRuntime, parcelId?: string) {
@@ -146,12 +224,18 @@ function emitParcelSelection(runtime: WorldMapRuntime, parcelId?: string) {
       canPurchase: runtime.canPurchase(parcel.id),
       canExpand: runtime.canExpandPlayerBuildingInto(parcel.id),
       extensionCost: runtime.getExtensionCost(parcel.id),
-    } : { parcel: null, canPurchase: false, canExpand: false, extensionCost: 0 },
+      pinned: pinnedParcelId === parcel.id,
+    } : { parcel: null, canPurchase: false, canExpand: false, extensionCost: 0, pinned: false },
   }))
 }
 
 function emitActionResult(success: boolean, parcelId: string, message: string) {
   window.dispatchEvent(new CustomEvent('market-tycoon:parcel-action-result', { detail: { success, parcelId, message } }))
+}
+
+function refundConstruction(scene: StoreScene, amount: number) {
+  scene.simulation.metrics.cash += amount
+  scene.simulation.metrics.constructionExpenses = Math.max(0, scene.simulation.metrics.constructionExpenses - amount)
 }
 
 function seedInitialStore(scene: StoreScene, runtime: WorldMapRuntime) {
