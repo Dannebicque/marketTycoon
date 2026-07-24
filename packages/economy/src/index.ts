@@ -23,6 +23,13 @@ export type {
   StoreReputationSnapshot,
   StoreReputationState,
 } from './StoreReputationManager'
+export { MarketEventManager, marketEventManager, MARKET_EVENT_DEFINITIONS } from './MarketEventManager'
+export type {
+  MarketEvent,
+  MarketEventDefinition,
+  MarketEventKind,
+  MarketEventState,
+} from './MarketEventManager'
 
 export { AdvertisingManager, advertisingManager, ADVERTISING_MEDIA } from './AdvertisingManager'
 export type {
