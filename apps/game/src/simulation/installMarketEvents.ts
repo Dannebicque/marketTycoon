@@ -21,6 +21,12 @@ export function installMarketEvents() {
       ...context,
       eventMultiplier: (context.eventMultiplier ?? 1) * effect.trafficMultiplier,
     })
+    const eventFactor = result.factors.find(factor => factor.source === 'events')
+    if (eventFactor) {
+      eventFactor.detail = effect.events.length
+        ? effect.events.map(event => `${marketEventManager.getDefinition(event.kind).icon} ${marketEventManager.getDefinition(event.kind).name}`).join(' · ')
+        : 'Aucun évènement majeur'
+    }
     const demandMultiplier = roundMultiplier(result.demandMultiplier * effect.demandMultiplier)
     const expectedBasket = roundMoney(result.expectedBasket * effect.demandMultiplier)
     persistMarketEvents()
