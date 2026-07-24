@@ -3,11 +3,36 @@ import { getBuildingDefinition } from '@market-tycoon/catalog'
 import type { Direction, GridManager, PlacedBuilding, PlacedEdge } from '@market-tycoon/simulation-engine'
 import { StoreScene } from './StoreScene'
 
+interface InventorySlotSnapshot {
+  id: string
+  productKey: string | null
+  quantity: number
+  capacity: number
+  averageUnitCost: number
+}
+
+export interface BuildMutationApi {
+  history: BuildHistory
+  placeRaw: GridManager['place']
+  removeRaw: GridManager['removeAt']
+  refresh(): void
+  restoreInventory(buildingId: string, slots?: InventorySlotSnapshot[]): void
+}
+
 interface BuildModeScene extends StoreScene {
   buildHistory?: BuildHistory
+  buildMutations?: BuildMutationApi
 }
 
 type Placement = PlacedBuilding | PlacedEdge
+
+interface PlacementSnapshot {
+  definition: ReturnType<typeof getBuildingDefinition> extends infer T ? Exclude<T, undefined> : never
+  x: number
+  y: number
+  direction: Direction
+  inventory?: InventorySlotSnapshot[]
+}
 
 let installed = false
 let activeHistory: BuildHistory | undefined
@@ -41,10 +66,29 @@ function runHistoryAction(action: 'undo' | 'redo') {
   if (changed) setSceneStatus(activeScene, action === 'undo' ? 'Action annulée.' : 'Action rétablie.')
 }
 
-function installGridHistory(scene: StoreScene, grid: GridManager, history: BuildHistory) {
+function installGridHistory(scene: BuildModeScene, grid: GridManager, history: BuildHistory) {
   const rawPlace = grid.place.bind(grid)
   const rawRemoveAt = grid.removeAt.bind(grid)
   let replaying = false
+
+  const refresh = () => refreshScene(scene)
+  const restoreInventory = (buildingId: string, slots?: InventorySlotSnapshot[]) => {
+    if (!slots?.length) return
+    const inventory = scene.simulation.getEquipmentInventory(buildingId)
+    if (!inventory) return
+    slots.forEach((saved, index) => {
+      const target = inventory.compartments.find(slot => slot.id === saved.id) ?? inventory.compartments[index]
+      if (target) Object.assign(target, saved)
+    })
+  }
+
+  scene.buildMutations = {
+    history,
+    placeRaw: rawPlace,
+    removeRaw: rawRemoveAt,
+    refresh,
+    restoreInventory,
+  }
 
   grid.place = (definition, x, y, direction) => {
     const placed = rawPlace(definition, x, y, direction)
@@ -60,7 +104,7 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
         replaying = false
         if (!current) return false
         scene.simulation.spend(definition.price)
-        refreshScene(scene)
+        refresh()
         return true
       },
       undo: () => {
@@ -71,7 +115,7 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
         if (!removed) return false
         refundConstruction(scene, definition.price)
         current = null
-        refreshScene(scene)
+        refresh()
         return true
       },
     }
@@ -80,7 +124,7 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
   }
 
   grid.removeAt = (x, y, direction) => {
-    const snapshot = capturePlacement(grid, x, y, direction)
+    const snapshot = capturePlacement(scene, grid, x, y, direction)
     const removed = rawRemoveAt(x, y, direction)
     if (!removed || replaying || !snapshot) return removed
 
@@ -93,7 +137,7 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
         replaying = false
         if (!result) return false
         current = null
-        refreshScene(scene)
+        refresh()
         return true
       },
       undo: () => {
@@ -101,7 +145,9 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
         current = rawPlace(snapshot.definition, snapshot.x, snapshot.y, snapshot.direction)
         replaying = false
         if (!current) return false
-        refreshScene(scene)
+        refresh()
+        if ('definition' in current) restoreInventory(current.id, snapshot.inventory)
+        refresh()
         return true
       },
     }
@@ -110,14 +156,28 @@ function installGridHistory(scene: StoreScene, grid: GridManager, history: Build
   }
 }
 
-function capturePlacement(grid: GridManager, x: number, y: number, direction?: Direction) {
+function capturePlacement(scene: StoreScene, grid: GridManager, x: number, y: number, direction?: Direction): PlacementSnapshot | undefined {
   if (direction !== undefined) {
     const edge = grid.getEdges().find(item => item.gridX === x && item.gridY === y && item.direction === direction)
     const definition = edge ? getBuildingDefinition(edge.definitionKey) : undefined
     if (edge && definition) return { definition, x, y, direction }
   }
   const building = grid.getBuildingAt(x, y)
-  return building ? { definition: building.definition, x: building.gridX, y: building.gridY, direction: building.direction } : undefined
+  if (!building) return undefined
+  const inventory = scene.simulation.getEquipmentInventory(building.id)
+  return {
+    definition: building.definition,
+    x: building.gridX,
+    y: building.gridY,
+    direction: building.direction,
+    inventory: inventory?.compartments.map(slot => ({
+      id: slot.id,
+      productKey: slot.productKey,
+      quantity: slot.quantity,
+      capacity: slot.capacity,
+      averageUnitCost: slot.averageUnitCost,
+    })),
+  }
 }
 
 function installKeyboardHistory(scene: StoreScene, history: BuildHistory) {
