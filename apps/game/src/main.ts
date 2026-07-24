@@ -11,6 +11,7 @@ import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
+import { CUSTOMER_MEMORY_STORAGE_KEY, installCustomerMemory } from './simulation/installCustomerMemory'
 import { installInfluence, STORE_REPUTATION_STORAGE_KEY } from './simulation/installInfluence'
 import { installSimulationContext } from './simulation/SimulationContext'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
@@ -22,7 +23,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '6'
+const DEV_SCENARIO_VERSION = '7'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -34,6 +35,7 @@ async function bootstrap() {
   installBusinessFinance()
   installSimulationContext()
   installInfluence()
+  installCustomerMemory()
   const progression = await createProgressionManager()
 
   createApp(App)
@@ -79,6 +81,7 @@ function migrateDevelopmentScenario() {
   localStorage.removeItem(ADVERTISING_STORAGE_KEY)
   localStorage.removeItem(LOANS_STORAGE_KEY)
   localStorage.removeItem(STORE_REPUTATION_STORAGE_KEY)
+  localStorage.removeItem(CUSTOMER_MEMORY_STORAGE_KEY)
   localStorage.setItem(DEV_SCENARIO_VERSION_KEY, DEV_SCENARIO_VERSION)
 }
 
