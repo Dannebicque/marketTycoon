@@ -1,17 +1,26 @@
 import Phaser from 'phaser'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import { GridManager, NavigationGrid } from '@market-tycoon/simulation-engine'
-import type { ParcelAccess, WorldMapRuntime } from '@market-tycoon/world-map'
+import type { ParcelAccess, ParcelDefinition, WorldMapRuntime } from '@market-tycoon/world-map'
 import { StoreScene } from './StoreScene'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
 
-const ACCESS_COLORS: Record<ParcelAccess, number> = {
-  owned: 0x16a34a,
-  'for-sale': 0xeab308,
-  locked: 0xf97316,
-  public: 0x475569,
-  reserved: 0x8b5cf6,
-  unavailable: 0x991b1b,
+interface ParcelVisualStyle {
+  fill: number
+  fillAlpha: number
+  line: number
+  lineAlpha: number
+  lineWidth: number
+  label: string
+}
+
+const ACCESS_STYLES: Record<ParcelAccess, ParcelVisualStyle> = {
+  owned: { fill: 0x1e293b, fillAlpha: .05, line: 0x94a3b8, lineAlpha: .42, lineWidth: 1, label: 'Possédée' },
+  'for-sale': { fill: 0xfacc15, fillAlpha: .08, line: 0xfacc15, lineAlpha: .95, lineWidth: 3, label: 'À vendre' },
+  locked: { fill: 0x0f172a, fillAlpha: .28, line: 0xfb923c, lineAlpha: .82, lineWidth: 2, label: 'Verrouillée' },
+  public: { fill: 0x334155, fillAlpha: .2, line: 0x64748b, lineAlpha: .55, lineWidth: 1, label: 'Espace public' },
+  reserved: { fill: 0x312e81, fillAlpha: .18, line: 0xa78bfa, lineAlpha: .82, lineWidth: 2, label: 'Réservée' },
+  unavailable: { fill: 0x450a0a, fillAlpha: .24, line: 0xef4444, lineAlpha: .72, lineWidth: 2, label: 'Indisponible' },
 }
 
 let installed = false
@@ -40,8 +49,6 @@ export function installWorldMapPhaserAdapter() {
       70,
     )
 
-    // NavigationGrid is private in the legacy scene, but remains a normal
-    // runtime property. It must be rebuilt whenever the grid is replaced.
     ;(this as unknown as { navigation: NavigationGrid }).navigation = new NavigationGrid(this.grid)
 
     installBuildabilityPolicy(this.grid, runtime)
@@ -61,11 +68,11 @@ function installBuildabilityPolicy(grid: GridManager, runtime: WorldMapRuntime) 
     if (!baseCanPlace(definition, x, y, direction)) return false
     const footprint = grid.getFootprint(definition, x, y, direction)
     const cells = footprint.length ? footprint : [{ x, y }]
-    return cells.every(cell => runtime.isBuildable(cell))
+    return cells.every(cell => runtime.isStoreInterior(cell))
   }
 
   const baseRemoveAt = grid.removeAt.bind(grid)
-  grid.removeAt = (x, y, direction) => runtime.isBuildable({ x, y }) && baseRemoveAt(x, y, direction)
+  grid.removeAt = (x, y, direction) => runtime.isStoreInterior({ x, y }) && baseRemoveAt(x, y, direction)
 }
 
 function installMapEntryPolicy(grid: GridManager, runtime: WorldMapRuntime) {
@@ -123,20 +130,69 @@ function initializeStarterAssortment(scene: StoreScene) {
 }
 
 function drawParcels(scene: StoreScene, runtime: WorldMapRuntime) {
-  const layer = scene.add.graphics().setDepth(2)
+  const fillLayer = scene.add.graphics().setDepth(2)
+  const borderLayer = scene.add.graphics().setDepth(3)
 
-  for (const parcel of runtime.definition.parcels) {
-    const access = runtime.getParcelState(parcel.id)?.access ?? parcel.access
-    const color = ACCESS_COLORS[access]
-    const alpha = access === 'owned' ? 0.16 : access === 'public' ? 0.08 : 0.12
+  for (const parcel of runtime.getParcels()) {
+    const style = ACCESS_STYLES[parcel.access]
+    drawParcelFill(scene, fillLayer, parcel, style)
+    drawParcelBoundary(scene, borderLayer, parcel, style)
+    drawParcelLabel(scene, parcel, style)
+  }
+}
 
-    for (let y = parcel.bounds.y; y < parcel.bounds.y + parcel.bounds.height; y++) {
-      for (let x = parcel.bounds.x; x < parcel.bounds.x + parcel.bounds.width; x++) {
-        const point = scene.grid.gridToScreen(x, y)
-        drawDiamond(layer, point.x, point.y, scene.grid.tileWidth, scene.grid.tileHeight, color, alpha)
-      }
+function drawParcelFill(scene: StoreScene, layer: Phaser.GameObjects.Graphics, parcel: ParcelDefinition, style: ParcelVisualStyle) {
+  for (let y = parcel.bounds.y; y < parcel.bounds.y + parcel.bounds.height; y++) {
+    for (let x = parcel.bounds.x; x < parcel.bounds.x + parcel.bounds.width; x++) {
+      const point = scene.grid.gridToScreen(x, y)
+      drawDiamond(layer, point.x, point.y, scene.grid.tileWidth, scene.grid.tileHeight, style.fill, style.fillAlpha)
     }
   }
+}
+
+function drawParcelBoundary(scene: StoreScene, layer: Phaser.GameObjects.Graphics, parcel: ParcelDefinition, style: ParcelVisualStyle) {
+  const top = scene.grid.gridToScreen(parcel.bounds.x, parcel.bounds.y)
+  const right = scene.grid.gridToScreen(parcel.bounds.x + parcel.bounds.width - 1, parcel.bounds.y)
+  const bottom = scene.grid.gridToScreen(parcel.bounds.x + parcel.bounds.width - 1, parcel.bounds.y + parcel.bounds.height - 1)
+  const left = scene.grid.gridToScreen(parcel.bounds.x, parcel.bounds.y + parcel.bounds.height - 1)
+  const halfWidth = scene.grid.tileWidth / 2
+  const halfHeight = scene.grid.tileHeight / 2
+
+  layer.lineStyle(style.lineWidth, style.line, style.lineAlpha)
+  layer.beginPath()
+  layer.moveTo(top.x, top.y)
+  layer.lineTo(right.x + halfWidth, right.y + halfHeight)
+  layer.lineTo(bottom.x, bottom.y + scene.grid.tileHeight)
+  layer.lineTo(left.x - halfWidth, left.y + halfHeight)
+  layer.closePath()
+  layer.strokePath()
+
+  if (parcel.access === 'unavailable' || parcel.access === 'locked') {
+    layer.lineStyle(2, style.line, .48)
+    layer.beginPath()
+    layer.moveTo(top.x, top.y)
+    layer.lineTo(bottom.x, bottom.y + scene.grid.tileHeight)
+    layer.moveTo(right.x + halfWidth, right.y + halfHeight)
+    layer.lineTo(left.x - halfWidth, left.y + halfHeight)
+    layer.strokePath()
+  }
+}
+
+function drawParcelLabel(scene: StoreScene, parcel: ParcelDefinition, style: ParcelVisualStyle) {
+  if (parcel.access === 'owned' && parcel.usage === 'store') return
+  const center = scene.grid.gridToScreen(
+    parcel.bounds.x + Math.floor(parcel.bounds.width / 2),
+    parcel.bounds.y + Math.floor(parcel.bounds.height / 2),
+  )
+  const price = parcel.access === 'for-sale' && parcel.price ? ` · ${parcel.price.toLocaleString('fr-FR')} €` : ''
+  scene.add.text(center.x, center.y, `${parcel.name}\n${style.label}${price}`, {
+    fontFamily: 'Arial',
+    fontSize: '12px',
+    align: 'center',
+    color: '#f8fafc',
+    backgroundColor: '#0f172acc',
+    padding: { x: 7, y: 5 },
+  }).setOrigin(.5).setDepth(4)
 }
 
 function drawDiamond(
@@ -152,7 +208,6 @@ function drawDiamond(
   const halfHeight = tileHeight / 2
   graphics
     .fillStyle(color, alpha)
-    .lineStyle(1, color, Math.min(0.7, alpha + 0.18))
     .beginPath()
     .moveTo(x, y)
     .lineTo(x + halfWidth, y + halfHeight)
@@ -160,7 +215,6 @@ function drawDiamond(
     .lineTo(x - halfWidth, y + halfHeight)
     .closePath()
     .fillPath()
-    .strokePath()
 }
 
 function frameWorldCamera(scene: StoreScene) {
