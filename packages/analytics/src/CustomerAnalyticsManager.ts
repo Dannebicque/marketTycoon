@@ -1,3 +1,5 @@
+import { getProductDefinition, type ProductCategory } from '@market-tycoon/catalog'
+
 export type PurchaseDecision = 'accept' | 'reduce' | 'reject'
 
 export interface PurchaseDecisionResult {
@@ -35,6 +37,7 @@ export interface CustomerPurchaseObservation {
 export interface ProductCustomerAnalytics {
   productKey: string
   productName: string
+  category: ProductCategory
   observations: number
   requestedQuantity: number
   acceptedQuantity: number
@@ -109,8 +112,13 @@ export class CustomerAnalyticsManager {
       const requestedQuantity = sum(observations, item => item.requestedQuantity)
       const acceptedQuantity = sum(observations, item => item.acceptedQuantity)
       return {
-        productKey, productName: observations[0]?.productName ?? productKey, observations: observations.length,
-        requestedQuantity, acceptedQuantity, rejectedQuantity: Math.max(0, requestedQuantity - acceptedQuantity),
+        productKey,
+        productName: observations[0]?.productName ?? productKey,
+        category: getProductDefinition(productKey)?.category ?? 'grocery',
+        observations: observations.length,
+        requestedQuantity,
+        acceptedQuantity,
+        rejectedQuantity: Math.max(0, requestedQuantity - acceptedQuantity),
         acceptedDecisions: observations.filter(item => item.decision === 'accept').length,
         reducedDecisions: observations.filter(item => item.decision === 'reduce').length,
         rejectedDecisions: observations.filter(item => item.decision === 'reject').length,
