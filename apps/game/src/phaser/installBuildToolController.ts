@@ -21,6 +21,11 @@ export function installBuildToolController() {
     const scene = this as BuildScene & Record<string, any>
     const controller = new BuildToolController()
     scene.buildTools = controller
+
+    const selected = scene.selected as BuildingDefinition | undefined
+    if (selected) controller.selectDefinition(selected.key, selected.category === 'wall' ? 'wall' : 'place')
+
+    scene.input.keyboard?.on('keydown-R', () => controller.rotate(1))
     controller.subscribe(state => {
       window.dispatchEvent(new CustomEvent('market-tycoon:build-tool-changed', { detail: state }))
     })
@@ -32,13 +37,6 @@ export function installBuildToolController() {
     const scene = this as BuildScene & Record<string, any>
     const selected = scene.selected as BuildingDefinition | undefined
     if (selected) scene.buildTools?.selectDefinition(selected.key, selected.category === 'wall' ? 'wall' : 'place')
-    return result
-  }
-
-  const originalRotate = prototype.rotateScene
-  prototype.rotateScene = function (step: -1 | 1) {
-    const result = originalRotate.call(this, step)
-    ;(this as BuildScene).buildTools?.rotate(step)
     return result
   }
 
