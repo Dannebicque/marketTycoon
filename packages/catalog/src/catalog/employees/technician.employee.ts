@@ -8,5 +8,6 @@ export default defineEmployeeRole({
   baseDailySalary: 120,
   qualityRange: [50, 95],
   skills: ['maintenance'],
+  requiredUnlockKey: 'advanced-logistics',
   order: 30,
 })

@@ -25,9 +25,36 @@ function validateBuilding(definition: BuildingDefinition, filename: string) {
   }
 }
 
+/**
+ * Premiers exemples de progression appliqués par famille d’équipements.
+ * Une définition peut toujours fournir explicitement requiredUnlockKey pour
+ * remplacer ces valeurs par défaut.
+ */
+function applyProgressionDefaults(definition: BuildingDefinition): BuildingDefinition {
+  if (definition.requiredUnlockKey) return definition
+
+  if (definition.category === 'shelf' && definition.frozen) {
+    return { ...definition, requiredUnlockKey: 'advanced-logistics', unlockVisibility: 'locked-visible' }
+  }
+  if (definition.category === 'shelf' && definition.refrigerated) {
+    return { ...definition, requiredUnlockKey: 'cold-chain', unlockVisibility: 'locked-visible' }
+  }
+  if (definition.category === 'storage' && definition.storageType === 'frozen') {
+    return { ...definition, requiredUnlockKey: 'advanced-logistics', unlockVisibility: 'locked-visible' }
+  }
+  if (definition.category === 'storage' && definition.storageType === 'cold') {
+    return { ...definition, requiredUnlockKey: 'cold-chain', unlockVisibility: 'locked-visible' }
+  }
+  if (definition.category === 'checkout' && !definition.requiresEmployee) {
+    return { ...definition, requiredUnlockKey: 'automation', unlockVisibility: 'locked-visible' }
+  }
+
+  return definition
+}
+
 const catalogMap = new Map<string, BuildingDefinition>()
 for (const [filename, module] of Object.entries(modules)) {
-  const definition = module.default
+  const definition = applyProgressionDefaults(module.default)
   validateBuilding(definition, filename)
   if (catalogMap.has(definition.key)) throw new Error(`Clé d’équipement dupliquée : ${definition.key}`)
   catalogMap.set(definition.key, definition)

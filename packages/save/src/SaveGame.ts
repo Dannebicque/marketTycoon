@@ -11,7 +11,7 @@ export interface SavedBuildingState {
   gridX: number
   gridY: number
   direction: Direction
-  compartments?: Array<{ id: string; productKey: string | null; quantity: number; capacity: number }>
+  compartments?: Array<{ id: string; productKey: string | null; quantity: number; capacity: number; averageUnitCost?: number }>
 }
 
 export interface SavedEdgeState {

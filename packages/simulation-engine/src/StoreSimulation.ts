@@ -10,6 +10,7 @@ import {
   createEquipmentInventory,
   getProductCapacity,
   isProductCompatible,
+  type EquipmentCompartmentState,
   type EquipmentInventoryState,
 } from './equipment/EquipmentInventory'
 import type { PlacedBuilding } from './GridManager'
@@ -27,6 +28,7 @@ export interface BasketLine {
   compartmentId: string
   product: ProductDefinition
   quantity: number
+  unitCost?: number
   requestedQuantity?: number
   satisfactionDelta?: number
 }
@@ -52,6 +54,8 @@ export interface StoreMetrics {
   constructionExpenses: number
   merchandiseExpenses: number
   operatingExpenses: number
+  costOfGoodsSold: number
+  grossMargin: number
   servedCustomers: number
   lostCustomers: number
   satisfactionTotal: number
@@ -70,6 +74,9 @@ export interface DaySnapshot {
   constructionExpenses: number
   merchandiseExpenses: number
   operatingExpenses: number
+  costOfGoodsSold: number
+  grossMargin: number
+  stockValue: number
   profit: number
   servedCustomers: number
   lostCustomers: number
@@ -98,8 +105,8 @@ export class StoreSimulation {
 
   readonly metrics: StoreMetrics = {
     cash: INITIAL_BUDGET, revenue: 0, profit: 0, constructionExpenses: 0,
-    merchandiseExpenses: 0, operatingExpenses: 0, servedCustomers: 0,
-    lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0,
+    merchandiseExpenses: 0, operatingExpenses: 0, costOfGoodsSold: 0, grossMargin: 0,
+    servedCustomers: 0, lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0,
     totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0,
     cardPayments: 0, cashPayments: 0, checkoutIncidents: 0,
   }
@@ -138,6 +145,9 @@ export class StoreSimulation {
       constructionExpenses: this.metrics.constructionExpenses - start.constructionExpenses,
       merchandiseExpenses: this.metrics.merchandiseExpenses - start.merchandiseExpenses,
       operatingExpenses: this.metrics.operatingExpenses - start.operatingExpenses,
+      costOfGoodsSold: this.metrics.costOfGoodsSold - start.costOfGoodsSold,
+      grossMargin: this.metrics.grossMargin - start.grossMargin,
+      stockValue: this.getTotalStockValue(),
       profit: this.getDayProfit(),
       servedCustomers: served,
       lostCustomers: this.metrics.lostCustomers - start.lostCustomers,
@@ -174,9 +184,16 @@ export class StoreSimulation {
     const definition = this.shelfDefinitions.get(buildingId)
     const compartment = inventory?.compartments.find(item => item.id === compartmentId)
     if (!inventory || !definition || !compartment) return false
-    if (compartment.productKey && compartment.quantity > 0) this.reserve.add(compartment.productKey, compartment.quantity, this.buildings)
+    if (compartment.productKey && compartment.quantity > 0) {
+      this.reserve.add(
+        compartment.productKey,
+        compartment.quantity,
+        this.buildings,
+        compartment.averageUnitCost,
+      )
+    }
     if (productKey === null) {
-      compartment.productKey = null; compartment.quantity = 0; compartment.capacity = 0
+      compartment.productKey = null; compartment.quantity = 0; compartment.capacity = 0; compartment.averageUnitCost = 0
       return true
     }
     const product = getProductDefinition(productKey)
@@ -184,15 +201,16 @@ export class StoreSimulation {
     compartment.productKey = product.key
     compartment.capacity = getProductCapacity(definition, product)
     compartment.quantity = 0
+    compartment.averageUnitCost = 0
     return true
   }
 
   restockCompartment(buildingId: string, compartmentId: string) {
     const compartment = this.getCompartment(buildingId, compartmentId)
     if (!compartment?.productKey) return false
-    const moved = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
-    compartment.quantity += moved
-    return moved > 0
+    const withdrawal = this.reserve.withdrawValued(compartment.productKey, compartment.capacity - compartment.quantity)
+    this.mergeCompartmentCost(compartment, withdrawal.quantity, withdrawal.averageUnitCost)
+    return withdrawal.quantity > 0
   }
 
   restockEquipment(buildingId: string) {
@@ -201,8 +219,9 @@ export class StoreSimulation {
     let moved = 0
     for (const compartment of inventory.compartments) {
       if (!compartment.productKey) continue
-      const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
-      compartment.quantity += quantity; moved += quantity
+      const withdrawal = this.reserve.withdrawValued(compartment.productKey, compartment.capacity - compartment.quantity)
+      this.mergeCompartmentCost(compartment, withdrawal.quantity, withdrawal.averageUnitCost)
+      moved += withdrawal.quantity
     }
     return moved > 0
   }
@@ -211,8 +230,9 @@ export class StoreSimulation {
     let moved = 0
     for (const inventory of this.inventories.values()) for (const compartment of inventory.compartments) {
       if (!compartment.productKey) continue
-      const quantity = this.reserve.withdraw(compartment.productKey, compartment.capacity - compartment.quantity)
-      compartment.quantity += quantity; moved += quantity
+      const withdrawal = this.reserve.withdrawValued(compartment.productKey, compartment.capacity - compartment.quantity)
+      this.mergeCompartmentCost(compartment, withdrawal.quantity, withdrawal.averageUnitCost)
+      moved += withdrawal.quantity
     }
     return moved > 0
   }
@@ -234,6 +254,7 @@ export class StoreSimulation {
   getPurchaseOrders() { return this.purchaseOrders.getOrders() }
   getReserveLines() { return this.reserve.getLines() }
   getReserveQuantity(productKey: string) { return this.reserve.getQuantity(productKey) }
+  getReserveStockValue() { return this.reserve.getStockValue() }
   getStorageCapacity(type: StorageType) { return this.reserve.getCapacity(this.buildings, type) }
   getStorageUsed(type: StorageType) { return this.reserve.getUsed(type) }
   getStorageFree(type: StorageType) { return this.reserve.getFree(this.buildings, type) }
@@ -289,8 +310,10 @@ export class StoreSimulation {
     }
 
     const quantity = Math.min(result.acceptedQuantity, compartment.quantity)
+    const unitCost = compartment.averageUnitCost ?? product.purchasePrice
     compartment.quantity -= quantity
-    return { shelfId, compartmentId, product, quantity, requestedQuantity: availableQuantity, satisfactionDelta: result.satisfactionDelta }
+    if (compartment.quantity <= 0) compartment.averageUnitCost = 0
+    return { shelfId, compartmentId, product, quantity, unitCost, requestedQuantity: availableQuantity, satisfactionDelta: result.satisfactionDelta }
   }
 
   summarizeBasket(lines: BasketLine[]): BasketSummary {
@@ -298,7 +321,7 @@ export class StoreSimulation {
       lines,
       articleCount: lines.reduce((total, line) => total + line.quantity, 0),
       saleTotal: lines.reduce((total, line) => total + line.quantity * line.product.salePrice, 0),
-      purchaseTotal: lines.reduce((total, line) => total + line.quantity * line.product.purchasePrice, 0),
+      purchaseTotal: lines.reduce((total, line) => total + line.quantity * (line.unitCost ?? line.product.purchasePrice), 0),
     }
   }
 
@@ -343,6 +366,8 @@ export class StoreSimulation {
     this.checkoutBusy.delete(checkoutId)
     this.metrics.cash += basket.saleTotal
     this.metrics.revenue += basket.saleTotal
+    this.metrics.costOfGoodsSold += basket.purchaseTotal
+    this.metrics.grossMargin += basket.saleTotal - basket.purchaseTotal
     this.metrics.servedCustomers += 1
     this.metrics.articlesSold += basket.articleCount
     this.metrics.totalQueueTimeMs += queueTimeMs
@@ -353,7 +378,7 @@ export class StoreSimulation {
     if (payment === 'cash') this.metrics.cashPayments += 1
     for (const line of basket.lines) gameEvents.emit('product:sold', {
       day: this.currentDay, productKey: line.product.key, quantity: line.quantity,
-      unitSalePrice: line.product.salePrice, unitCost: line.product.purchasePrice, checkoutId,
+      unitSalePrice: line.product.salePrice, unitCost: line.unitCost ?? line.product.purchasePrice, checkoutId,
     })
     gameEvents.emit('checkout:completed', {
       day: this.currentDay, checkoutId, customerId, articleCount: basket.articleCount,
@@ -381,17 +406,32 @@ export class StoreSimulation {
   getEquipmentInventory(buildingId: string) { return this.inventories.get(buildingId) }
   getEquipmentInventories() { return [...this.inventories.values()] }
   getTotalShelfStock() { return [...this.inventories.values()].flatMap(item => item.compartments).reduce((total, slot) => total + slot.quantity, 0) }
+  getTotalShelfStockValue() { return [...this.inventories.values()].flatMap(item => item.compartments).reduce((total, slot) => total + slot.quantity * (slot.averageUnitCost ?? 0), 0) }
   getTotalReserveStock() { return this.reserve.getLines().reduce((total, line) => total + line.quantity, 0) }
   getTotalStock() { return this.getTotalShelfStock() + this.getTotalReserveStock() }
+  getTotalStockValue() { return this.getTotalShelfStockValue() + this.getReserveStockValue() }
   getProducts() { return PRODUCTS }
 
   getDayRevenue() { return this.metrics.revenue - (this.dayStart?.revenue ?? 0) }
   getDayConstructionExpenses() { return this.metrics.constructionExpenses - (this.dayStart?.constructionExpenses ?? 0) }
   getDayMerchandiseExpenses() { return this.metrics.merchandiseExpenses - (this.dayStart?.merchandiseExpenses ?? 0) }
   getDayOperatingExpenses() { return this.metrics.operatingExpenses - (this.dayStart?.operatingExpenses ?? 0) }
+  getDayCostOfGoodsSold() { return this.metrics.costOfGoodsSold - (this.dayStart?.costOfGoodsSold ?? 0) }
+  getDayGrossMargin() { return this.metrics.grossMargin - (this.dayStart?.grossMargin ?? 0) }
   getDayProfit() { return this.getDayRevenue() - this.getDayConstructionExpenses() - this.getDayMerchandiseExpenses() - this.getDayOperatingExpenses() }
   getAverageSatisfaction() { return this.metrics.satisfactionSamples ? this.metrics.satisfactionTotal / this.metrics.satisfactionSamples : 100 }
   getAverageQueueSeconds() { return this.metrics.servedCustomers ? this.metrics.totalQueueTimeMs / this.metrics.servedCustomers / 1000 : 0 }
+
+  private mergeCompartmentCost(compartment: EquipmentCompartmentState, quantity: number, unitCost: number) {
+    if (quantity <= 0) return
+    const currentQuantity = compartment.quantity
+    const currentCost = compartment.averageUnitCost ?? 0
+    const totalQuantity = currentQuantity + quantity
+    compartment.averageUnitCost = totalQuantity > 0
+      ? (currentQuantity * currentCost + quantity * unitCost) / totalQuantity
+      : unitCost
+    compartment.quantity = totalQuantity
+  }
 
   private applyDailyOperatingCosts(buildings: PlacedBuilding[]) {
     const cost = buildings.reduce((total, building) => {
@@ -404,9 +444,12 @@ export class StoreSimulation {
     this.recalculateProfit()
   }
 
-  private recalculateProfit() { this.metrics.profit = this.metrics.revenue - this.metrics.constructionExpenses - this.metrics.merchandiseExpenses - this.metrics.operatingExpenses }
+  private recalculateProfit() {
+    this.metrics.grossMargin = this.metrics.revenue - this.metrics.costOfGoodsSold
+    this.metrics.profit = this.metrics.revenue - this.metrics.constructionExpenses - this.metrics.merchandiseExpenses - this.metrics.operatingExpenses
+  }
   private emptySnapshotStart(): StoreMetrics {
-    return { cash: this.metrics.cash, revenue: 0, profit: 0, constructionExpenses: 0, merchandiseExpenses: 0, operatingExpenses: 0, servedCustomers: 0, lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0, totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0, cardPayments: 0, cashPayments: 0, checkoutIncidents: 0 }
+    return { cash: this.metrics.cash, revenue: 0, profit: 0, constructionExpenses: 0, merchandiseExpenses: 0, operatingExpenses: 0, costOfGoodsSold: 0, grossMargin: 0, servedCustomers: 0, lostCustomers: 0, satisfactionTotal: 0, satisfactionSamples: 0, totalQueueTimeMs: 0, articlesSold: 0, contactlessPayments: 0, cardPayments: 0, cashPayments: 0, checkoutIncidents: 0 }
   }
 }
 

@@ -1,0 +1,2 @@
+import { defineZone } from '../contracts'
+export default defineZone({ key:'technical', name:'Local technique', description:'Installations électriques, froides et équipements de maintenance.', icon:'🔧', color:0xf97316, order:50, costs:{ electricityPerCell:.7, cleaningPerCell:.12, maintenancePerCell:.32, heatingPerCell:.05, securityPerCell:.08 }, constraints:{ indoor:true, requiresWalls:true, requiresDoor:true, minimumArea:3 }, allowedBuildingCategories:['storage','wall','door'], requiredUnlockKey:'advanced-logistics' })

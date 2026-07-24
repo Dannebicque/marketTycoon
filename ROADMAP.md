@@ -155,6 +155,7 @@ packages/
 - [ ] Priorités de tâches et affectation par zone
 - [ ] Hiérarchie : employé, chef de rayon, manager, directeur
 - [ ] Managers capables de distribuer automatiquement les tâches
+- [ ] Variété des employés et profils selon le scénario (hotesse d'accueil, animateur en rayon, technicien de maintenance, caissier, préparateur de commandes, etc.)
 
 ### Maintenance
 
@@ -166,7 +167,8 @@ packages/
 
 ### Magasin et zones
 
-- [ ] Entrée, réserve, parking, quai, bureaux, sanitaires et salle de pause
+- [ ] Entrée, réserve, parking (et ses équipements), quai, bureaux, sanitaires et salle de pause, drive
+- [ ] Galeries marchandes, rayons, caisses et zones de circulation
 - [ ] Agrandissement de la surface
 - [ ] Arbitrage entre vente, stock, personnel et extension
 - [ ] Rentabilité par mètre carré

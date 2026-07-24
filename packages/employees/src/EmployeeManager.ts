@@ -1,5 +1,6 @@
 import { EMPLOYEE_ROLES, getEmployeeRole } from '@market-tycoon/catalog'
-import type { EmployeeState, EmployeeTaskType } from './employeeTypes'
+import { EmployeeTaskQueue } from './EmployeeTaskQueue'
+import type { EmployeeState, EmployeeTaskType, EmployeeWorkTaskInput } from './employeeTypes'
 
 const FIRST_NAMES = ['Léa', 'Hugo', 'Emma', 'Lucas', 'Chloé', 'Nathan', 'Inès', 'Tom', 'Sarah', 'Noah']
 const LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 'Durand', 'Leroy']
@@ -7,6 +8,7 @@ const LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 
 export class EmployeeManager {
   private employees: EmployeeState[] = []
   private candidates: EmployeeState[] = []
+  readonly tasks = new EmployeeTaskQueue()
 
   constructor() { this.refreshCandidates(1) }
 
@@ -44,6 +46,8 @@ export class EmployeeManager {
   }
 
   dismiss(employeeId: string) {
+    const employee = this.employees.find(item => item.id === employeeId)
+    if (employee?.currentTask?.taskId) this.tasks.release(employee.currentTask.taskId, employeeId)
     const previous = this.employees.length
     this.employees = this.employees.filter(item => item.id !== employeeId)
     return this.employees.length < previous
@@ -52,10 +56,33 @@ export class EmployeeManager {
   assign(employeeId: string, buildingId?: string) {
     const employee = this.employees.find(item => item.id === employeeId)
     if (!employee) return false
+    if (employee.currentTask?.taskId) this.tasks.release(employee.currentTask.taskId, employeeId)
     employee.assignedBuildingId = buildingId
     employee.status = buildingId ? 'assigned' : 'available'
     employee.currentTask = undefined
     return true
+  }
+
+  enqueueTask(input: EmployeeWorkTaskInput) {
+    return this.tasks.enqueue(input)
+  }
+
+  claimNextTask(employeeId: string) {
+    const employee = this.employees.find(item => item.id === employeeId)
+    if (!employee || employee.currentTask?.taskId) return undefined
+    const task = this.tasks.claim(employeeId, employee.roleKey)
+    if (!task) return undefined
+    employee.status = 'working'
+    employee.currentTask = {
+      taskId: task.id,
+      type: task.type,
+      label: task.label,
+      priority: task.priority,
+      targetBuildingId: task.targetBuildingId,
+      targetCompartmentId: task.targetCompartmentId,
+      startedAt: task.startedAt,
+    }
+    return task
   }
 
   setTask(employeeId: string, type: EmployeeTaskType, label: string, targetBuildingId?: string) {
@@ -69,7 +96,18 @@ export class EmployeeManager {
   completeTask(employeeId: string) {
     const employee = this.employees.find(item => item.id === employeeId)
     if (!employee) return false
+    if (employee.currentTask?.taskId) this.tasks.complete(employee.currentTask.taskId, employeeId)
     employee.completedTasks = (employee.completedTasks ?? 0) + 1
+    employee.status = employee.assignedBuildingId ? 'assigned' : 'available'
+    employee.currentTask = undefined
+    this.tasks.pruneCompleted()
+    return true
+  }
+
+  releaseTask(employeeId: string) {
+    const employee = this.employees.find(item => item.id === employeeId)
+    if (!employee) return false
+    if (employee.currentTask?.taskId) this.tasks.release(employee.currentTask.taskId, employeeId)
     employee.status = employee.assignedBuildingId ? 'assigned' : 'available'
     employee.currentTask = undefined
     return true
@@ -93,6 +131,7 @@ export class EmployeeManager {
 
   exportState() { return { employees: this.getEmployees(), candidates: this.getCandidates() } }
   importState(state: { employees?: EmployeeState[]; candidates?: EmployeeState[] }) {
+    this.tasks.clear()
     this.employees = (state.employees ?? []).map(item => ({ ...item, currentTask: undefined, status: item.assignedBuildingId ? 'assigned' : 'available' }))
     this.candidates = (state.candidates ?? []).map(item => ({ ...item }))
   }

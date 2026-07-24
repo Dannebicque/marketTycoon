@@ -2,12 +2,13 @@ import Phaser from 'phaser'
 import { BUILDING_CATALOG, getBuildingDefinition } from '@market-tycoon/catalog'
 import type { BuildingDefinition, BuildingKey, PaymentMethod } from '@market-tycoon/catalog'
 import { isCheckoutDefinition } from '@market-tycoon/catalog'
+import type { CustomerAbandonReason } from '@market-tycoon/analytics'
 import { CustomerAgent } from './CustomerAgent'
 import {
+  CustomerVisitRegistry,
   GridManager,
   NavigationGrid,
   StoreSimulation,
-  type BasketLine,
   type Direction,
   type GridCell,
   type PlacedBuilding,
@@ -28,6 +29,7 @@ interface CustomerRoute { entry: GridCell; firstPath: GridCell[] }
 export class StoreScene extends Phaser.Scene {
   public grid = new GridManager(16, 16, 64, 32, 700, 80)
   public simulation = new StoreSimulation()
+  public customerVisits = new CustomerVisitRegistry()
   public customers = new Map<string, CustomerAgent>()
   public autoSpawn = false
   public day = 1
@@ -168,14 +170,16 @@ export class StoreScene extends Phaser.Scene {
   public async spawnCustomer() {
     if (!this.storeOpen) return this.setStatus('Le magasin est fermé.', '#f87171')
     this.syncSimulation()
+    const id = `C${this.nextCustomer++}`
+    this.customerVisits.start(id, { day: this.day })
     const shoppingPlan = this.simulation.createShoppingPlan(this.grid.getBuildings('shelf'))
     const route = shoppingPlan[0] ? this.findCustomerEntry(shoppingPlan[0].shelf) : undefined
     if (!shoppingPlan.length || !route || !this.grid.getBuildings('checkout').length) {
+      this.customerVisits.abandon(id, { reason: 'store-unavailable' })
       this.simulation.metrics.lostCustomers += 1
       this.setStatus('Il faut un emplacement approvisionné, une caisse et une entrée accessible.', '#fbbf24')
       return
     }
-    const id = `C${this.nextCustomer++}`
     const colors = [0xf97316, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899, 0xeab308]
     const customer = new CustomerAgent(this, this.grid, id, route.entry, colors[this.nextCustomer % colors.length])
     this.customers.set(id, customer)
@@ -299,61 +303,88 @@ export class StoreScene extends Phaser.Scene {
 
   private async runCustomerCycle(customer: CustomerAgent, shoppingPlan: ShoppingPlanItem[], route: CustomerRoute) {
     let queuedCheckout: PlacedBuilding | undefined
-    let satisfaction = 100
-    const basketLines: BasketLine[] = []
+    let queueTimeMs = 0
+    const visit = this.customerVisits.get(customer.id)
+    if (!visit) return
+    visit.journey.transitionTo('shopping')
     try {
       for (let index = 0; index < shoppingPlan.length; index++) {
         const planned = shoppingPlan[index]
         const path = index === 0 ? route.firstPath : this.navigation.findPathToAny(customer.position, this.grid.getAdjacentWalkableCells(planned.shelf))
-        if (!path.length) continue
+        if (!path.length) {
+          visit.satisfaction.adjust('availability', -10)
+          continue
+        }
         this.drawPath(path)
         await customer.follow(path)
         await this.wait(this.simulation.getPickupTimeMs(planned.shelf))
-        const line = this.simulation.takeItems(planned.shelf.id, planned.compartmentId, planned.requestedQuantity)
-        if (line) basketLines.push(line)
-        customer.setBasketCount(this.simulation.summarizeBasket(basketLines).articleCount)
+        const productKey = this.simulation.getCompartment(planned.shelf.id, planned.compartmentId)?.productKey
+        const line = this.simulation.takeItems(planned.shelf.id, planned.compartmentId, planned.requestedQuantity, {
+          customerId: customer.id,
+          day: this.day,
+          priceSensitivity: visit.profile.priceSensitivity,
+          remainingBudget: visit.getRemainingBudget(),
+        })
+        const observation = this.simulation.customerAnalytics.getRecent(1)[0]
+        if (observation?.customerId === customer.id && observation.productKey === productKey) {
+          visit.satisfaction.adjust('price', observation.satisfactionDelta)
+        }
+        if (line) visit.basket.add(line)
+        else if (!observation || observation.customerId !== customer.id || observation.productKey !== productKey) visit.satisfaction.adjust('availability', -10)
+        customer.setBasketCount(visit.basket.summarize().articleCount)
+        customer.setMood(visit.getSatisfaction())
         this.drawBuildings()
       }
-      const basket = this.simulation.summarizeBasket(basketLines)
+      const basket = visit.basket.summarize()
       if (!basket.articleCount) throw new Error('empty-basket')
       const checkouts = this.grid.getBuildings('checkout')
-      let payment = this.simulation.choosePaymentMethod()
+      let payment = visit.profile.preferredPaymentMethod ?? this.simulation.choosePaymentMethod()
       let checkout = this.simulation.chooseCheckout(checkouts, basket, payment)
       if (!checkout) {
         checkout = this.simulation.chooseCheckout(checkouts, basket)
         if (!checkout || !isCheckoutDefinition(checkout.definition)) throw new Error('no-compatible-checkout')
-        payment = this.simulation.choosePaymentMethod(checkout.definition.acceptedPayments)
+        payment = checkout.definition.acceptedPayments.includes(payment)
+          ? payment
+          : this.simulation.choosePaymentMethod(checkout.definition.acceptedPayments)
       }
       queuedCheckout = checkout
       const checkoutPath = this.navigation.findPathToAny(customer.position, this.grid.getAdjacentWalkableCells(checkout))
       if (!checkoutPath.length) throw new Error('checkout-blocked')
+      visit.journey.transitionTo('queueing')
       this.simulation.enqueue(checkout.id, customer.id)
       await customer.follow(checkoutPath)
       await this.repositionQueue(checkout)
       const queueStartedAt = performance.now()
+      const maximumQueueWaitMs = Math.min(MAX_QUEUE_WAIT_MS, visit.profile.availableTimeMs)
       while (!this.simulation.isFirst(checkout.id, customer.id)) {
-        const queueTime = performance.now() - queueStartedAt
-        satisfaction = Math.max(0, 100 - Math.round(queueTime / 180))
-        customer.setMood(satisfaction)
-        if (queueTime >= MAX_QUEUE_WAIT_MS) throw new Error('impatient')
+        queueTimeMs = performance.now() - queueStartedAt
+        visit.satisfaction.set('queue', Math.max(0, 100 - Math.round(queueTimeMs / 180)))
+        customer.setMood(visit.getSatisfaction())
+        if (queueTimeMs >= maximumQueueWaitMs) throw new Error('impatient')
         await this.wait(350)
       }
-      const queueTimeMs = performance.now() - queueStartedAt
+      queueTimeMs = performance.now() - queueStartedAt
+      visit.satisfaction.set('queue', Math.max(0, 100 - Math.round(queueTimeMs / 180)))
       const timing = this.simulation.getCheckoutTiming(checkout, basket.articleCount, payment)
-      satisfaction = Math.max(15, satisfaction - Math.round(timing.durationMs / 900) - (timing.incident ? 15 : 0))
-      customer.setMood(satisfaction)
+      visit.satisfaction.set('checkout', Math.max(15, 100 - Math.round(timing.durationMs / 900) - (timing.incident ? 15 : 0)))
+      customer.setMood(visit.getSatisfaction())
+      visit.journey.transitionTo('checkout')
       this.simulation.startCheckout(checkout.id)
       await this.moveCustomerToCheckout(customer, checkout)
       this.setStatus(`${customer.id} · ${checkout.definition.name} · ${this.paymentLabel(payment)}${timing.incident ? ' · assistance requise' : ''}`)
       await this.wait(timing.durationMs)
-      this.simulation.finishCheckout(checkout.id, customer.id, basket, payment, queueTimeMs, satisfaction)
-      queuedCheckout = undefined
-      await this.repositionQueue(checkout)
       const exitPath = this.navigation.findPath(customer.position, route.entry)
       if (!exitPath.length) throw new Error('exit-blocked')
+      this.simulation.finishCheckout(checkout.id, customer.id, basket, payment, queueTimeMs, visit.getSatisfaction())
+      queuedCheckout = undefined
+      visit.journey.transitionTo('leaving')
+      await this.repositionQueue(checkout)
       await customer.follow(exitPath)
-    } catch {
-      this.simulation.abandon(queuedCheckout?.id, customer.id, satisfaction)
+      this.customerVisits.complete(customer.id, { paymentMethod: payment, queueTimeMs })
+    } catch (error) {
+      const reason = this.customerAbandonReason(error)
+      this.simulation.abandon(queuedCheckout?.id, customer.id, visit.getSatisfaction())
+      this.customerVisits.abandon(customer.id, { reason, queueTimeMs })
       this.setStatus(`${customer.id} quitte le magasin sans finaliser ses achats.`, '#f87171')
       if (queuedCheckout) await this.repositionQueue(queuedCheckout)
     } finally {
@@ -363,6 +394,12 @@ export class StoreScene extends Phaser.Scene {
       this.drawQueues()
       this.drawBuildings()
     }
+  }
+
+  private customerAbandonReason(error: unknown): CustomerAbandonReason {
+    if (!(error instanceof Error)) return 'unknown'
+    const reasons: CustomerAbandonReason[] = ['empty-basket', 'no-compatible-checkout', 'checkout-blocked', 'impatient', 'exit-blocked', 'store-unavailable']
+    return reasons.includes(error.message as CustomerAbandonReason) ? error.message as CustomerAbandonReason : 'unknown'
   }
 
   private paymentLabel(payment: PaymentMethod) { return payment === 'contactless' ? 'sans contact' : payment === 'card' ? 'carte' : 'espèces' }

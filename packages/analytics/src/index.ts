@@ -1,4 +1,4 @@
-export { CustomerAnalyticsManager } from './CustomerAnalyticsManager'
+export { CustomerAnalyticsManager, customerAnalytics } from './CustomerAnalyticsManager'
 export type {
   AnalyticsProduct,
   CustomerAnalyticsState,
@@ -8,3 +8,30 @@ export type {
   PurchaseDecision,
   PurchaseDecisionResult,
 } from './CustomerAnalyticsManager'
+export { CustomerVisitAnalyticsManager, customerVisitAnalytics } from './CustomerVisitAnalyticsManager'
+export type {
+  CustomerAbandonReason,
+  CustomerProfileVisitAnalytics,
+  CustomerVisitAbandoned,
+  CustomerVisitAnalyticsState,
+  CustomerVisitCompleted,
+  CustomerVisitOutcome,
+  CustomerVisitRecord,
+  CustomerVisitSatisfaction,
+  CustomerVisitStarted,
+  CustomerVisitSummary,
+} from './CustomerVisitAnalyticsManager'
+export { StorePerformanceAnalyticsManager, storePerformanceAnalytics } from './StorePerformanceAnalyticsManager'
+export type {
+  StorePerformanceAnalyticsState,
+  StorePerformanceRecord,
+  StorePerformanceSummary,
+} from './StorePerformanceAnalyticsManager'
+export { PromotionAnalyticsManager, promotionAnalytics } from './PromotionAnalyticsManager'
+export type {
+  PromotionAnalyticsState,
+  PromotionCampaignReport,
+  PromotionDecisionObservation,
+  PromotionPeriodMetrics,
+  PromotionSaleObservation,
+} from './PromotionAnalyticsManager'

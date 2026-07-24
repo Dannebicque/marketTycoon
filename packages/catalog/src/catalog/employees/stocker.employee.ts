@@ -8,5 +8,6 @@ export default defineEmployeeRole({
   baseDailySalary: 88,
   qualityRange: [40, 88],
   skills: ['restocking'],
+  requiredUnlockKey: 'core-store',
   order: 20,
 })

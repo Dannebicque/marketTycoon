@@ -7,6 +7,7 @@ export interface EquipmentCompartmentState {
   productKey: string | null
   quantity: number
   capacity: number
+  averageUnitCost?: number
 }
 
 export interface EquipmentInventoryState {
@@ -26,6 +27,7 @@ export function createEquipmentInventory(buildingId: string, definition: ShelfDe
         productKey: null,
         quantity: 0,
         capacity: 0,
+        averageUnitCost: 0,
       })
     }
   }

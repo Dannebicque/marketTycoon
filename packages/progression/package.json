@@ -1,0 +1,10 @@
+{
+  "name": "@market-tycoon/progression",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@market-tycoon/events": "0.1.0"
+  }
+}

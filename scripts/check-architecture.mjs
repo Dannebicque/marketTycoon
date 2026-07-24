@@ -4,6 +4,7 @@ import { extname, join, relative, resolve, sep } from 'node:path'
 const root = process.cwd()
 const packagesRoot = resolve(root, 'packages')
 const violations = []
+const forbiddenRuntimeDependencies = new Set(['phaser', 'vue', 'vue-i18n'])
 
 async function walk(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -20,6 +21,9 @@ async function inspect(filename) {
   for (const match of source.matchAll(importPattern)) {
     const specifier = match[2]
     if (specifier.includes('apps/')) violations.push(`${relative(root, filename)} importe ${specifier}`)
+    if (forbiddenRuntimeDependencies.has(specifier)) {
+      violations.push(`${relative(root, filename)} dépend du runtime ${specifier}`)
+    }
     if (specifier.startsWith('.')) {
       const target = resolve(filename, '..', specifier)
       if (!target.startsWith(`${packageDirectory}${sep}`) && target !== packageDirectory) {
