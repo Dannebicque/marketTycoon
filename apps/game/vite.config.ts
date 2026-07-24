@@ -19,6 +19,7 @@ export default defineConfig({
       '@market-tycoon/progression': packageSource('progression'),
       '@market-tycoon/store-zones': packageSource('store-zones'),
       '@market-tycoon/world-map': packageSource('world-map'),
+      '@market-tycoon/build-mode': packageSource('build-mode'),
     },
   },
 })
