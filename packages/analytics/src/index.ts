@@ -21,6 +21,13 @@ export type {
   CustomerVisitStarted,
   CustomerVisitSummary,
 } from './CustomerVisitAnalyticsManager'
+export { COMMERCIAL_ZONES, ZoneSatisfactionManager } from './ZoneSatisfactionManager'
+export type {
+  CommercialZoneDefinition,
+  CommercialZoneKey,
+  ZoneSatisfactionBreakdown,
+  ZoneSatisfactionSnapshot,
+} from './ZoneSatisfactionManager'
 export { StorePerformanceAnalyticsManager, storePerformanceAnalytics } from './StorePerformanceAnalyticsManager'
 export type {
   StorePerformanceAnalyticsState,
