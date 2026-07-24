@@ -1,6 +1,8 @@
 export { BuildHistory } from './BuildHistory'
 export { BuildToolController } from './BuildToolController'
+export { DemolitionRefundPolicy, getDemolitionRefundRule } from './DemolitionRefundPolicy'
 export { invalidPlacement, validPlacement } from './PlacementValidation'
 export type { BuildCommand, BuildHistoryListener, BuildHistorySnapshot } from './BuildHistory'
 export type { BuildToolKind, BuildToolListener, BuildToolState } from './BuildToolController'
+export type { BuildDifficulty, DemolitionRefundRule } from './DemolitionRefundPolicy'
 export type { PlacementInvalidReason, PlacementValidationResult } from './PlacementValidation'
