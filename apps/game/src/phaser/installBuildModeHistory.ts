@@ -10,6 +10,8 @@ interface BuildModeScene extends StoreScene {
 type Placement = PlacedBuilding | PlacedEdge
 
 let installed = false
+let activeHistory: BuildHistory | undefined
+let activeScene: StoreScene | undefined
 
 export function installBuildModeHistory() {
   if (installed) return
@@ -20,12 +22,23 @@ export function installBuildModeHistory() {
     originalCreate.call(this)
     const history = new BuildHistory(150)
     this.buildHistory = history
+    activeHistory = history
+    activeScene = this
     installGridHistory(this, this.grid, history)
     installKeyboardHistory(this, history)
     history.subscribe(snapshot => {
       window.dispatchEvent(new CustomEvent('market-tycoon:build-history-changed', { detail: snapshot }))
     })
   }
+
+  window.addEventListener('market-tycoon:build-undo', () => runHistoryAction('undo'))
+  window.addEventListener('market-tycoon:build-redo', () => runHistoryAction('redo'))
+}
+
+function runHistoryAction(action: 'undo' | 'redo') {
+  if (!activeHistory || !activeScene) return
+  const changed = action === 'undo' ? activeHistory.undo() : activeHistory.redo()
+  if (changed) setSceneStatus(activeScene, action === 'undo' ? 'Action annulée.' : 'Action rétablie.')
 }
 
 function installGridHistory(scene: StoreScene, grid: GridManager, history: BuildHistory) {
