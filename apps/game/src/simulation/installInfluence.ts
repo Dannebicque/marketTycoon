@@ -22,6 +22,15 @@ interface InfluenceRuntimeSnapshot {
   previousDaySatisfaction: number
 }
 
+interface SpawnControlledScene {
+  autoSpawn: boolean
+  currentMinutes: number
+  time: Phaser.Time.Clock
+  spawnTimer?: Phaser.Time.TimerEvent
+  spawnCustomer: () => Promise<unknown>
+  setStatus?: (message: string, color?: string) => void
+}
+
 const engine = new InfluenceEngine()
 let installed = false
 let activeScene: StoreScene | null = null
@@ -37,12 +46,12 @@ export function installInfluence() {
     originalCreate.call(this)
     activeScene = this
     refreshForecast(this.day)
-    configureSpawnTimer(this)
+    configureSpawnTimer(this as unknown as SpawnControlledScene)
   }
 
   const originalToggleAutoSpawn = StoreScene.prototype.toggleAutoSpawn
   StoreScene.prototype.toggleAutoSpawn = function toggleInfluencedAutoSpawn() {
-    const scene = this as StoreScene & { spawnTimer?: Phaser.Time.TimerEvent; setStatus?: (message: string, color?: string) => void }
+    const scene = this as unknown as SpawnControlledScene
     if (scene.currentMinutes >= 20 * 60) return originalToggleAutoSpawn.call(this)
     scene.autoSpawn = !scene.autoSpawn
     configureSpawnTimer(scene)
@@ -63,7 +72,7 @@ export function installInfluence() {
     activeScene = this
     runtime.actualVisitors = 0
     refreshForecast(this.day)
-    configureSpawnTimer(this)
+    configureSpawnTimer(this as unknown as SpawnControlledScene)
     persistInfluence()
     dispatchUpdate()
   }
@@ -74,6 +83,7 @@ export function installInfluence() {
 }
 
 export function getInfluenceSnapshot() {
+  refreshForecast(activeScene?.day ?? runtime.day)
   return {
     ...runtime,
     forecast: {
@@ -128,7 +138,7 @@ function processClosedDay(snapshot: StoreDayClosedEvent) {
 
 function refreshCurrentForecast() {
   refreshForecast(activeScene?.day ?? runtime.day)
-  if (activeScene) configureSpawnTimer(activeScene)
+  if (activeScene) configureSpawnTimer(activeScene as unknown as SpawnControlledScene)
   dispatchUpdate()
 }
 
@@ -154,7 +164,7 @@ function refreshForecast(day: number) {
   })
 }
 
-function configureSpawnTimer(scene: StoreScene & { spawnTimer?: Phaser.Time.TimerEvent }) {
+function configureSpawnTimer(scene: SpawnControlledScene) {
   scene.spawnTimer?.destroy()
   scene.spawnTimer = undefined
   if (!scene.autoSpawn || scene.currentMinutes >= 20 * 60) return
