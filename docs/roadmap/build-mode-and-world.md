@@ -32,6 +32,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter un contrôleur explicite pour les outils sélection, placement, déplacement, suppression et rotation
 - [x] Raccorder sélection, déplacement et suppression à l'interface principale
 - [x] Conserver assortiment et stock lors d'un déplacement ou d'une restauration
+- [x] Regrouper outils, diagnostic et historique dans une barre horizontale sous la topbar
+- [x] Ajouter une politique de remboursement de démolition configurable par difficulté
+- [ ] Intégrer la difficulté de construction dans les paramètres globaux de partie
 - [ ] Ajouter les outils mur, rectangle de pièce, sol et remplissage
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
