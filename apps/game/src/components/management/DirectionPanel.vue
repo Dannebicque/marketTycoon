@@ -34,20 +34,21 @@
 
     <section class="direction-card zone-satisfaction-card">
       <header>
-        <div><span class="eyebrow">Expérience locale</span><h2>Satisfaction par zone commerciale</h2></div>
+        <div><span class="eyebrow">Expérience locale</span><h2>Satisfaction par secteur commercial</h2></div>
         <p>Prix 40 % · disponibilité 45 % · attente 15 %</p>
       </header>
       <div class="zone-satisfaction-grid">
         <article v-for="zone in zones" :key="zone.key" :class="zoneClass(zone.score)">
-          <div class="zone-title"><span>{{ zone.icon }}</span><div><strong>{{ zone.name }}</strong><small>{{ zone.observations ? `${zone.observations} décision(s) observée(s)` : 'Pas encore de données' }}</small></div><b>{{ zone.score }}</b></div>
+          <div class="zone-title"><span>{{ zone.icon }}</span><div><strong>{{ zone.name }}</strong><small>{{ zone.zoneCount }} zone(s) · {{ zone.cellCount }} case(s)</small><small>{{ zone.observations ? `${zone.observations} décision(s) observée(s)` : 'Pas encore de données client' }}</small></div><b>{{ zone.score }}</b></div>
           <div class="zone-progress"><i :style="{ width: `${zone.score}%` }" /></div>
           <dl>
             <div><dt>Prix</dt><dd>{{ zone.breakdown.price }}</dd></div>
             <div><dt>Disponibilité</dt><dd>{{ zone.breakdown.availability }}</dd></div>
             <div><dt>Attente</dt><dd>{{ zone.breakdown.waiting }}</dd></div>
           </dl>
-          <p v-if="zone.strongestIssue" class="zone-alert">⚠ {{ issueLabel(zone.strongestIssue) }}</p>
-          <p v-else-if="zone.observations" class="zone-ok">✓ Zone maîtrisée</p>
+          <p v-if="!zone.zoneCount" class="zone-alert">⚠ Aucune zone physique définie</p>
+          <p v-else-if="zone.strongestIssue" class="zone-alert">⚠ {{ issueLabel(zone.strongestIssue) }}</p>
+          <p v-else-if="zone.observations" class="zone-ok">✓ Secteur maîtrisé</p>
         </article>
       </div>
     </section>
@@ -95,11 +96,12 @@
 </template>
 
 <script setup lang="ts">
-import { customerAnalytics, customerVisitAnalytics, ZoneSatisfactionManager, type ZoneSatisfactionBreakdown, type ZoneSatisfactionSnapshot } from '@market-tycoon/analytics'
+import { customerAnalytics, customerVisitAnalytics, ZoneSatisfactionManager, type CommercialSatisfactionSource, type ZoneSatisfactionBreakdown, type ZoneSatisfactionSnapshot } from '@market-tycoon/analytics'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { getCompetitionSnapshot } from '../../simulation/installCompetition'
 import { getCustomerMemorySnapshot } from '../../simulation/installCustomerMemory'
 import { getInfluenceSnapshot } from '../../simulation/installInfluence'
+import { commercialZoneRuntime } from '../../zones/commercialZoneRuntime'
 
 const zoneSatisfaction = new ZoneSatisfactionManager()
 const snapshot = reactive(getInfluenceSnapshot())
@@ -115,12 +117,27 @@ const priceIndexLabel = computed(() => snapshot.forecast.pricing.storePriceIndex
 const priceIndexTitle = computed(() => snapshot.forecast.pricing.storePriceIndex < 97 ? 'Avantage prix actif' : snapshot.forecast.pricing.storePriceIndex > 103 ? 'Risque de fuite client' : 'Positionnement équilibré')
 const priceIndexExplanation = computed(() => snapshot.forecast.pricing.storePriceIndex < 97 ? 'Les prix plus bas soutiennent le trafic et la demande, mais réduisent la marge unitaire.' : snapshot.forecast.pricing.storePriceIndex > 103 ? 'Les prix plus élevés augmentent la valeur du panier, mais font reculer trafic et demande.' : 'Les prix sont proches du marché et ne créent pas de frein majeur.')
 
+function getCommercialSources(): CommercialSatisfactionSource[] {
+  const configuredZones = commercialZoneRuntime.zones
+  return commercialZoneRuntime.definitions.map(definition => {
+    const sectorZones = configuredZones.filter(zone => zone.sectorKey === definition.key)
+    return {
+      key: definition.key,
+      name: definition.name,
+      icon: definition.icon,
+      categories: definition.defaultProductCategories ?? [],
+      zoneCount: sectorZones.length,
+      cellCount: sectorZones.reduce((total, zone) => total + zone.cells.length, 0),
+    }
+  })
+}
+
 function refresh() {
   Object.assign(snapshot, getInfluenceSnapshot())
   Object.assign(memory, getCustomerMemorySnapshot(snapshot.day))
   Object.assign(competition, getCompetitionSnapshot(snapshot.day))
   const visits = customerVisitAnalytics.getSummary(snapshot.day)
-  zones.value = zoneSatisfaction.getSnapshot(customerAnalytics.getProductAnalytics(snapshot.day), visits.averageQueueTimeMs)
+  zones.value = zoneSatisfaction.getSnapshot(getCommercialSources(), customerAnalytics.getProductAnalytics(snapshot.day), visits.averageQueueTimeMs)
 }
 function score(value:number) { return `${value.toFixed(1)} / 100` }
 function percent(value:number) { return `${Math.round(value * 100)} %` }
