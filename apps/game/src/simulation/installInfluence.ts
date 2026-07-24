@@ -1,3 +1,4 @@
+import type Phaser from 'phaser'
 import {
   InfluenceEngine,
   advertisingManager,
@@ -41,7 +42,7 @@ export function installInfluence() {
 
   const originalToggleAutoSpawn = StoreScene.prototype.toggleAutoSpawn
   StoreScene.prototype.toggleAutoSpawn = function toggleInfluencedAutoSpawn() {
-    const scene = this as StoreScene & { spawnTimer?: Phaser.Time.TimerEvent; storeOpen?: boolean; setStatus?: (message: string, color?: string) => void }
+    const scene = this as StoreScene & { spawnTimer?: Phaser.Time.TimerEvent; setStatus?: (message: string, color?: string) => void }
     if (scene.currentMinutes >= 20 * 60) return originalToggleAutoSpawn.call(this)
     scene.autoSpawn = !scene.autoSpawn
     configureSpawnTimer(scene)
@@ -64,10 +65,11 @@ export function installInfluence() {
     refreshForecast(this.day)
     configureSpawnTimer(this)
     persistInfluence()
-    window.dispatchEvent(new CustomEvent('market-tycoon:influence-updated', { detail: getInfluenceSnapshot() }))
+    dispatchUpdate()
   }
 
   gameEvents.on('store:day-closed', processClosedDay)
+  window.addEventListener('market-tycoon:influence-source-changed', refreshCurrentForecast)
   window.addEventListener('beforeunload', persistInfluence)
 }
 
@@ -121,6 +123,13 @@ function processClosedDay(snapshot: StoreDayClosedEvent) {
   runtime.previousDayLost = snapshot.lostCustomers
   runtime.previousDaySatisfaction = snapshot.averageSatisfaction
   persistInfluence()
+  dispatchUpdate()
+}
+
+function refreshCurrentForecast() {
+  refreshForecast(activeScene?.day ?? runtime.day)
+  if (activeScene) configureSpawnTimer(activeScene)
+  dispatchUpdate()
 }
 
 function refreshForecast(day: number) {
@@ -171,6 +180,10 @@ function promotionDiscount(promotion: ReturnType<typeof promotionManager.getProm
   if (promotion.type === 'percentage' || promotion.type === 'second-item-discount') return promotion.value / 100
   if (promotion.type === 'x-for-y') return 1 - (promotion.payQuantity ?? 2) / (promotion.buyQuantity ?? 3)
   return .12
+}
+
+function dispatchUpdate() {
+  window.dispatchEvent(new CustomEvent('market-tycoon:influence-updated', { detail: getInfluenceSnapshot() }))
 }
 
 function createRuntime(day: number): InfluenceRuntimeSnapshot {
