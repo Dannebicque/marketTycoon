@@ -15,6 +15,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Séparer cellules accessibles, constructibles et possédées
 - [x] Ajouter l'overlay et le panneau d'achat des parcelles
 - [x] Distinguer aperçu au survol et sélection de parcelle épinglée au clic
+- [x] Identifier toutes les parcelles possédées par un cadre blanc
+- [x] Distinguer les surfaces bâties des terrains seulement possédés
 
 ## 2. Bâtiments dynamiques
 
@@ -22,6 +24,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Gérer l'emprise et conserver les entrées et le style de façade dans le runtime
 - [ ] Ajouter les outils de modification des entrées, façades et enseignes
 - [x] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
+- [x] Autoriser la construction partielle d'une pièce sur un terrain possédé et constructible
 - [x] Conserver l'identité du bâtiment lors des transformations
 - [x] Préparer les opérations inverses d'achat et d'extension dans le runtime
 - [ ] Préparer les annexes : réserve, drive, bureaux, quai et galerie
@@ -44,7 +47,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter l'outil pièce rectangulaire avec murs et sol
 - [x] Ajouter l'outil sol rectangulaire
 - [x] Ajouter l'outil remplissage de surface intérieure
-- [ ] Ajouter plusieurs styles de sols et leur coût
+- [x] Ajouter plusieurs styles de sols sélectionnables
+- [ ] Appliquer les coûts de revêtement à la trésorerie
+- [ ] Ajouter des textures ou motifs d'image aux styles de sols
 - [ ] Ajouter une prévisualisation graphique du rectangle avant validation
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
