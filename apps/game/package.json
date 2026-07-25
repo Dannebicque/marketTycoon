@@ -13,6 +13,7 @@
     "@market-tycoon/analytics": "0.1.0",
     "@market-tycoon/build-mode": "0.1.0",
     "@market-tycoon/catalog": "0.3.0",
+    "@market-tycoon/construction": "0.1.0",
     "@market-tycoon/economy": "0.1.0",
     "@market-tycoon/employees": "0.1.0",
     "@market-tycoon/events": "0.1.0",
