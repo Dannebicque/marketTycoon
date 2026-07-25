@@ -31,9 +31,10 @@ export class ConstructionOrderQueue {
 
   start(id: string, now = Date.now()) {
     const order = this.orders.get(id)
-    if (!order || order.status !== 'planned') return false
+    if (!order || (order.status !== 'planned' && order.status !== 'cancelled')) return false
     order.status = 'building'
     order.startedAt = now
+    order.completedAt = undefined
     return true
   }
 
@@ -47,8 +48,18 @@ export class ConstructionOrderQueue {
 
   cancel(id: string) {
     const order = this.orders.get(id)
-    if (!order || order.status === 'completed') return false
+    if (!order || order.status === 'cancelled') return false
     order.status = 'cancelled'
+    order.completedAt = undefined
+    return true
+  }
+
+  restore(id: string, now = Date.now()) {
+    const order = this.orders.get(id)
+    if (!order || order.status !== 'cancelled') return false
+    order.status = 'completed'
+    order.startedAt ??= now
+    order.completedAt = now
     return true
   }
 
