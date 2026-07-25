@@ -1,5 +1,12 @@
 import type { BuildToolController, BuildToolKind } from '@market-tycoon/build-mode'
-import type { WallMap, WallOrientation, WallSegment, WallSegmentKind } from '@market-tycoon/construction'
+import {
+  getWallSegmentProperties,
+  isExteriorSegment,
+  type WallMap,
+  type WallOrientation,
+  type WallSegment,
+  type WallSegmentKind,
+} from '@market-tycoon/construction'
 import type { Direction } from '@market-tycoon/simulation-engine'
 import { StoreScene } from './StoreScene'
 import { requireWorldMapRuntime } from '../world/worldMapRuntime'
@@ -90,6 +97,9 @@ function drawSegment(scene: StructuralRenderScene, layer: Phaser.GameObjects.Gra
   const { start, end } = edgeEndpoints(scene, center.x, center.y, direction)
   const topStart = { x: start.x, y: start.y - 44 }
   const topEnd = { x: end.x, y: end.y - 44 }
+  const properties = getWallSegmentProperties(segment.kind)
+  const world = requireWorldMapRuntime()
+  const exterior = isExteriorSegment(segment, point => world.isStoreInterior(point))
 
   if (segment.kind === 'door') {
     layer.lineStyle(4, 0x7c3aed, 1)
@@ -102,7 +112,13 @@ function drawSegment(scene: StructuralRenderScene, layer: Phaser.GameObjects.Gra
   }
 
   const color = segment.kind === 'window' ? 0x7dd3fc : 0x22d3ee
-  const alpha = segment.kind === 'window' ? .62 : .78
+  const alpha = Math.max(.35, Math.min(.85, properties.daylightFactor * .82))
+  if (exterior) {
+    layer.lineStyle(5, color, .22)
+      .beginPath()
+      .moveTo(start.x, start.y - 3).lineTo(end.x, end.y - 3)
+      .strokePath()
+  }
   layer.fillStyle(color, alpha)
     .beginPath()
     .moveTo(start.x, start.y - 8)
@@ -131,8 +147,12 @@ function drawStructuralPreview(scene: StructuralRenderScene & Record<string, any
   if (!scene.grid.isInside(cell.x, cell.y)) return
   const orientation = orientationByDirection[state.rotation]
   const previous = scene.buildWalls?.get(cell.x, cell.y, orientation)
-  const inside = requireWorldMapRuntime().isStoreInterior(cell)
-  const valid = inside && (kind === 'wall' ? !previous : Boolean(previous))
+  const world = requireWorldMapRuntime()
+  const inside = world.isStoreInterior(cell)
+  const properties = getWallSegmentProperties(kind)
+  const exterior = isExteriorSegment({ x: cell.x, y: cell.y, orientation }, point => world.isStoreInterior(point))
+  const validBase = kind === 'wall' ? !previous : Boolean(previous)
+  const valid = inside && validBase && (!properties.facadeOnly || exterior)
   const color = valid ? previewColor(kind) : 0xef4444
   const center = scene.grid.gridToScreen(cell.x, cell.y)
   const direction = scene.grid.getViewDirection(state.rotation)
@@ -141,6 +161,10 @@ function drawStructuralPreview(scene: StructuralRenderScene & Record<string, any
   layer.lineStyle(9, color, .88).beginPath().moveTo(start.x, start.y).lineTo(end.x, end.y).strokePath()
   layer.lineStyle(2, 0xffffff, .9).beginPath().moveTo(start.x, start.y - 5).lineTo(end.x, end.y - 5).strokePath()
   layer.fillStyle(color, .95).fillCircle((start.x + end.x) / 2, (start.y + end.y) / 2 - 10, 4)
+  if (properties.facadeOnly) {
+    layer.lineStyle(2, exterior ? 0xfef08a : 0xef4444, .9)
+      .strokeCircle((start.x + end.x) / 2, (start.y + end.y) / 2 - 18, 7)
+  }
 }
 
 function previewColor(kind: WallSegmentKind) {
