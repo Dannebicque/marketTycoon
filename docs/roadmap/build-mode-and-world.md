@@ -30,7 +30,19 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Préparer les annexes : réserve, drive, bureaux, quai et galerie
 - [ ] Préparer plusieurs niveaux sans rendre cette fonctionnalité obligatoire
 
-## 3. Build Mode orienté outils
+## 3. Architecture de construction
+
+- [x] Créer le package `@market-tycoon/construction`
+- [x] Séparer le pilotage des outils (`build-mode`) de la logique métier (`construction`)
+- [x] Ajouter un catalogue unifié pour sols, murs, façades et futurs matériaux
+- [x] Ajouter un modèle de prévisualisation indépendant du renderer
+- [x] Ajouter une file d'ordres de construction avec états planifié, chantier et terminé
+- [x] Conserver des réexports temporaires dans `build-mode` pour migrer progressivement
+- [ ] Déplacer définitivement les surfaces de sol dans `construction`
+- [ ] Introduire un vrai modèle métier de murs, portes, vitrines et fenêtres
+- [ ] Raccorder les ordres à une durée de chantier et à des ouvriers
+
+## 4. Build Mode orienté outils
 
 - [x] Extraire un package `build-mode` indépendant de Phaser
 - [x] Utiliser les équipements du catalogue comme placables du premier adaptateur
@@ -50,7 +62,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter plusieurs styles de sols sélectionnables
 - [ ] Appliquer les coûts de revêtement à la trésorerie
 - [ ] Ajouter des textures ou motifs d'image aux styles de sols
-- [ ] Ajouter une prévisualisation graphique du rectangle avant validation
+- [x] Ajouter une prévisualisation graphique du rectangle avant validation
+- [x] Afficher dimensions, validité et coût estimé dans le ghost
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
@@ -58,16 +71,16 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Afficher les causes précises d'un placement invalide
 - [ ] Viser moins de trois actions pour les opérations courantes
 
-## 4. Blueprints
+## 5. Blueprints
 
 - [ ] Définir un format indépendant du rendu
 - [ ] Enregistrer équipements, murs, sols et métadonnées de secteur
 - [ ] Prévisualiser et valider un blueprint avant placement
-- [ ] Calculer coût, emprise et conflits
+- [ ] Calculer coût, emprise et conflits avec `@market-tycoon/construction`
 - [ ] Fournir quelques modèles de départ
 - [ ] Préparer import/export et partage futur
 
-## 5. Personnalisation
+## 6. Personnalisation
 
 - [ ] Nom, identité et couleurs de l'enseigne
 - [ ] Façades, vitrines, portes et enseignes
@@ -76,7 +89,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Uniformes et ambiance du magasin
 - [ ] Décorations saisonnières
 
-## 6. Éditeur de cartes hors Phaser
+## 7. Éditeur de cartes hors Phaser
 
 - [ ] Créer une application Vue dédiée à l'édition
 - [ ] Dessiner les parcelles et définir leurs statuts
@@ -87,7 +100,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Exporter le même `map.json` que celui chargé par le jeu
 - [ ] Ajouter une prévisualisation Phaser optionnelle
 
-## 7. Merchandising à conserver pour la suite
+## 8. Merchandising à conserver pour la suite
 
 - [ ] Créer un package `store-layout`
 - [ ] Calculer organisation, compacité, dispersion et densité par secteur
@@ -103,7 +116,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 3. équipement initial et limites constructibles ;
 4. achat de parcelles ;
 5. package Build Mode et historique ;
-6. bâtiments dynamiques ;
-7. blueprints ;
-8. éditeur de cartes Vue ;
-9. analyse de layout et merchandising.
+6. package Construction et prévisualisations ;
+7. bâtiments dynamiques et vrais murs ;
+8. blueprints ;
+9. éditeur de cartes Vue ;
+10. analyse de layout et merchandising.
