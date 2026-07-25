@@ -10,6 +10,7 @@
       <strong>{{ toolLabel }}</strong>
       <small v-if="moveState.waitingForDestination">{{ moveState.name }} · cliquez sur la destination</small>
       <small v-else-if="surfaceStart">Premier angle {{ surfaceStart.x }},{{ surfaceStart.y }} · choisissez l’angle opposé</small>
+      <small v-else-if="structuralToolActive">Cliquez sur un côté de case · orientation {{ state.rotation * 90 }}°.</small>
       <small v-else-if="state.activeTool === 'fill'">Cliquez dans une surface intérieure à remplir.</small>
       <small v-else-if="state.activeTool === 'room' || state.activeTool === 'floor'">Cliquez sur le premier angle du rectangle.</small>
       <small v-else-if="state.selectedDefinitionKey">{{ state.selectedDefinitionKey }} · {{ state.rotation * 90 }}°</small>
@@ -58,17 +59,22 @@ const refundRate = ref(rates[initialDifficulty])
 const floorStyles = BUILD_SURFACE_STYLES
 const floorStyleKey = ref(localStorage.getItem('market-tycoon.floor-style') ?? floorStyles[0].key)
 const surfaceToolActive = computed(() => state.activeTool === 'room' || state.activeTool === 'floor' || state.activeTool === 'fill')
+const structuralToolActive = computed(() => state.activeTool === 'wall' || state.activeTool === 'door' || state.activeTool === 'window' || state.activeTool === 'storefront')
 
 const tools: Array<{ key: BuildToolKind; icon: string; label: string; title: string }> = [
   { key: 'select', icon: '↖', label: 'Sélection', title: 'Sélectionner et configurer un équipement' },
   { key: 'move', icon: '✥', label: 'Déplacer', title: 'Sélectionner puis déplacer un équipement' },
   { key: 'remove', icon: '⌫', label: 'Supprimer', title: 'Supprimer un équipement en cliquant dessus' },
+  { key: 'wall', icon: '┃', label: 'Mur', title: 'Poser un segment de mur' },
+  { key: 'door', icon: '▯', label: 'Porte', title: 'Transformer un mur en porte' },
+  { key: 'window', icon: '▫', label: 'Fenêtre', title: 'Transformer un mur en fenêtre' },
+  { key: 'storefront', icon: '▤', label: 'Vitrine', title: 'Transformer un mur en vitrine' },
   { key: 'room', icon: '▣', label: 'Pièce', title: 'Créer une pièce rectangulaire avec murs et sol' },
   { key: 'floor', icon: '▦', label: 'Sol', title: 'Peindre un sol rectangulaire' },
   { key: 'fill', icon: '◫', label: 'Remplir', title: 'Remplir toute la surface intérieure contiguë' },
 ]
 
-const toolLabel = computed(() => ({ select: 'Sélection', place: 'Placement', move: 'Déplacement', remove: 'Suppression', rotate: 'Rotation', wall: 'Mur', room: 'Pièce', floor: 'Sol', fill: 'Remplissage' } as Record<BuildToolKind, string>)[state.activeTool])
+const toolLabel = computed(() => ({ select: 'Sélection', place: 'Placement', move: 'Déplacement', remove: 'Suppression', rotate: 'Rotation', wall: 'Mur', door: 'Porte', window: 'Fenêtre', storefront: 'Vitrine', room: 'Pièce', floor: 'Sol', fill: 'Remplissage' } as Record<BuildToolKind, string>)[state.activeTool])
 const undoTitle = computed(() => history.nextUndoLabel ? `Annuler : ${history.nextUndoLabel}` : 'Rien à annuler')
 const redoTitle = computed(() => history.nextRedoLabel ? `Rétablir : ${history.nextRedoLabel}` : 'Rien à rétablir')
 const historyStatus = computed(() => history.nextUndoLabel ?? 'Aucune modification')
@@ -105,9 +111,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.build-bar { position:fixed; z-index:970; top:106px; left:220px; right:16px; min-height:54px; display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid rgba(148,163,184,.28); border-radius:14px; background:rgba(2,6,23,.94); color:#e2e8f0; box-shadow:0 14px 38px rgba(0,0,0,.3); backdrop-filter:blur(12px); }
+.build-bar { position:fixed; z-index:970; top:106px; left:220px; right:16px; min-height:54px; display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid rgba(148,163,184,.28); border-radius:14px; background:rgba(2,6,23,.94); color:#e2e8f0; box-shadow:0 14px 38px rgba(0,0,0,.3); backdrop-filter:blur(12px); overflow-x:auto; }
 .build-bar-tools { display:flex; gap:5px; }
-.build-bar-tools button { min-width:62px; padding:6px 7px; border:1px solid transparent; border-radius:9px; background:transparent; color:#cbd5e1; cursor:pointer; }
+.build-bar-tools button { min-width:58px; padding:6px 7px; border:1px solid transparent; border-radius:9px; background:transparent; color:#cbd5e1; cursor:pointer; }
 .build-bar-tools button span,.build-bar-tools button small { display:block; }.build-bar-tools button span { font-size:17px; }.build-bar-tools button small { margin-top:2px; font-size:9px; }
 .build-bar-tools button:hover { background:rgba(51,65,85,.72); }.build-bar-tools button.active { border-color:#38bdf8; background:rgba(14,116,144,.42); color:#f8fafc; }
 .build-bar-context { min-width:180px; display:flex; flex-direction:column; }.build-bar-context strong { font-size:12px; }.build-bar-context small,.build-bar-history small { margin-top:2px; color:#94a3b8; font-size:10px; }
@@ -115,5 +121,5 @@ onBeforeUnmount(() => {
 .build-bar-style,.build-bar-refund { min-width:120px; padding-left:10px; border-left:1px solid rgba(148,163,184,.2); }.build-bar-style span,.build-bar-refund span { display:block; margin-bottom:3px; color:#86efac; font-size:9px; text-transform:uppercase; }.build-bar-style select,.build-bar-refund select { width:100%; padding:4px 6px; border:1px solid #334155; border-radius:7px; background:#0f172a; color:#e2e8f0; font-size:10px; }
 .build-bar-history { display:grid; grid-template-columns:36px 36px minmax(90px,150px); gap:6px; align-items:center; }.build-bar-history button { height:34px; border:1px solid #334155; border-radius:8px; background:#1e293b; color:#f8fafc; font-size:19px; cursor:pointer; }.build-bar-history button:disabled { opacity:.35; cursor:not-allowed; }.build-bar-history small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 @media (max-width:1280px) { .build-bar-context,.build-bar-history small { display:none; } }
-@media (max-width:1000px) { .build-bar { left:16px; overflow-x:auto; }.build-bar-warning { display:none; } }
+@media (max-width:1000px) { .build-bar { left:16px; }.build-bar-warning { display:none; } }
 </style>
