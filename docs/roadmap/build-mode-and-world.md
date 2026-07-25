@@ -44,6 +44,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Rendre les ordres compatibles avec annulation et rétablissement
 - [x] Introduire un modèle métier de segments pour murs, portes, vitrines et fenêtres
 - [x] Permettre le remplacement d'un segment sans perdre son identité
+- [x] Définir transparence, collision, lumière et visibilité par type de segment
+- [x] Identifier les segments réellement extérieurs
+- [x] Calculer lumière naturelle, visibilité commerciale et ratio vitré de façade
 - [x] Raccorder les ordres à une durée minimale de chantier
 - [ ] Affecter des ouvriers aux ordres de construction
 - [ ] Différer réellement l'apparition des constructions jusqu'à la fin du chantier
@@ -65,7 +68,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter l'outil pièce rectangulaire avec murs et sol
 - [x] Ajouter l'outil mur orientable
 - [x] Ajouter les outils porte, fenêtre et vitrine par remplacement d'un mur
+- [x] Limiter fenêtres et vitrines aux façades extérieures
 - [x] Ajouter un rendu distinct pour portes, fenêtres et vitrines
+- [x] Ajouter un indicateur de qualité de façade
 - [x] Ajouter l'outil sol rectangulaire
 - [x] Ajouter l'outil remplissage de surface intérieure
 - [x] Ajouter plusieurs styles de sols sélectionnables
@@ -76,7 +81,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter une prévisualisation graphique du rectangle avant validation
 - [x] Afficher dimensions, validité et coût estimé dans le ghost
 - [x] Ajouter une prévisualisation précise des segments structurels
-- [ ] Donner aux fenêtres et vitrines leurs propres règles de collision et visibilité
+- [x] Donner aux fenêtres et vitrines leurs propres règles de visibilité
+- [ ] Relier lumière naturelle et visibilité à la satisfaction et à l'attractivité
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
