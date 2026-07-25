@@ -41,8 +41,14 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Déplacer définitivement les surfaces de sol dans `construction`
 - [x] Enregistrer pièces et revêtements dans la file d'ordres
 - [x] Rendre les ordres compatibles avec annulation et rétablissement
-- [ ] Introduire un vrai modèle métier de murs, portes, vitrines et fenêtres
-- [ ] Raccorder les ordres à une durée de chantier et à des ouvriers
+- [x] Introduire un modèle métier de segments de murs indépendant de Phaser
+- [x] Préparer les variantes mur, porte, vitrine et fenêtre
+- [x] Projeter les murs métier dans la grille Phaser via un adaptateur
+- [x] Faire progresser les ordres de planifié à chantier puis terminé
+- [x] Afficher une file de chantiers et leur progression dans l'interface
+- [ ] Ajouter les outils dédiés porte, vitrine et fenêtre
+- [ ] Retarder réellement l'apparition des éléments jusqu'à la fin du chantier
+- [ ] Raccorder les ordres à des ouvriers et à leur disponibilité
 
 ## 4. Build Mode orienté outils
 
