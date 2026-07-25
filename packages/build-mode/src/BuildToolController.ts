@@ -1,4 +1,4 @@
-export type BuildToolKind = 'select' | 'place' | 'move' | 'remove' | 'rotate' | 'wall' | 'room' | 'floor' | 'fill'
+export type BuildToolKind = 'select' | 'place' | 'move' | 'remove' | 'rotate' | 'wall' | 'door' | 'window' | 'storefront' | 'room' | 'floor' | 'fill'
 
 export interface BuildToolState {
   activeTool: BuildToolKind
@@ -20,7 +20,9 @@ export class BuildToolController {
     this.state = {
       activeTool: tool,
       selectedDefinitionKey: definitionKey,
-      rotation: tool === 'place' || tool === 'wall' ? this.state.rotation : 0,
+      rotation: tool === 'place' || tool === 'wall' || tool === 'door' || tool === 'window' || tool === 'storefront'
+        ? this.state.rotation
+        : 0,
     }
     this.notify()
   }
