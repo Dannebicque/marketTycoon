@@ -20,6 +20,7 @@ import { installBuildToolController } from './phaser/installBuildToolController'
 import { installConstructionPreview } from './phaser/installConstructionPreview'
 import { installOwnedLandOverlay } from './phaser/installOwnedLandOverlay'
 import { installStructuralBuildTools } from './phaser/installStructuralBuildTools'
+import { installStructuralRendering } from './phaser/installStructuralRendering'
 import { installSurfaceBuildTools } from './phaser/installSurfaceBuildTools'
 import { installViewDisplay } from './phaser/installViewDisplay'
 import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
@@ -43,7 +44,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '20'
+const DEV_SCENARIO_VERSION = '21'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -55,6 +56,7 @@ async function bootstrap() {
   installBuildInteractionTools()
   installSurfaceBuildTools()
   installStructuralBuildTools()
+  installStructuralRendering()
   installConstructionPreview()
   installOwnedLandOverlay()
   installBuildingIdentityOverlay()
