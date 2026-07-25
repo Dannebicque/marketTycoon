@@ -38,7 +38,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter un modèle de prévisualisation indépendant du renderer
 - [x] Ajouter une file d'ordres de construction avec états planifié, chantier et terminé
 - [x] Conserver des réexports temporaires dans `build-mode` pour migrer progressivement
-- [ ] Déplacer définitivement les surfaces de sol dans `construction`
+- [x] Déplacer définitivement les surfaces de sol dans `construction`
+- [x] Enregistrer pièces et revêtements dans la file d'ordres
+- [x] Rendre les ordres compatibles avec annulation et rétablissement
 - [ ] Introduire un vrai modèle métier de murs, portes, vitrines et fenêtres
 - [ ] Raccorder les ordres à une durée de chantier et à des ouvriers
 
@@ -60,7 +62,9 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter l'outil sol rectangulaire
 - [x] Ajouter l'outil remplissage de surface intérieure
 - [x] Ajouter plusieurs styles de sols sélectionnables
-- [ ] Appliquer les coûts de revêtement à la trésorerie
+- [x] Appliquer les coûts de revêtement et de murs à la trésorerie
+- [x] Refuser une construction lorsque le budget est insuffisant
+- [x] Rembourser les coûts lors d'une annulation et les débiter lors d'un rétablissement
 - [ ] Ajouter des textures ou motifs d'image aux styles de sols
 - [x] Ajouter une prévisualisation graphique du rectangle avant validation
 - [x] Afficher dimensions, validité et coût estimé dans le ghost
