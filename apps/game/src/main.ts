@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
 import BuildActionToolbar from './components/build/BuildActionToolbar.vue'
+import BuildingEnvelopeWidget from './components/build/BuildingEnvelopeWidget.vue'
 import ConstructionQueueWidget from './components/build/ConstructionQueueWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
@@ -13,6 +14,7 @@ import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installBuildingEnvelopeAnalysis } from './phaser/installBuildingEnvelopeAnalysis'
 import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentityOverlay'
 import { installBuildInteractionTools } from './phaser/installBuildInteractionTools'
 import { installBuildModeHistory } from './phaser/installBuildModeHistory'
@@ -44,7 +46,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '21'
+const DEV_SCENARIO_VERSION = '22'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -57,6 +59,7 @@ async function bootstrap() {
   installSurfaceBuildTools()
   installStructuralBuildTools()
   installStructuralRendering()
+  installBuildingEnvelopeAnalysis()
   installConstructionPreview()
   installOwnedLandOverlay()
   installBuildingIdentityOverlay()
@@ -93,6 +96,11 @@ async function bootstrap() {
   constructionQueueRoot.id = 'construction-queue-ui'
   document.body.appendChild(constructionQueueRoot)
   createApp(ConstructionQueueWidget).mount(constructionQueueRoot)
+
+  const buildingEnvelopeRoot = document.createElement('div')
+  buildingEnvelopeRoot.id = 'building-envelope-ui'
+  document.body.appendChild(buildingEnvelopeRoot)
+  createApp(BuildingEnvelopeWidget).mount(buildingEnvelopeRoot)
 
   const parcelRoot = document.createElement('div')
   parcelRoot.id = 'parcel-info-ui'
