@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
 import BuildActionToolbar from './components/build/BuildActionToolbar.vue'
+import ConstructionQueueWidget from './components/build/ConstructionQueueWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
@@ -41,7 +42,7 @@ import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '18'
+const DEV_SCENARIO_VERSION = '19'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
@@ -83,6 +84,11 @@ async function bootstrap() {
   buildActionRoot.id = 'build-action-ui'
   document.body.appendChild(buildActionRoot)
   createApp(BuildActionToolbar).mount(buildActionRoot)
+
+  const constructionQueueRoot = document.createElement('div')
+  constructionQueueRoot.id = 'construction-queue-ui'
+  document.body.appendChild(constructionQueueRoot)
+  createApp(ConstructionQueueWidget).mount(constructionQueueRoot)
 
   const parcelRoot = document.createElement('div')
   parcelRoot.id = 'parcel-info-ui'
