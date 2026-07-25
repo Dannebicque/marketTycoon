@@ -65,6 +65,7 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Ajouter l'outil pièce rectangulaire avec murs et sol
 - [x] Ajouter l'outil mur orientable
 - [x] Ajouter les outils porte, fenêtre et vitrine par remplacement d'un mur
+- [x] Ajouter un rendu distinct pour portes, fenêtres et vitrines
 - [x] Ajouter l'outil sol rectangulaire
 - [x] Ajouter l'outil remplissage de surface intérieure
 - [x] Ajouter plusieurs styles de sols sélectionnables
@@ -74,7 +75,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Ajouter des textures ou motifs d'image aux styles de sols
 - [x] Ajouter une prévisualisation graphique du rectangle avant validation
 - [x] Afficher dimensions, validité et coût estimé dans le ghost
-- [ ] Ajouter une prévisualisation précise des segments structurels
+- [x] Ajouter une prévisualisation précise des segments structurels
+- [ ] Donner aux fenêtres et vitrines leurs propres règles de collision et visibilité
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
