@@ -1,12 +1,14 @@
 import {
   BuildSurfaceMap,
   ConstructionOrderQueue,
+  ConstructionScheduler,
+  WallMap,
   constructionMaterialCatalog,
   floodFillCells,
   getRectanglePerimeterUnits,
   rectangleCells,
 } from '@market-tycoon/construction'
-import type { ConstructionOrder, ConstructionRect } from '@market-tycoon/construction'
+import type { ConstructionOrder, ConstructionRect, WallOrientation, WallSegment } from '@market-tycoon/construction'
 import { type BuildCommand, type BuildToolController } from '@market-tycoon/build-mode'
 import { getBuildingDefinition } from '@market-tycoon/catalog'
 import type { Direction } from '@market-tycoon/simulation-engine'
@@ -19,10 +21,18 @@ interface SurfaceScene extends StoreScene {
   buildTools?: BuildToolController
   buildMutations?: BuildMutationApi
   buildSurfaces?: BuildSurfaceMap
+  buildWalls?: WallMap
   buildSurfaceLayer?: Phaser.GameObjects.Graphics
 }
 
+const directionByOrientation: Record<WallOrientation, Direction> = {
+  north: 0,
+  east: 1,
+  south: 2,
+  west: 3,
+}
 const orderQueue = new ConstructionOrderQueue()
+const scheduler = new ConstructionScheduler(orderQueue)
 let installed = false
 let rectangleStart: { x: number; y: number } | undefined
 let selectedFloorStyle = localStorage.getItem('market-tycoon.floor-style') ?? 'concrete-light'
@@ -31,12 +41,17 @@ export function installSurfaceBuildTools() {
   if (installed) return
   installed = true
 
+  scheduler.subscribe(orders => {
+    window.dispatchEvent(new CustomEvent('market-tycoon:construction-orders-changed', { detail: { orders } }))
+  })
+
   const prototype = StoreScene.prototype as StoreScene & Record<string, any>
   const originalCreate = prototype.create
   prototype.create = function () {
     originalCreate.call(this)
     const scene = this as SurfaceScene
     scene.buildSurfaces = new BuildSurfaceMap()
+    scene.buildWalls = new WallMap()
     scene.buildSurfaceLayer = scene.add.graphics().setDepth(10)
     drawSurfaces(scene)
     scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => handleSurfacePointer(scene, pointer))
@@ -122,7 +137,7 @@ function applyFloorCommand(scene: SurfaceScene, cells: Array<{ x: number; y: num
   surfaces.paint(cells, material.key)
   drawSurfaces(scene)
   const after = surfaces.snapshot()
-  const order = completeOrder({
+  const order = scheduleOrder({
     kind: 'floor',
     label: `${label} · ${material.name}`,
     cost,
@@ -133,32 +148,31 @@ function applyFloorCommand(scene: SurfaceScene, cells: Array<{ x: number; y: num
   const undo = () => {
     surfaces.restore(before)
     scene.simulation.refund(cost)
-    orderQueue.cancel(order.id)
+    scheduler.cancel(order.id)
     drawSurfaces(scene)
-    emitOrders()
     return true
   }
   const execute = () => {
     if (!scene.simulation.canSpend(cost) || !scene.simulation.spend(cost)) return false
     surfaces.restore(after)
-    orderQueue.restore(order.id)
+    scheduler.restoreCompleted(order.id)
     drawSurfaces(scene)
-    emitOrders()
     return true
   }
   const command: BuildCommand = { label: order.label, execute, undo }
   history.record(command)
-  scene.setStatus(`${cells.length} case(s) · ${material.name} · ${cost.toLocaleString('fr-FR')} €.`, '#86efac')
+  scene.setStatus(`${cells.length} case(s) · ${material.name} · chantier lancé (${cost.toLocaleString('fr-FR')} €).`, '#86efac')
 }
 
 function applyRoomCommand(scene: SurfaceScene, start: { x: number; y: number }, end: { x: number; y: number }, cells: Array<{ x: number; y: number }>) {
   const surfaces = scene.buildSurfaces
+  const walls = scene.buildWalls
   const mutations = scene.buildMutations
-  const wall = getBuildingDefinition('wall')
+  const wallDefinition = getBuildingDefinition('wall')
   const world = requireWorldMapRuntime()
   const floorMaterial = constructionMaterialCatalog.get(selectedFloorStyle)
   const wallMaterial = constructionMaterialCatalog.get('wall-standard')
-  if (!surfaces || !mutations || !wall || floorMaterial?.kind !== 'floor' || wallMaterial?.kind !== 'wall') return
+  if (!surfaces || !walls || !mutations || !wallDefinition || floorMaterial?.kind !== 'floor' || wallMaterial?.kind !== 'wall') return
   const minX = Math.min(start.x, end.x), maxX = Math.max(start.x, end.x)
   const minY = Math.min(start.y, end.y), maxY = Math.max(start.y, end.y)
   if (minX === maxX || minY === maxY) {
@@ -185,59 +199,73 @@ function applyRoomCommand(scene: SurfaceScene, start: { x: number; y: number }, 
   }
 
   const beforeFloor = surfaces.snapshot()
-  const placedWalls: Array<{ x: number; y: number; direction: Direction }> = []
-  const perimeter: Array<{ x: number; y: number; direction: Direction }> = []
-  for (let x = minX; x <= maxX; x++) perimeter.push({ x, y: minY, direction: 0 }, { x, y: maxY, direction: 2 })
-  for (let y = minY; y <= maxY; y++) perimeter.push({ x: minX, y, direction: 3 }, { x: maxX, y, direction: 1 })
-  for (const edge of perimeter) if (mutations.placeRaw(wall, edge.x, edge.y, edge.direction)) placedWalls.push(edge)
-
+  const beforeWalls = walls.snapshot()
+  const domainWalls = walls.addRectangle(constructionRect, wallMaterial.key)
+  const placedWalls = projectWallsToGrid(mutations, wallDefinition, domainWalls)
   surfaces.paint(cells, floorMaterial.key)
   mutations.refresh()
   drawSurfaces(scene)
   window.dispatchEvent(new Event('market-tycoon:building-runtime-changed'))
   const afterFloor = surfaces.snapshot()
-  const order = completeOrder({
+  const afterWalls = walls.snapshot()
+  const order = scheduleOrder({
     kind: 'room',
     label: `Créer une pièce ${area.width} × ${area.height} · ${floorMaterial.name}`,
     cost,
     durationMs: 1_200,
-    payload: { area, floorMaterialKey: floorMaterial.key, wallMaterialKey: wallMaterial.key },
+    payload: {
+      area,
+      floorMaterialKey: floorMaterial.key,
+      wallMaterialKey: wallMaterial.key,
+      wallSegmentIds: domainWalls.map(segment => segment.id),
+    },
   })
 
   const removeRoom = () => {
-    for (const edge of placedWalls) mutations.removeRaw(edge.x, edge.y, edge.direction)
+    for (const segment of placedWalls) mutations.removeRaw(segment.x, segment.y, segment.direction)
     world.removePlayerInteriorArea(area)
     surfaces.restore(beforeFloor)
+    walls.restore(beforeWalls)
     scene.simulation.refund(cost)
-    orderQueue.cancel(order.id)
-    mutations.refresh(); drawSurfaces(scene); emitOrders()
+    scheduler.cancel(order.id)
+    mutations.refresh(); drawSurfaces(scene)
     window.dispatchEvent(new Event('market-tycoon:building-runtime-changed'))
     return true
   }
   const restoreRoom = () => {
     if (!scene.simulation.canSpend(cost) || !world.addPlayerInteriorArea(area)) return false
     if (!scene.simulation.spend(cost)) { world.removePlayerInteriorArea(area); return false }
-    for (const edge of placedWalls) mutations.placeRaw(wall, edge.x, edge.y, edge.direction)
+    walls.restore(afterWalls)
+    projectWallsToGrid(mutations, wallDefinition, domainWalls)
     surfaces.restore(afterFloor)
-    orderQueue.restore(order.id)
-    mutations.refresh(); drawSurfaces(scene); emitOrders()
+    scheduler.restoreCompleted(order.id)
+    mutations.refresh(); drawSurfaces(scene)
     window.dispatchEvent(new Event('market-tycoon:building-runtime-changed'))
     return true
   }
   mutations.history.record({ label: order.label, execute: restoreRoom, undo: removeRoom })
-  scene.setStatus(`Pièce créée · ${placedWalls.length} murs · ${cost.toLocaleString('fr-FR')} €.`, '#86efac')
+  scene.setStatus(`Pièce planifiée · ${domainWalls.length} segments · ${cost.toLocaleString('fr-FR')} €.`, '#86efac')
 }
 
-function completeOrder(input: Omit<ConstructionOrder, 'id' | 'createdAt' | 'status'>) {
+function projectWallsToGrid(
+  mutations: BuildMutationApi,
+  wallDefinition: NonNullable<ReturnType<typeof getBuildingDefinition>>,
+  segments: WallSegment[],
+) {
+  const placed: Array<{ x: number; y: number; direction: Direction }> = []
+  for (const segment of segments) {
+    const direction = directionByOrientation[segment.orientation]
+    if (mutations.placeRaw(wallDefinition, segment.x, segment.y, direction)) {
+      placed.push({ x: segment.x, y: segment.y, direction })
+    }
+  }
+  return placed
+}
+
+function scheduleOrder(input: Omit<ConstructionOrder, 'id' | 'createdAt' | 'status'>) {
   const order = orderQueue.create(input)
-  orderQueue.start(order.id)
-  orderQueue.complete(order.id)
-  emitOrders()
+  scheduler.schedule(order.id)
   return order
-}
-
-function emitOrders() {
-  window.dispatchEvent(new CustomEvent('market-tycoon:construction-orders-changed', { detail: { orders: orderQueue.list() } }))
 }
 
 function drawSurfaces(scene: SurfaceScene) {
