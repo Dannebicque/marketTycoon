@@ -1,6 +1,8 @@
+export { BuildSurfaceMap, floodFillCells, rectangleCells } from './BuildSurfaceMap'
 export { ConstructionOrderQueue } from './ConstructionOrder'
 export { MaterialCatalog, constructionMaterialCatalog, DEFAULT_CONSTRUCTION_MATERIALS } from './MaterialCatalog'
 export { createRectangleBounds, getRectangleCells, getRectanglePerimeterUnits } from './ConstructionPreview'
+export type { BuildSurfaceCell, BuildSurfaceSnapshot } from './BuildSurfaceMap'
 export type { ConstructionOrder, ConstructionOrderKind, ConstructionOrderStatus } from './ConstructionOrder'
 export type { ConstructionMaterialDefinition, ConstructionMaterialKind } from './MaterialCatalog'
 export type { ConstructionPoint, ConstructionPreview, ConstructionRect } from './ConstructionPreview'
