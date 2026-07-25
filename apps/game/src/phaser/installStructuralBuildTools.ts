@@ -2,6 +2,8 @@ import {
   ConstructionOrderQueue,
   ConstructionScheduler,
   constructionMaterialCatalog,
+  getWallSegmentProperties,
+  isExteriorSegment,
   type ConstructionOrder,
   type WallMap,
   type WallOrientation,
@@ -96,6 +98,8 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
   const orientation = orientationByDirection[direction]
   const previous = walls.get(cell.x, cell.y, orientation)
   const gridEdge = scene.grid.getEdges().find(edge => edge.gridX === cell.x && edge.gridY === cell.y && edge.axis === scene.grid.getEdgeAxis(direction))
+  const candidate = { x: cell.x, y: cell.y, orientation, kind: tool.kind, materialKey: material.key }
+  const properties = getWallSegmentProperties(tool.kind)
 
   if (tool.kind === 'wall' && (previous || gridEdge)) {
     scene.setStatus('Un segment existe déjà à cet emplacement.', '#f87171')
@@ -103,6 +107,10 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
   }
   if (tool.kind !== 'wall' && !previous && !gridEdge) {
     scene.setStatus(`Placez d’abord un mur avant d’ajouter une ${tool.label.toLowerCase()}.`, '#f87171')
+    return
+  }
+  if (properties.facadeOnly && !isExteriorSegment(candidate, point => world.isStoreInterior(point))) {
+    scene.setStatus(`${tool.label} uniquement disponible sur une façade extérieure.`, '#f87171')
     return
   }
 
@@ -115,7 +123,7 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
 
   const before = walls.snapshot()
   mutations.removeRaw(cell.x, cell.y, direction)
-  walls.replace({ x: cell.x, y: cell.y, orientation, kind: tool.kind, materialKey: material.key })
+  walls.replace(candidate)
   const visualDefinition = tool.kind === 'door' && doorDefinition ? doorDefinition : wallDefinition
   if (!mutations.placeRaw(visualDefinition, cell.x, cell.y, direction)) {
     walls.restore(before)
@@ -126,6 +134,7 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
   }
   const after = walls.snapshot()
   mutations.refresh()
+  emitStructuralChange()
 
   const order = orderQueue.create({
     kind: 'wall',
@@ -149,6 +158,7 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
     }
     if (refund) scene.simulation.refund(cost)
     mutations.refresh()
+    emitStructuralChange()
     return true
   }
 
@@ -166,6 +176,10 @@ function handleStructuralPointer(scene: StructuralScene & Record<string, any>, p
     },
   })
   scene.setStatus(`${tool.label} planifiée · ${cost.toLocaleString('fr-FR')} €.`, '#86efac')
+}
+
+function emitStructuralChange() {
+  window.dispatchEvent(new Event('market-tycoon:structural-runtime-changed'))
 }
 
 function emitCombinedOrders() {
