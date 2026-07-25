@@ -44,6 +44,9 @@ export const DEFAULT_CONSTRUCTION_MATERIALS: readonly ConstructionMaterialDefini
   { key: 'wood-warm', kind: 'floor', name: 'Bois chaleureux', color: 0xb45309, pricePerUnit: 20 },
   { key: 'anthracite', kind: 'floor', name: 'Anthracite', color: 0x334155, pricePerUnit: 16 },
   { key: 'wall-standard', kind: 'wall', name: 'Cloison standard', color: 0xcbd5e1, pricePerUnit: 35 },
+  { key: 'door-standard', kind: 'wall', name: 'Porte standard', color: 0x92400e, pricePerUnit: 120 },
+  { key: 'window-standard', kind: 'wall', name: 'Fenêtre standard', color: 0x7dd3fc, pricePerUnit: 160 },
+  { key: 'storefront-standard', kind: 'wall', name: 'Vitrine standard', color: 0x67e8f9, pricePerUnit: 240 },
   { key: 'facade-standard', kind: 'facade', name: 'Façade standard', color: 0xf8fafc, pricePerUnit: 90 },
 ]
 
