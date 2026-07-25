@@ -22,7 +22,8 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 
 - [x] Introduire une entité bâtiment indépendante de ses murs et équipements
 - [x] Gérer l'emprise et conserver les entrées et le style de façade dans le runtime
-- [ ] Ajouter les outils de modification des entrées, façades et enseignes
+- [x] Ajouter les premiers outils de modification des murs, portes, fenêtres et vitrines
+- [ ] Ajouter les outils de modification des façades et enseignes
 - [x] Autoriser l'extension d'un bâtiment sur une parcelle nouvellement acquise
 - [x] Autoriser la construction partielle d'une pièce sur un terrain possédé et constructible
 - [x] Conserver l'identité du bâtiment lors des transformations
@@ -41,14 +42,11 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [x] Déplacer définitivement les surfaces de sol dans `construction`
 - [x] Enregistrer pièces et revêtements dans la file d'ordres
 - [x] Rendre les ordres compatibles avec annulation et rétablissement
-- [x] Introduire un modèle métier de segments de murs indépendant de Phaser
-- [x] Préparer les variantes mur, porte, vitrine et fenêtre
-- [x] Projeter les murs métier dans la grille Phaser via un adaptateur
-- [x] Faire progresser les ordres de planifié à chantier puis terminé
-- [x] Afficher une file de chantiers et leur progression dans l'interface
-- [ ] Ajouter les outils dédiés porte, vitrine et fenêtre
-- [ ] Retarder réellement l'apparition des éléments jusqu'à la fin du chantier
-- [ ] Raccorder les ordres à des ouvriers et à leur disponibilité
+- [x] Introduire un modèle métier de segments pour murs, portes, vitrines et fenêtres
+- [x] Permettre le remplacement d'un segment sans perdre son identité
+- [x] Raccorder les ordres à une durée minimale de chantier
+- [ ] Affecter des ouvriers aux ordres de construction
+- [ ] Différer réellement l'apparition des constructions jusqu'à la fin du chantier
 
 ## 4. Build Mode orienté outils
 
@@ -65,15 +63,18 @@ Cette roadmap complète `ROADMAP.md` avec un axe prioritaire centré sur la joua
 - [ ] Intégrer la difficulté de construction dans les paramètres globaux de partie
 - [x] Ajouter le domaine indépendant des surfaces de sol
 - [x] Ajouter l'outil pièce rectangulaire avec murs et sol
+- [x] Ajouter l'outil mur orientable
+- [x] Ajouter les outils porte, fenêtre et vitrine par remplacement d'un mur
 - [x] Ajouter l'outil sol rectangulaire
 - [x] Ajouter l'outil remplissage de surface intérieure
 - [x] Ajouter plusieurs styles de sols sélectionnables
-- [x] Appliquer les coûts de revêtement et de murs à la trésorerie
+- [x] Appliquer les coûts de revêtement, murs et ouvertures à la trésorerie
 - [x] Refuser une construction lorsque le budget est insuffisant
 - [x] Rembourser les coûts lors d'une annulation et les débiter lors d'un rétablissement
 - [ ] Ajouter des textures ou motifs d'image aux styles de sols
 - [x] Ajouter une prévisualisation graphique du rectangle avant validation
 - [x] Afficher dimensions, validité et coût estimé dans le ghost
+- [ ] Ajouter une prévisualisation précise des segments structurels
 - [ ] Ajouter multi-sélection et déplacement d'un groupe
 - [ ] Ajouter copier/coller
 - [x] Ajouter l'historique annuler/refaire pour les poses, suppressions et déplacements
