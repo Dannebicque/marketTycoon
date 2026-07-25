@@ -28,12 +28,23 @@ export class WallMap {
     return segment
   }
 
+  replace(input: Omit<WallSegment, 'id'>) {
+    const key = segmentKey(input.x, input.y, input.orientation)
+    const previous = this.segments.get(key)
+    const segment: WallSegment = previous
+      ? { ...input, id: previous.id }
+      : { ...input, id: `wall-${this.nextId++}` }
+    this.segments.set(key, segment)
+    return { previous: previous ? { ...previous } : undefined, segment: { ...segment } }
+  }
+
   remove(x: number, y: number, orientation: WallOrientation) {
     return this.segments.delete(segmentKey(x, y, orientation))
   }
 
   get(x: number, y: number, orientation: WallOrientation) {
-    return this.segments.get(segmentKey(x, y, orientation))
+    const segment = this.segments.get(segmentKey(x, y, orientation))
+    return segment ? { ...segment } : undefined
   }
 
   entries() {
