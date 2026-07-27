@@ -2,11 +2,26 @@
   <div class="management-content pricing-panel">
     <header class="pricing-header">
       <div><span class="eyebrow">Tarification</span><h2>Prix de vente et marges</h2></div>
-      <div class="pricing-summary">
-        <span>Marge moyenne</span>
-        <strong :class="averageMargin >= 0 ? 'positive-text' : 'negative-text'">{{ percent(averageMargin) }}</strong>
+      <div class="pricing-summaries">
+        <div class="pricing-summary">
+          <span>Marge moyenne</span>
+          <strong :class="averageMargin >= 0 ? 'positive-text' : 'negative-text'">{{ percent(averageMargin) }}</strong>
+        </div>
+        <div class="pricing-summary price-index-summary">
+          <span>Indice prix magasin</span>
+          <strong :class="priceIndexClass">{{ storePriceIndex.toFixed(1) }}</strong>
+          <small>{{ priceIndexLabel }}</small>
+        </div>
       </div>
     </header>
+
+    <section class="price-index-explanation">
+      <strong>{{ storePriceIndex.toFixed(1) }}</strong>
+      <div>
+        <span>Base marché : 100</span>
+        <p>{{ priceIndexExplanation }}</p>
+      </div>
+    </section>
 
     <section class="bulk-pricing">
       <div>
@@ -22,13 +37,15 @@
 
     <div class="pricing-table-wrap">
       <table class="pricing-table">
-        <thead><tr><th>Produit</th><th>Achat</th><th>Prix conseillé</th><th>Prix magasin</th><th>Marge/unité</th><th>Taux de marge</th><th>Taux de marque</th><th>État</th></tr></thead>
+        <thead><tr><th>Produit</th><th>Achat</th><th>Marché</th><th>Prix conseillé</th><th>Prix magasin</th><th>Indice prix</th><th>Marge/unité</th><th>Taux de marge</th><th>Taux de marque</th><th>État</th></tr></thead>
         <tbody>
           <tr v-for="line in lines" :key="line.productKey" :class="{ loss: line.isLossLeader }">
             <td><strong>{{ line.name }}</strong><small>{{ line.category }}</small></td>
             <td>{{ money(line.purchasePrice) }}</td>
+            <td>{{ money(line.marketPrice) }}</td>
             <td>{{ money(line.recommendedPrice) }}</td>
             <td><input :value="line.salePrice" type="number" min="0.01" step="0.01" @change="changePrice(line.productKey, $event)" /></td>
+            <td><span class="price-position" :class="line.pricePosition">{{ line.priceIndex.toFixed(1) }}</span></td>
             <td :class="line.unitMargin >= 0 ? 'positive-text' : 'negative-text'">{{ money(line.unitMargin) }}</td>
             <td>{{ percent(line.markupRate) }}</td>
             <td>{{ percent(line.marginRate) }}</td>
@@ -48,8 +65,11 @@ interface PricingLine {
   name: string
   category: string
   purchasePrice: number
+  marketPrice: number
   recommendedPrice: number
   salePrice: number
+  priceIndex: number
+  pricePosition: 'cheaper' | 'aligned' | 'more-expensive'
   unitMargin: number
   markupRate: number
   marginRate: number
@@ -60,11 +80,29 @@ const props = defineProps<{ lines: PricingLine[] }>()
 const emit = defineEmits<{ 'update-price': [productKey: string, salePrice: number]; 'apply-markup': [markupRate: number] }>()
 const bulkMarkup = ref(35)
 const averageMargin = computed(() => props.lines.length ? props.lines.reduce((sum, line) => sum + line.markupRate, 0) / props.lines.length : 0)
+const storePriceIndex = computed(() => {
+  const marketTotal = props.lines.reduce((sum, line) => sum + line.marketPrice, 0)
+  const storeTotal = props.lines.reduce((sum, line) => sum + line.salePrice, 0)
+  return marketTotal > 0 ? storeTotal / marketTotal * 100 : 100
+})
+const priceIndexClass = computed(() => storePriceIndex.value < 97 ? 'positive-text' : storePriceIndex.value > 103 ? 'negative-text' : '')
+const priceIndexLabel = computed(() => storePriceIndex.value < 97 ? 'moins cher que le marché' : storePriceIndex.value > 103 ? 'plus cher que le marché' : 'aligné sur le marché')
+const priceIndexExplanation = computed(() => {
+  const gap = Math.abs(storePriceIndex.value - 100).toFixed(1)
+  if (storePriceIndex.value < 97) return `Le panier de référence est ${gap} % moins cher que le marché. La compétitivité augmente, mais la marge unitaire diminue.`
+  if (storePriceIndex.value > 103) return `Le panier de référence est ${gap} % plus cher que le marché. La marge augmente, mais les clients sensibles au prix peuvent réduire ou abandonner leurs achats.`
+  return 'Les prix du magasin sont globalement alignés sur le marché. Les écarts par produit restent visibles dans le tableau.'
+})
 
 function changePrice(productKey: string, event: Event) {
   emit('update-price', productKey, Number((event.target as HTMLInputElement).value))
+  dispatchPricingChanged()
 }
-function applyBulk() { emit('apply-markup', Number(bulkMarkup.value) / 100) }
+function applyBulk() {
+  emit('apply-markup', Number(bulkMarkup.value) / 100)
+  dispatchPricingChanged()
+}
+function dispatchPricingChanged() { window.dispatchEvent(new CustomEvent('market-tycoon:pricing-changed')) }
 function money(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value || 0) }
 function percent(value: number) { return new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 }).format(value || 0) }
 </script>
@@ -72,15 +110,22 @@ function percent(value: number) { return new Intl.NumberFormat('fr-FR', { style:
 <style scoped>
 .pricing-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
 .pricing-header h2 { margin:4px 0 0; font-size:22px; }
+.pricing-summaries { display:flex; gap:10px; }
 .pricing-summary { min-width:150px; padding:12px; border:1px solid #1e293b; border-radius:10px; background:#0f172a; text-align:right; }
-.pricing-summary span { display:block; color:#94a3b8; font-size:10px; }
+.pricing-summary span,.pricing-summary small { display:block; color:#94a3b8; font-size:10px; }
 .pricing-summary strong { display:block; margin-top:4px; font-size:20px; }
+.pricing-summary small { margin-top:3px; }
+.price-index-summary { min-width:190px; }
+.price-index-explanation { display:flex; align-items:center; gap:14px; margin-top:18px; padding:14px; border:1px solid #1e293b; border-radius:12px; background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.92)); }
+.price-index-explanation>strong { min-width:72px; font-size:30px; text-align:center; }
+.price-index-explanation span { color:#cbd5e1; font-size:11px; font-weight:700; }
+.price-index-explanation p { margin:4px 0 0; color:#94a3b8; font-size:10px; line-height:1.5; }
 .bulk-pricing { margin:18px 0; padding:14px; border:1px solid #1e293b; border-radius:12px; background:#0f172a; }
 .bulk-controls { display:flex; align-items:center; gap:8px; }
 .bulk-controls input { width:90px; padding:8px; border:1px solid #334155; border-radius:8px; background:#020617; color:#e2e8f0; }
 .bulk-pricing p { margin:8px 0 0; color:#94a3b8; font-size:11px; }
 .pricing-table-wrap { overflow:auto; border:1px solid #1e293b; border-radius:12px; }
-.pricing-table { width:100%; border-collapse:collapse; min-width:980px; background:#0f172a; }
+.pricing-table { width:100%; border-collapse:collapse; min-width:1240px; background:#0f172a; }
 .pricing-table th,.pricing-table td { padding:10px; border-bottom:1px solid #1e293b; text-align:right; font-size:11px; }
 .pricing-table th:first-child,.pricing-table td:first-child { text-align:left; }
 .pricing-table th { position:sticky; top:0; background:#111827; color:#94a3b8; }
@@ -88,8 +133,13 @@ function percent(value: number) { return new Intl.NumberFormat('fr-FR', { style:
 .pricing-table td small { margin-top:3px; color:#64748b; }
 .pricing-table input { width:92px; padding:7px; border:1px solid #334155; border-radius:7px; background:#020617; color:#f8fafc; text-align:right; }
 .pricing-table tr.loss { background:rgba(127,29,29,.12); }
+.price-position { display:inline-flex; min-width:52px; justify-content:center; padding:4px 7px; border-radius:999px; font-size:9px; font-weight:700; }
+.price-position.cheaper { background:rgba(22,101,52,.3); color:#bbf7d0; }
+.price-position.aligned { background:rgba(30,64,175,.3); color:#bfdbfe; }
+.price-position.more-expensive { background:rgba(146,64,14,.3); color:#fde68a; }
 .pricing-status { display:inline-flex; padding:4px 7px; border-radius:999px; font-size:9px; font-weight:700; }
 .pricing-status.success { background:rgba(22,101,52,.3); color:#bbf7d0; }
 .pricing-status.warning { background:rgba(146,64,14,.3); color:#fde68a; }
 .pricing-status.danger { background:rgba(127,29,29,.35); color:#fecaca; }
+@media(max-width:800px){.pricing-header{flex-direction:column}.pricing-summaries{width:100%;flex-wrap:wrap}.pricing-summary{flex:1}.price-index-explanation{align-items:flex-start}}
 </style>

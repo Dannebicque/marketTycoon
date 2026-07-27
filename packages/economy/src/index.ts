@@ -1,5 +1,10 @@
 export { StorePricingManager } from './StorePricingManager'
-export type { ProductPricingSummary, StoreProductPricing } from './StorePricingManager'
+export type {
+  PricePosition,
+  ProductPricingSummary,
+  StorePricingSnapshot,
+  StoreProductPricing,
+} from './StorePricingManager'
 export { MarketDemandManager } from './MarketDemandManager'
 export type {
   CustomerPriceContext,
@@ -14,6 +19,7 @@ export type {
   InfluenceContext,
   InfluenceFactor,
   InfluenceSource,
+  PricingInfluence,
   TrafficForecast,
 } from './InfluenceEngine'
 export { StoreReputationManager, storeReputationManager } from './StoreReputationManager'

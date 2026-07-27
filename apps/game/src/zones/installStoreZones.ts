@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { validateZones } from '@market-tycoon/store-zones'
 import { StoreScene } from '../phaser/StoreScene'
+import { requireWorldMapRuntime } from '../world/worldMapRuntime'
 import { storeZoneManager, zoneRuntime } from './zoneRuntime'
 
 let installed = false
@@ -174,6 +175,13 @@ function paintAtPointer(scene: StoreScene & Record<string, any>, pointer: Phaser
   const world = pointer.positionToCamera(scene.cameras.main) as Phaser.Math.Vector2
   const cell = scene.grid.screenToGrid(world.x, world.y)
   if (!scene.grid.isInside(cell.x, cell.y)) return
+
+  const worldMap = requireWorldMapRuntime()
+  if (!worldMap.isStoreInterior(cell)) {
+    scene.setStatus('Les zones commerciales ne peuvent être dessinées qu’à l’intérieur du magasin.', '#f87171')
+    return
+  }
+
   if (zoneRuntime.eraseMode || pointer.rightButtonDown()) storeZoneManager.erase(cell.x, cell.y)
   else if (zoneRuntime.activeZoneKey) storeZoneManager.paint(cell.x, cell.y, zoneRuntime.activeZoneKey)
   zoneRuntime.notifyChanged()

@@ -1,12 +1,9 @@
 {
-  "name": "@market-tycoon/store-zones",
+  "name": "@market-tycoon/construction",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@market-tycoon/catalog": "0.3.0"
   }
 }

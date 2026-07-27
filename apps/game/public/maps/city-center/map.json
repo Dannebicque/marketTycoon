@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "city-center",
+  "name": "Centre-ville",
+  "description": "Un magasin compact en centre-ville avec peu d'espace latéral et des extensions immobilières coûteuses.",
+  "size": { "columns": 36, "rows": 32 },
+  "tile": { "width": 64, "height": 32 },
+  "theme": "city-center",
+  "parcels": [
+    { "id": "starter-store", "name": "Commerce initial", "bounds": { "x": 11, "y": 8, "width": 14, "height": 16 }, "access": "owned", "usage": "store", "buildable": true },
+    { "id": "rear-courtyard", "name": "Cour arrière", "bounds": { "x": 11, "y": 3, "width": 14, "height": 4 }, "access": "owned", "usage": "service", "buildable": true },
+    { "id": "west-building", "name": "Immeuble voisin ouest", "bounds": { "x": 4, "y": 8, "width": 6, "height": 16 }, "access": "for-sale", "usage": "commercial", "price": 120000, "buildable": true },
+    { "id": "east-building", "name": "Immeuble voisin est", "bounds": { "x": 26, "y": 8, "width": 6, "height": 16 }, "access": "locked", "usage": "commercial", "unlockCondition": "reputation-3", "buildable": true },
+    { "id": "north-block", "name": "Îlot urbain", "bounds": { "x": 4, "y": 0, "width": 28, "height": 3 }, "access": "unavailable", "usage": "commercial", "buildable": false },
+    { "id": "pedestrian-street", "name": "Rue piétonne", "bounds": { "x": 0, "y": 25, "width": 36, "height": 4 }, "access": "public", "usage": "infrastructure", "buildable": false },
+    { "id": "main-road", "name": "Boulevard", "bounds": { "x": 0, "y": 29, "width": 36, "height": 3 }, "access": "public", "usage": "infrastructure", "buildable": false }
+  ],
+  "buildings": [
+    { "id": "player-store", "name": "Épicerie MarketTycoon", "kind": "store", "bounds": { "x": 13, "y": 10, "width": 10, "height": 12 }, "owner": "player", "dynamic": true, "facadeStyle": "urban-classic", "entrances": [{ "x": 18, "y": 22 }] },
+    { "id": "west-neighbour", "name": "Bâtiment ouest", "kind": "mixed-use", "bounds": { "x": 5, "y": 9, "width": 4, "height": 14 }, "owner": "neutral", "dynamic": true, "facadeStyle": "urban-brick" },
+    { "id": "east-neighbour", "name": "Bâtiment est", "kind": "mixed-use", "bounds": { "x": 27, "y": 9, "width": 4, "height": 14 }, "owner": "neutral", "dynamic": true, "facadeStyle": "urban-stone" }
+  ],
+  "roads": [
+    { "id": "boulevard", "kind": "road", "width": 3, "points": [{ "x": 0, "y": 30 }, { "x": 35, "y": 30 }] },
+    { "id": "pedestrian-axis", "kind": "pedestrian", "width": 4, "points": [{ "x": 0, "y": 26 }, { "x": 35, "y": 26 }] },
+    { "id": "service-alley", "kind": "service-road", "width": 1, "points": [{ "x": 11, "y": 5 }, { "x": 25, "y": 5 }] }
+  ],
+  "spawnPoints": [
+    { "id": "customers-west", "kind": "customer", "x": 3, "y": 26, "direction": 1 },
+    { "id": "customers-east", "kind": "customer", "x": 33, "y": 26, "direction": 3 },
+    { "id": "delivery-courtyard", "kind": "delivery", "x": 18, "y": 4, "direction": 2 },
+    { "id": "employees-store", "kind": "employee", "x": 14, "y": 20, "direction": 0 }
+  ],
+  "initialStore": {
+    "parcelId": "starter-store",
+    "buildingId": "player-store",
+    "equipment": [
+      { "id": "starter-shelf-1", "definitionKey": "standard-shelf", "x": 15, "y": 14, "direction": 0 },
+      { "id": "starter-shelf-2", "definitionKey": "standard-shelf", "x": 18, "y": 14, "direction": 0 }
+    ],
+    "edges": []
+  }
+}

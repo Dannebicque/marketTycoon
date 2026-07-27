@@ -1,37 +1,71 @@
 import { createApp } from 'vue'
 import { SAVE_GAME_STORAGE_KEY } from '@market-tycoon/save'
 import App from './App.vue'
+import BuildActionToolbar from './components/build/BuildActionToolbar.vue'
+import BuildingEnvelopeWidget from './components/build/BuildingEnvelopeWidget.vue'
+import ConstructionQueueWidget from './components/build/ConstructionQueueWidget.vue'
 import HelpWidget from './components/help/HelpWidget.vue'
 import ProgressionWidget from './components/progression/ProgressionWidget.vue'
 import PromotionReactionOverlay from './components/promotions/PromotionReactionOverlay.vue'
 import StoreIdentityWidget from './components/store/StoreIdentityWidget.vue'
+import ParcelInfoWidget from './components/world/ParcelInfoWidget.vue'
+import CommercialZoneWidget from './components/zones/CommercialZoneWidget.vue'
 import ZoneToolbarWidget from './components/zones/ZoneToolbarWidget.vue'
 import { ADVERTISING_STORAGE_KEY, installBusinessFinance, LOANS_STORAGE_KEY } from './finance/installBusinessFinance'
 import { i18n } from './i18n'
 import { createProgressionManager } from './progression'
+import { installBuildingEnvelopeAnalysis } from './phaser/installBuildingEnvelopeAnalysis'
+import { installBuildingIdentityOverlay } from './phaser/installBuildingIdentityOverlay'
+import { installBuildInteractionTools } from './phaser/installBuildInteractionTools'
+import { installBuildModeHistory } from './phaser/installBuildModeHistory'
+import { installBuildToolController } from './phaser/installBuildToolController'
+import { installConstructionPreview } from './phaser/installConstructionPreview'
+import { installOwnedLandOverlay } from './phaser/installOwnedLandOverlay'
+import { installStructuralBuildTools } from './phaser/installStructuralBuildTools'
+import { installStructuralRendering } from './phaser/installStructuralRendering'
+import { installSurfaceBuildTools } from './phaser/installSurfaceBuildTools'
 import { installViewDisplay } from './phaser/installViewDisplay'
+import { installWorldMapPhaserAdapter } from './phaser/installWorldMapAdapter'
 import { installPromotions, PROMOTIONS_STORAGE_KEY, PROMOTION_ANALYTICS_STORAGE_KEY } from './promotions/installPromotions'
 import { COMPETITION_STORAGE_KEY, installCompetition } from './simulation/installCompetition'
 import { CUSTOMER_MEMORY_STORAGE_KEY, installCustomerMemory } from './simulation/installCustomerMemory'
 import { installInfluence, STORE_REPUTATION_STORAGE_KEY } from './simulation/installInfluence'
 import { installMarketEvents, MARKET_EVENTS_STORAGE_KEY } from './simulation/installMarketEvents'
+import { installPricingInfluence } from './simulation/installPricingInfluence'
 import { installSimulationContext } from './simulation/SimulationContext'
 import { installStoreNeeds } from './simulation/installStoreNeeds'
+import { loadWorldMap } from './world/worldMapRuntime'
+import { COMMERCIAL_ZONE_STORAGE_KEY } from './zones/commercialZoneRuntime'
+import { installCommercialZones } from './zones/installCommercialZones'
 import { installStoreZones } from './zones/installStoreZones'
 import './style.css'
+import './build-layout.css'
 import './progression.css'
 import './store-identity.css'
 import './zones.css'
 import './help.css'
 import './simulation-context.css'
 
-const DEV_SCENARIO_VERSION = '9'
+const DEV_SCENARIO_VERSION = '22'
 const DEV_SCENARIO_VERSION_KEY = 'market-tycoon.dev-scenario-version'
 
 async function bootstrap() {
   migrateDevelopmentScenario()
+  await loadWorldMap('retail-park')
+  installWorldMapPhaserAdapter()
+  installBuildModeHistory()
+  installBuildToolController()
+  installBuildInteractionTools()
+  installSurfaceBuildTools()
+  installStructuralBuildTools()
+  installStructuralRendering()
+  installBuildingEnvelopeAnalysis()
+  installConstructionPreview()
+  installOwnedLandOverlay()
+  installBuildingIdentityOverlay()
   installViewDisplay()
   installStoreZones()
+  installCommercialZones()
   installStoreNeeds()
   installPromotions()
   installBusinessFinance()
@@ -39,6 +73,7 @@ async function bootstrap() {
   installCompetition()
   installMarketEvents()
   installInfluence()
+  installPricingInfluence()
   installCustomerMemory()
   const progression = await createProgressionManager()
 
@@ -52,10 +87,35 @@ async function bootstrap() {
   document.body.appendChild(storeIdentityRoot)
   createApp(StoreIdentityWidget).mount(storeIdentityRoot)
 
+  const buildActionRoot = document.createElement('div')
+  buildActionRoot.id = 'build-action-ui'
+  document.body.appendChild(buildActionRoot)
+  createApp(BuildActionToolbar).mount(buildActionRoot)
+
+  const constructionQueueRoot = document.createElement('div')
+  constructionQueueRoot.id = 'construction-queue-ui'
+  document.body.appendChild(constructionQueueRoot)
+  createApp(ConstructionQueueWidget).mount(constructionQueueRoot)
+
+  const buildingEnvelopeRoot = document.createElement('div')
+  buildingEnvelopeRoot.id = 'building-envelope-ui'
+  document.body.appendChild(buildingEnvelopeRoot)
+  createApp(BuildingEnvelopeWidget).mount(buildingEnvelopeRoot)
+
+  const parcelRoot = document.createElement('div')
+  parcelRoot.id = 'parcel-info-ui'
+  document.body.appendChild(parcelRoot)
+  createApp(ParcelInfoWidget).mount(parcelRoot)
+
   const zoneRoot = document.createElement('div')
   zoneRoot.id = 'zone-ui'
   document.body.appendChild(zoneRoot)
   createApp(ZoneToolbarWidget, { progression }).mount(zoneRoot)
+
+  const commercialZoneRoot = document.createElement('div')
+  commercialZoneRoot.id = 'commercial-zone-ui'
+  document.body.appendChild(commercialZoneRoot)
+  createApp(CommercialZoneWidget).mount(commercialZoneRoot)
 
   const progressionRoot = document.createElement('div')
   progressionRoot.id = 'progression-ui'
@@ -79,6 +139,7 @@ function migrateDevelopmentScenario() {
 
   localStorage.removeItem(SAVE_GAME_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.zones.v1')
+  localStorage.removeItem(COMMERCIAL_ZONE_STORAGE_KEY)
   localStorage.removeItem('market-tycoon.analytics.v1')
   localStorage.removeItem(PROMOTIONS_STORAGE_KEY)
   localStorage.removeItem(PROMOTION_ANALYTICS_STORAGE_KEY)
